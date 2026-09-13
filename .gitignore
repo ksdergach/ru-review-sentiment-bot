@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Data (not committed, see data/README.md for sources)
+data/raw/
+data/interim/
+data/processed/
+
+# Models / checkpoints
+*.pt
+*.bin
+checkpoints/
+
+# Secrets
+.env
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
