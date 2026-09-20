@@ -1,0 +1,103 @@
+{
+  "bundle_path": "models/baseline/tfidf_logreg_baseline.joblib",
+  "bundle_sha256": "4f3d3cca2a1f7bdf98a8ba1baad783015e6375532c8df6227b62484db22185d4",
+  "label_mapping": {
+    "negative": 0,
+    "neutral": 1,
+    "positive": 2
+  },
+  "logistic_regression": {
+    "C": 2.0,
+    "class_weight_mode": "balanced_train",
+    "class_weights": {
+      "0": 1.1943487570989666,
+      "1": 7.7984802431610944,
+      "2": 0.49152282610777986
+    },
+    "max_iter": 1000,
+    "penalty": "l2",
+    "solver": "lbfgs",
+    "tol": 0.0001
+  },
+  "seed": 42,
+  "selection_rule": {
+    "final_test_used": false,
+    "primary": "validation_macro_f1_max",
+    "tie_break": "C_min"
+  },
+  "text_processing": {
+    "manual_normalization": "none",
+    "truncation": null
+  },
+  "tfidf": {
+    "analyzer": "word",
+    "lowercase": true,
+    "max_df": 0.98,
+    "max_features": 100000,
+    "min_df": 2,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "norm": "l2",
+    "smooth_idf": true,
+    "sublinear_tf": true,
+    "token_pattern": "(?u)\\b\\w\\w+\\b",
+    "use_idf": true
+  },
+  "tfidf_state_sha256": "87c3bf68185b15b23c7418fa8385f3ac114142ac02dd0753756e3b68268efbb7",
+  "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+  "validation_confusion_matrix": {
+    "column_order": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "matrix": [
+      [
+        2488,
+        196,
+        141
+      ],
+      [
+        112,
+        201,
+        123
+      ],
+      [
+        259,
+        310,
+        6566
+      ]
+    ],
+    "row_order": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "rows_are_true_classes": true
+  },
+  "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+  "winner": {
+    "C": 2.0,
+    "accuracy": 0.8902462485571374,
+    "class_weight_mode": "balanced_train",
+    "convergence_warning": false,
+    "macro_f1": 0.7224989150144149,
+    "n_iter_max": 76,
+    "negative_f1": 0.8754398311048557,
+    "negative_precision": 0.8702343476740119,
+    "negative_recall": 0.8807079646017699,
+    "negative_support": 2825,
+    "neutral_f1": 0.35170603674540685,
+    "neutral_precision": 0.2842998585572843,
+    "neutral_recall": 0.4610091743119266,
+    "neutral_support": 436,
+    "other_warnings": "",
+    "positive_f1": 0.9403508771929825,
+    "positive_precision": 0.9613469985358711,
+    "positive_recall": 0.9202522775052557,
+    "positive_support": 7135,
+    "run_name": "run_3_C_2"
+  }
+}

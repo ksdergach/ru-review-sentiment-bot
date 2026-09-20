@@ -28,3 +28,6 @@ artifacts/data_prep/
 
 # Test cache
 .pytest_cache/
+
+# T04: trained model bundles are local artifacts and must not be committed
+models/
