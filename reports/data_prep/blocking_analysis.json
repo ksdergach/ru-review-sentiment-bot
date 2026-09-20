@@ -1,0 +1,32 @@
+{
+  "blocking_keys_total": 264555,
+  "blocks_over_budget": 0,
+  "blocks_with_pairs": 8534,
+  "config_near_duplicates": {
+    "decision_file": "configs/near_duplicate_decisions.csv",
+    "enabled": true,
+    "length_ratio_min": 0.85,
+    "max_block_pairs": 2000000,
+    "max_candidates": 5000,
+    "min_chars": 40,
+    "ngram_size": 3,
+    "prefix_chars": 24,
+    "suffix_chars": 24,
+    "threshold": 0.9
+  },
+  "eligible_pairs_after_length_filter": 50486,
+  "extra_pairs_in_pipeline": 0,
+  "independent_pairs_above_threshold": 59,
+  "largest_block_size": 359,
+  "lost_pairs_above_threshold": 0,
+  "new_pairs_vs_current_candidates": 0,
+  "pipeline_candidate_pairs": 59,
+  "records_considered": 95512,
+  "source_sha256": {
+    "test": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+    "train": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+    "validation": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae"
+  },
+  "total_block_pairs": 334709,
+  "verdict": "complete"
+}

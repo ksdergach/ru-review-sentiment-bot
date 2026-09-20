@@ -1,0 +1,192 @@
+{
+  "artifacts": [
+    "reports/data_prep/excluded_ids.csv",
+    "reports/data_prep/split_ids.csv",
+    "reports/data_prep/label_conflicts.csv",
+    "reports/data_prep/undecided_candidates.csv",
+    "reports/data_prep/near_duplicate_candidates.csv",
+    "artifacts/data_prep/near_duplicate_review.csv",
+    "reports/data_prep/audit.json",
+    "reports/data_prep/audit_report.md"
+  ],
+  "config": {
+    "allowed_languages": [
+      "ru",
+      "kk",
+      "cs"
+    ],
+    "artifact_dir": "artifacts/data_prep",
+    "class_mapping": {
+      "negative": 0,
+      "neutral": 1,
+      "positive": 2
+    },
+    "expected_columns": [
+      "movie_id",
+      "review_text",
+      "review_sentiment",
+      "review_language"
+    ],
+    "files": {
+      "test": "test-00000-of-00001.parquet",
+      "train": "train-00000-of-00001.parquet",
+      "validation": "validation-00000-of-00001.parquet"
+    },
+    "input_dir": "NLP_dataset",
+    "near_duplicates": {
+      "decision_file": "configs/near_duplicate_decisions.csv",
+      "enabled": true,
+      "length_ratio_min": 0.85,
+      "max_block_pairs": 2000000,
+      "max_candidates": 5000,
+      "min_chars": 40,
+      "ngram_size": 3,
+      "prefix_chars": 24,
+      "suffix_chars": 24,
+      "threshold": 0.9
+    },
+    "output_dir": "data/processed",
+    "report_dir": "reports/data_prep",
+    "subsample": {
+      "enabled": false,
+      "seed": 42,
+      "size": 0
+    },
+    "target_language": "ru"
+  },
+  "exact_dedup": {
+    "removed_exact_train_vs_eval": 2,
+    "removed_exact_validation_vs_test": 0,
+    "removed_exact_within_train": 7,
+    "removed_exact_within_validation": 0,
+    "test_exact_duplicate_extra_rows": 0,
+    "test_exact_duplicate_groups": 0
+  },
+  "excluded_rows": 58,
+  "final_exact_text_overlap": {
+    "train__test": 0,
+    "train__validation": 0,
+    "validation__test": 0
+  },
+  "final_movie_id_overlap": {
+    "train__test": 0,
+    "train__validation": 0,
+    "validation__test": 0
+  },
+  "final_summary": {
+    "test": {
+      "negative": 2619,
+      "neutral": 411,
+      "positive": 6294,
+      "rows": 9324,
+      "unique_movie_id": 492
+    },
+    "train": {
+      "negative": 21482,
+      "neutral": 3290,
+      "positive": 52199,
+      "rows": 76971,
+      "unique_movie_id": 3941
+    },
+    "validation": {
+      "negative": 2825,
+      "neutral": 436,
+      "positive": 7135,
+      "rows": 10396,
+      "unique_movie_id": 495
+    }
+  },
+  "label_conflicts": {
+    "label_conflict_groups": 0,
+    "label_conflict_groups_cross_split": 0,
+    "label_conflict_groups_within_split": 0,
+    "label_conflict_rows": 0
+  },
+  "near_duplicates": {
+    "candidate_pairs": 59,
+    "candidates_without_decision": 0,
+    "confirmed_duplicate_pairs": 58,
+    "manual_decisions_total": 59,
+    "near_block_pairs_evaluated": 334709,
+    "near_blocks_skipped_large": 0,
+    "near_candidates_truncated": false,
+    "near_components": 54,
+    "near_components_larger_than_pair": 2,
+    "near_indirect_pairs_in_components": 0,
+    "near_largest_block_size": 359,
+    "near_pairs_within_test": 7,
+    "near_records_considered": 95512,
+    "near_removed_rows_with_label_conflict": 0,
+    "near_test_rows_preserved": 14,
+    "ngram_size": 3,
+    "rows_removed": 49,
+    "threshold": 0.9
+  },
+  "pipeline_version": "t03.2",
+  "prepared_files": {
+    "test": "data/processed/test.parquet",
+    "train": "data/processed/train.parquet",
+    "validation": "data/processed/validation.parquet"
+  },
+  "ru_summary_before_cleaning": {
+    "test": {
+      "negative": 2619,
+      "neutral": 411,
+      "positive": 6294,
+      "rows": 9324,
+      "unique_movie_id": 492
+    },
+    "train": {
+      "negative": 21492,
+      "neutral": 3291,
+      "positive": 52239,
+      "rows": 77022,
+      "unique_movie_id": 3941
+    },
+    "validation": {
+      "negative": 2825,
+      "neutral": 438,
+      "positive": 7140,
+      "rows": 10403,
+      "unique_movie_id": 495
+    }
+  },
+  "source_files": {
+    "test": {
+      "path": "NLP_dataset/test-00000-of-00001.parquet",
+      "sha256_after": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+      "sha256_before": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+      "unchanged": true
+    },
+    "train": {
+      "path": "NLP_dataset/train-00000-of-00001.parquet",
+      "sha256_after": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+      "sha256_before": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+      "unchanged": true
+    },
+    "validation": {
+      "path": "NLP_dataset/validation-00000-of-00001.parquet",
+      "sha256_after": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae",
+      "sha256_before": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae",
+      "unchanged": true
+    }
+  },
+  "source_summary": {
+    "test": {
+      "rows": 9664
+    },
+    "train": {
+      "rows": 80009
+    },
+    "validation": {
+      "rows": 10829
+    }
+  },
+  "status": "completed",
+  "subsample": {
+    "enabled": false,
+    "path": null,
+    "seed": 42,
+    "size": 0
+  }
+}

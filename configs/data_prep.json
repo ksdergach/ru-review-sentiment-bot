@@ -1,0 +1,45 @@
+{
+  "input_dir": "NLP_dataset",
+  "files": {
+    "train": "train-00000-of-00001.parquet",
+    "validation": "validation-00000-of-00001.parquet",
+    "test": "test-00000-of-00001.parquet"
+  },
+  "output_dir": "data/processed",
+  "report_dir": "reports/data_prep",
+  "artifact_dir": "artifacts/data_prep",
+  "expected_columns": [
+    "movie_id",
+    "review_text",
+    "review_sentiment",
+    "review_language"
+  ],
+  "allowed_languages": [
+    "ru",
+    "kk",
+    "cs"
+  ],
+  "target_language": "ru",
+  "class_mapping": {
+    "negative": 0,
+    "neutral": 1,
+    "positive": 2
+  },
+  "near_duplicates": {
+    "enabled": true,
+    "threshold": 0.9,
+    "ngram_size": 3,
+    "min_chars": 40,
+    "prefix_chars": 24,
+    "suffix_chars": 24,
+    "length_ratio_min": 0.85,
+    "max_block_pairs": 2000000,
+    "max_candidates": 5000,
+    "decision_file": "configs/near_duplicate_decisions.csv"
+  },
+  "subsample": {
+    "enabled": false,
+    "size": 0,
+    "seed": 42
+  }
+}

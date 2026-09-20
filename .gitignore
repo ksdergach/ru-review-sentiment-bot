@@ -22,3 +22,9 @@ checkpoints/
 .DS_Store
 .vscode/
 .idea/
+
+# T03: ручной аудит near-duplicates содержит исходные тексты отзывов
+artifacts/data_prep/
+
+# Test cache
+.pytest_cache/

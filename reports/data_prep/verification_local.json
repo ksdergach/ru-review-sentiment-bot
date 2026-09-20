@@ -1,0 +1,741 @@
+{
+  "passed": 100,
+  "failed": 0,
+  "checks": [
+    {
+      "check": "python",
+      "status": "INFO",
+      "detail": "3.13.7"
+    },
+    {
+      "check": "pyarrow",
+      "status": "INFO",
+      "detail": "24.0.0"
+    },
+    {
+      "check": "pandas",
+      "status": "INFO",
+      "detail": "2.3.2"
+    },
+    {
+      "check": "source file exists: train-00000-of-00001.parquet",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "sha256 train",
+      "status": "INFO",
+      "detail": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da"
+    },
+    {
+      "check": "source readable: train",
+      "status": "PASS",
+      "detail": "80009 rows"
+    },
+    {
+      "check": "source file exists: validation-00000-of-00001.parquet",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "sha256 validation",
+      "status": "INFO",
+      "detail": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae"
+    },
+    {
+      "check": "source readable: validation",
+      "status": "PASS",
+      "detail": "10829 rows"
+    },
+    {
+      "check": "source file exists: test-00000-of-00001.parquet",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "sha256 test",
+      "status": "INFO",
+      "detail": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f"
+    },
+    {
+      "check": "source readable: test",
+      "status": "PASS",
+      "detail": "9664 rows"
+    },
+    {
+      "check": "schema train",
+      "status": "INFO",
+      "detail": "{'movie_id': 'object', 'review_text': 'object', 'review_sentiment': 'object', 'review_language': 'object'}"
+    },
+    {
+      "check": "required columns present: train",
+      "status": "PASS",
+      "detail": "[]"
+    },
+    {
+      "check": "no nulls in required columns: train",
+      "status": "PASS",
+      "detail": "{}"
+    },
+    {
+      "check": "review_text all strings: train",
+      "status": "PASS",
+      "detail": "0 non-string"
+    },
+    {
+      "check": "no empty review_text: train",
+      "status": "PASS",
+      "detail": "0 empty"
+    },
+    {
+      "check": "no whitespace-only review_text: train",
+      "status": "PASS",
+      "detail": "0 whitespace-only"
+    },
+    {
+      "check": "languages train",
+      "status": "INFO",
+      "detail": "{'ru': 77022, 'kk': 2178, 'cs': 809}"
+    },
+    {
+      "check": "raw review_sentiment values train",
+      "status": "INFO",
+      "detail": "['NEGATIVE', 'NEUTRAL', 'POSITIVE']"
+    },
+    {
+      "check": "rows whose review_text is not NFC-normalised: train",
+      "status": "INFO",
+      "detail": "4341"
+    },
+    {
+      "check": "schema validation",
+      "status": "INFO",
+      "detail": "{'movie_id': 'object', 'review_text': 'object', 'review_sentiment': 'object', 'review_language': 'object'}"
+    },
+    {
+      "check": "required columns present: validation",
+      "status": "PASS",
+      "detail": "[]"
+    },
+    {
+      "check": "no nulls in required columns: validation",
+      "status": "PASS",
+      "detail": "{}"
+    },
+    {
+      "check": "review_text all strings: validation",
+      "status": "PASS",
+      "detail": "0 non-string"
+    },
+    {
+      "check": "no empty review_text: validation",
+      "status": "PASS",
+      "detail": "0 empty"
+    },
+    {
+      "check": "no whitespace-only review_text: validation",
+      "status": "PASS",
+      "detail": "0 whitespace-only"
+    },
+    {
+      "check": "languages validation",
+      "status": "INFO",
+      "detail": "{'ru': 10403, 'kk': 230, 'cs': 196}"
+    },
+    {
+      "check": "raw review_sentiment values validation",
+      "status": "INFO",
+      "detail": "['NEGATIVE', 'NEUTRAL', 'POSITIVE']"
+    },
+    {
+      "check": "rows whose review_text is not NFC-normalised: validation",
+      "status": "INFO",
+      "detail": "436"
+    },
+    {
+      "check": "schema test",
+      "status": "INFO",
+      "detail": "{'movie_id': 'object', 'review_text': 'object', 'review_sentiment': 'object', 'review_language': 'object'}"
+    },
+    {
+      "check": "required columns present: test",
+      "status": "PASS",
+      "detail": "[]"
+    },
+    {
+      "check": "no nulls in required columns: test",
+      "status": "PASS",
+      "detail": "{}"
+    },
+    {
+      "check": "review_text all strings: test",
+      "status": "PASS",
+      "detail": "0 non-string"
+    },
+    {
+      "check": "no empty review_text: test",
+      "status": "PASS",
+      "detail": "0 empty"
+    },
+    {
+      "check": "no whitespace-only review_text: test",
+      "status": "PASS",
+      "detail": "0 whitespace-only"
+    },
+    {
+      "check": "languages test",
+      "status": "INFO",
+      "detail": "{'ru': 9324, 'kk': 231, 'cs': 109}"
+    },
+    {
+      "check": "raw review_sentiment values test",
+      "status": "INFO",
+      "detail": "['NEGATIVE', 'NEUTRAL', 'POSITIVE']"
+    },
+    {
+      "check": "rows whose review_text is not NFC-normalised: test",
+      "status": "INFO",
+      "detail": "435"
+    },
+    {
+      "check": "ru rows train",
+      "status": "INFO",
+      "detail": "77022"
+    },
+    {
+      "check": "class distribution train",
+      "status": "INFO",
+      "detail": "{'positive': 52239, 'negative': 21492, 'neutral': 3291}"
+    },
+    {
+      "check": "unique movie_id train",
+      "status": "INFO",
+      "detail": "3941"
+    },
+    {
+      "check": "ru rows validation",
+      "status": "INFO",
+      "detail": "10403"
+    },
+    {
+      "check": "class distribution validation",
+      "status": "INFO",
+      "detail": "{'positive': 7140, 'negative': 2825, 'neutral': 438}"
+    },
+    {
+      "check": "unique movie_id validation",
+      "status": "INFO",
+      "detail": "495"
+    },
+    {
+      "check": "ru rows test",
+      "status": "INFO",
+      "detail": "9324"
+    },
+    {
+      "check": "class distribution test",
+      "status": "INFO",
+      "detail": "{'positive': 6294, 'negative': 2619, 'neutral': 411}"
+    },
+    {
+      "check": "unique movie_id test",
+      "status": "INFO",
+      "detail": "492"
+    },
+    {
+      "check": "exact duplicate groups within train",
+      "status": "INFO",
+      "detail": "7 groups / 7 extra rows"
+    },
+    {
+      "check": "exact duplicate groups within validation",
+      "status": "INFO",
+      "detail": "0 groups / 0 extra rows"
+    },
+    {
+      "check": "exact duplicate groups within test",
+      "status": "INFO",
+      "detail": "0 groups / 0 extra rows"
+    },
+    {
+      "check": "label conflict groups (same normalised text, different label)",
+      "status": "INFO",
+      "detail": "0"
+    },
+    {
+      "check": "raw movie_id overlap train/validation",
+      "status": "INFO",
+      "detail": "0"
+    },
+    {
+      "check": "raw movie_id overlap train/test",
+      "status": "INFO",
+      "detail": "0"
+    },
+    {
+      "check": "raw movie_id overlap validation/test",
+      "status": "INFO",
+      "detail": "0"
+    },
+    {
+      "check": "pipeline run #1 exit code 0",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "pipeline run #2 exit code 0",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "byte-identical across runs: split_ids.csv",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "byte-identical across runs: excluded_ids.csv",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "byte-identical across runs: audit.json",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "byte-identical across runs: audit_report.md",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "byte-identical across runs: near_duplicate_candidates.csv",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "byte-identical across runs: label_conflicts.csv",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "prepared parquet byte-identical: train",
+      "status": "INFO",
+      "detail": "True"
+    },
+    {
+      "check": "prepared parquet byte-identical: validation",
+      "status": "INFO",
+      "detail": "True"
+    },
+    {
+      "check": "prepared parquet byte-identical: test",
+      "status": "INFO",
+      "detail": "True"
+    },
+    {
+      "check": "audit status is completed",
+      "status": "PASS",
+      "detail": "completed"
+    },
+    {
+      "check": "source unchanged: train",
+      "status": "PASS",
+      "detail": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da"
+    },
+    {
+      "check": "audit reports source unchanged: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "audit sha256 matches measured: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "source unchanged: validation",
+      "status": "PASS",
+      "detail": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae"
+    },
+    {
+      "check": "audit reports source unchanged: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "audit sha256 matches measured: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "source unchanged: test",
+      "status": "PASS",
+      "detail": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f"
+    },
+    {
+      "check": "audit reports source unchanged: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "audit sha256 matches measured: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "prepared file exists: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "prepared readable: train",
+      "status": "PASS",
+      "detail": "76971 rows"
+    },
+    {
+      "check": "prepared file exists: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "prepared readable: validation",
+      "status": "PASS",
+      "detail": "10396 rows"
+    },
+    {
+      "check": "prepared file exists: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "prepared readable: test",
+      "status": "PASS",
+      "detail": "9324 rows"
+    },
+    {
+      "check": "no internal columns: train",
+      "status": "PASS",
+      "detail": "[]"
+    },
+    {
+      "check": "prepared columns train",
+      "status": "INFO",
+      "detail": "['movie_id', 'review_text', 'review_sentiment', 'review_language', 'source_file', 'source_row', 'record_id', 'label_name', 'label_id']"
+    },
+    {
+      "check": "rows match audit: train",
+      "status": "PASS",
+      "detail": "76971 vs 76971"
+    },
+    {
+      "check": "only target language: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "label_id within {0,1,2}: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "class mapping negative=0/neutral=1/positive=2: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "prepared class distribution train",
+      "status": "INFO",
+      "detail": "{'positive': 52199, 'negative': 21482, 'neutral': 3290}"
+    },
+    {
+      "check": "record_id unique: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no internal columns: validation",
+      "status": "PASS",
+      "detail": "[]"
+    },
+    {
+      "check": "prepared columns validation",
+      "status": "INFO",
+      "detail": "['movie_id', 'review_text', 'review_sentiment', 'review_language', 'source_file', 'source_row', 'record_id', 'label_name', 'label_id']"
+    },
+    {
+      "check": "rows match audit: validation",
+      "status": "PASS",
+      "detail": "10396 vs 10396"
+    },
+    {
+      "check": "only target language: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "label_id within {0,1,2}: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "class mapping negative=0/neutral=1/positive=2: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "prepared class distribution validation",
+      "status": "INFO",
+      "detail": "{'positive': 7135, 'negative': 2825, 'neutral': 436}"
+    },
+    {
+      "check": "record_id unique: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no internal columns: test",
+      "status": "PASS",
+      "detail": "[]"
+    },
+    {
+      "check": "prepared columns test",
+      "status": "INFO",
+      "detail": "['movie_id', 'review_text', 'review_sentiment', 'review_language', 'source_file', 'source_row', 'record_id', 'label_name', 'label_id']"
+    },
+    {
+      "check": "rows match audit: test",
+      "status": "PASS",
+      "detail": "9324 vs 9324"
+    },
+    {
+      "check": "only target language: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "label_id within {0,1,2}: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "class mapping negative=0/neutral=1/positive=2: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "prepared class distribution test",
+      "status": "INFO",
+      "detail": "{'positive': 6294, 'negative': 2619, 'neutral': 411}"
+    },
+    {
+      "check": "record_id unique: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "split_ids matches prepared parquet: train",
+      "status": "PASS",
+      "detail": "csv=76971 parquet=76971"
+    },
+    {
+      "check": "split_ids matches prepared parquet: validation",
+      "status": "PASS",
+      "detail": "csv=10396 parquet=10396"
+    },
+    {
+      "check": "split_ids matches prepared parquet: test",
+      "status": "PASS",
+      "detail": "csv=9324 parquet=9324"
+    },
+    {
+      "check": "every prepared record_id exists in source: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "review_text identical to source: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "record_id consistent with source_row: train",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "every prepared record_id exists in source: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "review_text identical to source: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "record_id consistent with source_row: validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "every prepared record_id exists in source: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "review_text identical to source: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "record_id consistent with source_row: test",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "no normalised exact-text overlap train/validation",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "no movie_id overlap train/validation",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "no normalised exact-text overlap train/test",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "no movie_id overlap train/test",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "no normalised exact-text overlap validation/test",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "no movie_id overlap validation/test",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "test keeps every russian source row",
+      "status": "PASS",
+      "detail": "9324 vs 9324"
+    },
+    {
+      "check": "manual decisions",
+      "status": "INFO",
+      "detail": "59 total for 59 candidates"
+    },
+    {
+      "check": "confirmed duplicate pairs",
+      "status": "INFO",
+      "detail": "58"
+    },
+    {
+      "check": "not_duplicate pairs",
+      "status": "INFO",
+      "detail": "1"
+    },
+    {
+      "check": "every 'duplicate' decision is reflected in the final splits",
+      "status": "PASS",
+      "detail": "[]"
+    },
+    {
+      "check": "no 'not_duplicate' pair was removed by the near-duplicate mechanism",
+      "status": "PASS",
+      "detail": "[]"
+    },
+    {
+      "check": "no confirmed near-duplicate link remains between train/validation/test",
+      "status": "PASS",
+      "detail": "0 cross-split confirmed pairs, violations: []"
+    },
+    {
+      "check": "every candidate pair has a manual decision",
+      "status": "PASS",
+      "detail": "0 undecided: []"
+    },
+    {
+      "check": "audit reports the number of undecided candidates",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "audit exposes search-completeness field: near_blocks_skipped_large",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "audit exposes search-completeness field: near_largest_block_size",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "audit exposes search-completeness field: near_block_pairs_evaluated",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "audit exposes search-completeness field: near_candidates_truncated",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "candidate list was not truncated by max_candidates",
+      "status": "PASS",
+      "detail": "False"
+    },
+    {
+      "check": "no blocking key was skipped",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "largest block / pairs evaluated",
+      "status": "INFO",
+      "detail": "359 records / 334709 pairs"
+    },
+    {
+      "check": "an independent search re-check report is present",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "re-check was produced for the current source files",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "re-check was produced for the current near-duplicate config",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "re-check finds no pair above threshold missing from the pipeline",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "re-check finds no extra pair in the pipeline",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "re-check reports no block over the pair budget",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "check": "independent pair count equals the pipeline candidate count",
+      "status": "PASS",
+      "detail": "59 vs 59"
+    }
+  ]
+}
