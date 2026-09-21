@@ -1,0 +1,383 @@
+{
+  "task": "T05",
+  "methodology": "t05.2",
+  "status": "PASS",
+  "has_resource_warnings": false,
+  "profile": "reserve",
+  "machine_label": "personal-pc-rtx4050",
+  "created_at_utc": "2026-09-21T16:07:58.439853+00:00",
+  "constraints": {
+    "final_36_audio_used": false,
+    "audio_declared_debug_only": true,
+    "audio_final_name_heuristic_passed": true,
+    "final_text_test_used": false
+  },
+  "environment": {
+    "timestamp_utc": "2026-09-21T16:07:41.579190+00:00",
+    "os": "Windows-10-10.0.19045-SP0",
+    "os_edition": "Professional",
+    "system": "Windows",
+    "release": "10",
+    "python": "3.13.7",
+    "python_executable_name": "python.exe",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "logical_cpu_count": 12,
+    "physical_cpu_count": 8,
+    "ram_total_mib": 14039.8671875,
+    "ram_note": "RAM as visible to the OS; installed RAM can be larger (firmware/iGPU reservations).",
+    "ram_available_mib_at_start": 4654.99609375,
+    "process_rss_mib_at_start": 789.18359375,
+    "repo_disk_free_gib": 43.37346649169922,
+    "torch": "2.10.0+cu126",
+    "torch_cuda_runtime": "12.6",
+    "cuda_available": true,
+    "gpu": {
+      "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+      "total_vram_mib": 6140.5,
+      "device_free_vram_mib_at_start": 5090.0,
+      "device_total_vram_mib_reported_by_driver": 6140.5,
+      "compute_capability": "8.9"
+    },
+    "nvidia_smi": {
+      "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+      "driver_version": "546.18",
+      "memory_total_mib": 6141,
+      "memory_used_mib": 596,
+      "memory_free_mib": 5339,
+      "utilization_percent": 35
+    },
+    "hf_hub_offline": true,
+    "hf_token_present": false,
+    "versions": {
+      "pandas": "2.3.2",
+      "pyarrow": "24.0.0",
+      "torch": "2.10.0+cu126",
+      "transformers": "5.5.0",
+      "tokenizers": "0.22.2",
+      "faster-whisper": "1.2.1",
+      "ctranslate2": "4.8.2",
+      "av": "18.1.0",
+      "psutil": "7.1.0"
+    }
+  },
+  "inputs": {
+    "train_parquet": "data/processed/train.parquet",
+    "train_parquet_sha256": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
+    "train_ids_csv": "reports/baseline/train_ids.csv",
+    "train_ids_file_sha256": "ba4e73ceb3e52eb5e958afdde4515242b4145cb2736066e7e84db226e96228d5",
+    "rubert_smoke_batch_size": 4,
+    "rubert_smoke_batch_label_counts": {
+      "0": 1,
+      "1": 1,
+      "2": 2
+    },
+    "rubert_smoke_batch_ids_sha256": "a0aa1a4397066aaf0e7ddf5e1552215527ac3b76ec033cfaa3342dd94a4e17dd",
+    "debug_audio": {
+      "audio_bytes": 22793,
+      "audio_duration_seconds": 5.9,
+      "audio_sha256": "c8783fa0d7d25bbad1884e8c66502f4af54f25ae4417bce985376cb502b81c56",
+      "limits": {
+        "language": "ru",
+        "max_seconds": 30,
+        "max_bytes": 5242880
+      },
+      "location": "git_ignored"
+    }
+  },
+  "train_provenance": {
+    "train_parquet_sha256_matches_t04": true,
+    "train_ids_sha256_matches_t04": true,
+    "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+    "all_ids_in_t03_train_split": true,
+    "t03_train_split_rows": 76971,
+    "train_ids_rows": 76971,
+    "t04_final_test_used": false
+  },
+  "profile_config": {
+    "rubert": {
+      "device": "cuda",
+      "batch_size": 4,
+      "max_length": 128,
+      "mixed_precision": "fp16"
+    },
+    "whisper": {
+      "model_size": "base",
+      "device": "cpu",
+      "compute_type": "int8",
+      "beam_size": 1,
+      "vad_filter": true,
+      "cpu_threads": 6
+    }
+  },
+  "rubert": {
+    "status": "PASS",
+    "model_name": "cointegrated/rubert-tiny2",
+    "device": "cuda",
+    "learning_rate": 2e-05,
+    "weight_decay": 0.01,
+    "tokenizer_load_seconds": 0.19585649999999077,
+    "model_load_seconds": 0.7859643000001597,
+    "model_commit_hash": "e8ed3b0c8bbf4fb6984c3de043bf7d2f4e5969ae",
+    "tokenizer_commit_hash": null,
+    "loading_info": {
+      "available": true,
+      "missing_keys": [
+        "classifier.bias",
+        "classifier.weight"
+      ],
+      "missing_keys_count": 2,
+      "unexpected_keys_count": 8,
+      "unexpected_keys_sample": [
+        "bert.embeddings.position_ids",
+        "cls.predictions.bias",
+        "cls.predictions.transform.LayerNorm.bias",
+        "cls.predictions.transform.LayerNorm.weight",
+        "cls.predictions.transform.dense.bias"
+      ],
+      "mismatched_keys_count": 0,
+      "only_new_head_missing": true
+    },
+    "id2label": {
+      "0": "negative",
+      "1": "neutral",
+      "2": "positive"
+    },
+    "batch_size": 4,
+    "max_length": 128,
+    "mixed_precision": "fp16",
+    "training_steps": 3,
+    "tokenization_seconds": 0.006853100000171253,
+    "encoded_sequence_length": 128,
+    "non_pad_tokens_min": 14,
+    "non_pad_tokens_max": 58,
+    "non_pad_tokens_mean": 26.0,
+    "resource_stress_padding": "max_length",
+    "model_parameters_on_device": "cuda",
+    "inputs_on_device": "cuda",
+    "optimizer_contains_sentinel_parameters": true,
+    "step_seconds": [
+      0.6155222000002141,
+      0.050519599999915954,
+      0.055753399999957765
+    ],
+    "step_seconds_first_cold": 0.6155222000002141,
+    "step_seconds_steady_mean": 0.05313649999993686,
+    "optimizer_steps_skipped_by_grad_scaler": 0,
+    "losses": [
+      1.08642578125,
+      1.111083984375,
+      1.08251953125
+    ],
+    "encoder_updated": true,
+    "head_updated": true,
+    "encoder_sentinel_parameters": [
+      "bert.encoder.layer.0.attention.output.dense.weight",
+      "bert.encoder.layer.2.attention.output.dense.weight"
+    ],
+    "head_sentinel_parameters": [
+      "classifier.bias",
+      "classifier.weight"
+    ],
+    "encoder_max_abs_update": 6.0185790061950684e-05,
+    "head_max_abs_update": 6.0082413256168365e-05,
+    "sentinel_grad_norms": {
+      "bert.encoder.layer.0.attention.output.dense.weight": 0.15996992588043213,
+      "bert.encoder.layer.2.attention.output.dense.weight": 0.14064790308475494,
+      "classifier.bias": 0.19681024551391602,
+      "classifier.weight": 0.9196805953979492
+    },
+    "encoder_tensors_snapshotted": 54,
+    "encoder_tensors_changed": 54,
+    "head_tensors_snapshotted": 2,
+    "head_tensors_changed": 2,
+    "snapshot_max_elements_per_tensor": 2000000,
+    "cuda_peak_allocated_after_backward_mib": 241.56787109375,
+    "cuda_memory_at_peak_window": {
+      "torch_allocated_mib": 464.18212890625,
+      "torch_reserved_mib": 620.0,
+      "torch_peak_allocated_mib": 575.794921875,
+      "torch_peak_reserved_mib": 620.0,
+      "device_used_mib": 1706.5,
+      "device_total_mib": 6140.5,
+      "nvidia_smi": {
+        "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+        "driver_version": "546.18",
+        "memory_total_mib": 6141,
+        "memory_used_mib": 1252,
+        "memory_free_mib": 4683,
+        "utilization_percent": 65
+      }
+    },
+    "cuda_memory_after_release": {
+      "torch_allocated_mib": 128.89404296875,
+      "torch_reserved_mib": 152.0,
+      "torch_peak_allocated_mib": 575.794921875,
+      "torch_peak_reserved_mib": 620.0,
+      "device_used_mib": 1238.5,
+      "device_total_mib": 6140.5,
+      "nvidia_smi": {
+        "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+        "driver_version": "546.18",
+        "memory_total_mib": 6141,
+        "memory_used_mib": 784,
+        "memory_free_mib": 5151,
+        "utilization_percent": 48
+      }
+    },
+    "process_rss_before_mib": 886.15625,
+    "process_rss_after_mib": 1700.80859375,
+    "process_rss_peak_sampled_mib": 1705.75,
+    "cuda_device_used_mib_after_step": 1706.5
+  },
+  "whisper": {
+    "status": "PASS",
+    "requested_language": "ru",
+    "language_forced": true,
+    "model_size": "base",
+    "device": "cpu",
+    "compute_type": "int8",
+    "beam_size": 1,
+    "vad_filter": true,
+    "cpu_threads": 6,
+    "backend_reported_device": "cpu",
+    "backend_reported_compute_type": "int8_float32",
+    "model_load_seconds": 0.9872998999999254,
+    "model_load_note": "includes a one-off download if the model was not cached yet",
+    "transcription_seconds": 1.4563677999999527,
+    "transcription_measured_with_all_segments_consumed": true,
+    "audio_sha256": "c8783fa0d7d25bbad1884e8c66502f4af54f25ae4417bce985376cb502b81c56",
+    "audio_bytes": 22793,
+    "audio_duration_seconds": 5.9,
+    "recognized_duration_seconds": 4.94,
+    "real_time_factor": 0.24684199999999196,
+    "segment_count": 1,
+    "transcript_chars": 71,
+    "transcript_sha256": "ff5c27c4007fa4dd01ba7726674539bd61e2536fe704316ae4576fcb23487c5d",
+    "language": "ru",
+    "process_rss_before_mib": 1702.796875,
+    "process_rss_after_mib": 1861.08203125,
+    "process_rss_peak_sampled_mib": 1956.76953125,
+    "nvidia_smi_before": {
+      "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+      "driver_version": "546.18",
+      "memory_total_mib": 6141,
+      "memory_used_mib": 784,
+      "memory_free_mib": 5151,
+      "utilization_percent": 48
+    },
+    "nvidia_smi_after": {
+      "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+      "driver_version": "546.18",
+      "memory_total_mib": 6141,
+      "memory_used_mib": 784,
+      "memory_free_mib": 5151,
+      "utilization_percent": 36
+    },
+    "transcript_in_git_report": false
+  },
+  "joint_load": {
+    "status": "PASS",
+    "operation_order": [
+      "rubert_forward",
+      "whisper_transcribe",
+      "rubert_forward"
+    ],
+    "rubert_forward_seconds_before_whisper": 0.013216499999998632,
+    "rubert_forward_seconds_after_whisper": 0.0087124000001495,
+    "rubert_logits_identical_before_after_whisper": true,
+    "predicted_label_id": 0,
+    "predicted_label": "negative",
+    "whisper_while_rubert_loaded": {
+      "transcription_seconds_warm": 1.3379956999997376,
+      "segments_consumed": 1,
+      "transcript_chars": 71,
+      "transcript_sha256": "ff5c27c4007fa4dd01ba7726674539bd61e2536fe704316ae4576fcb23487c5d",
+      "transcript_matches_cold_run": true
+    },
+    "process_rss_peak_sampled_mib": 1961.6953125,
+    "rubert_and_whisper_loaded_together": true,
+    "rubert_parameters_on_device": "cuda",
+    "rubert_parameter_count": 29194707,
+    "whisper_backend": {
+      "backend_reported_device": "cpu",
+      "backend_reported_compute_type": "int8_float32"
+    },
+    "encoded_sequence_length": 128,
+    "process_rss_mib": 1872.5390625,
+    "cuda_memory": {
+      "torch_allocated_mib": 128.8935546875,
+      "torch_reserved_mib": 154.0,
+      "torch_peak_allocated_mib": 575.794921875,
+      "torch_peak_reserved_mib": 620.0,
+      "device_used_mib": 1240.5,
+      "device_total_mib": 6140.5,
+      "nvidia_smi": {
+        "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+        "driver_version": "546.18",
+        "memory_total_mib": 6141,
+        "memory_used_mib": 786,
+        "memory_free_mib": 5149,
+        "utilization_percent": 37
+      }
+    }
+  },
+  "memory": {
+    "process_peak_rss_mib_os": 1961.69921875,
+    "process_peak_rss_mib_sampled": 1961.3046875,
+    "process_rss_mib_at_start": 789.18359375,
+    "process_rss_mib_at_end": 1872.53125,
+    "system_total_mib": 14039.8671875,
+    "system_available_mib_at_start": 4654.99609375,
+    "system_available_mib_min_sampled": 3525.89453125,
+    "definition": "process_peak_rss_mib_os is the OS-reported peak working set of this Python process for the whole run (imports, both models, training step); *_sampled values come from a 50 ms sampler and can miss short spikes."
+  },
+  "resource_findings": [
+    {
+      "level": "OK",
+      "code": "ram_headroom",
+      "message": "Минимум свободной системной RAM за прогон: 3526 MiB (порог 1024 MiB); свободно на старте: 4655 MiB из 14040 MiB, видимых ОС. Другие открытые программы уменьшают запас; перед демонстрацией нужно закрыть лишнее."
+    },
+    {
+      "level": "OK",
+      "code": "vram_headroom",
+      "message": "Свободно VRAM на устройстве сразу после шага обучения: 4434 MiB из 6140 MiB (занято всеми процессами 1706 MiB; порог 1024 MiB)."
+    },
+    {
+      "level": "INFO",
+      "code": "first_call_timings",
+      "message": "Время первого шага RuBERT и первого распознавания включает прогрев (CUDA/ядра/кэши); устоявшийся шаг и повторное распознавание указаны отдельно. Время загрузки Whisper при первом запуске может включать скачивание модели."
+    },
+    {
+      "level": "INFO",
+      "code": "rubert_head_initialised_from_scratch",
+      "message": "Ожидаемо: classifier.weight/bias созданы заново (в чекпойнте rubert-tiny2 нет 3-классовой головы), cls.* исходного чекпойнта не используются. Это не ошибка."
+    },
+    {
+      "level": "INFO",
+      "code": "mixed_precision",
+      "message": "Замеры сделаны с mixed_precision=fp16; при обучении в другой точности расход VRAM нужно измерить заново."
+    },
+    {
+      "level": "INFO",
+      "code": "external_backup_compute",
+      "message": "Внешний резервный доступ к вычислениям: NOT_VERIFIED_NOT_CLAIMED (скриптом не проверяется)."
+    }
+  ],
+  "resource_plan": {
+    "this_report_covers_profile_only": "reserve",
+    "primary_profile": "primary",
+    "reserve_profile": "reserve",
+    "external_backup_compute": {
+      "status": "NOT_VERIFIED_NOT_CLAIMED",
+      "provider": null,
+      "note": "Не считать удалённый GPU доступным, пока участник команды явно не подтвердит его.",
+      "explanation": "reserve profile = a lighter LOCAL configuration; external/remote compute is a different thing and is not tested by this script."
+    }
+  },
+  "local_only_artifacts": {
+    "whisper_result": "artifacts/resource_check/reserve/whisper_result.json",
+    "contains_transcript": true,
+    "must_not_commit": true,
+    "git_safety": "git_ignored"
+  }
+}

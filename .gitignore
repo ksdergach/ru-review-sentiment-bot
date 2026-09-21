@@ -31,3 +31,11 @@ artifacts/data_prep/
 
 # T04: trained model bundles are local artifacts and must not be committed
 models/
+
+# Local artifacts and audio files are not committed
+artifacts/
+*.m4a
+*.wav
+*.mp3
+*.ogg
+*.oga

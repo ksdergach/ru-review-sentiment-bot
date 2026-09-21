@@ -1,0 +1,5 @@
+batch_order,record_id,label_id
+0,train-00000-of-00001.parquet#row=00000007,0
+1,train-00000-of-00001.parquet#row=00000002,1
+2,train-00000-of-00001.parquet#row=00000000,2
+3,train-00000-of-00001.parquet#row=00000001,2
