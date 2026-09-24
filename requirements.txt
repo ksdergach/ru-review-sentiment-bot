@@ -1,0 +1,21 @@
+# Python 3.13.7; versions used by the committed T04/T05 reports.
+# Install the appropriate torch wheel FIRST (see README: CPU / CUDA / macOS).
+numpy==2.3.3
+pandas==2.3.2
+pyarrow==24.0.0
+scipy==1.15.3
+scikit-learn==1.7.2
+joblib==1.5.2
+torch==2.10.0
+transformers==5.5.0
+tokenizers==0.22.2
+faster-whisper==1.2.1
+ctranslate2==4.8.2
+av==18.1.0
+psutil==7.1.0
+
+# Telegram implementation will be added in T09.
+aiogram==3.22.0
+
+# Existing regression tests (no model downloads or Telegram token needed).
+pytest==8.4.2

@@ -5,7 +5,7 @@ __pycache__/
 .venv/
 venv/
 
-# Data (not committed, see data/README.md for sources)
+# Derived data (the existing NLP_dataset/*.parquet remain tracked)
 data/raw/
 data/interim/
 data/processed/
@@ -39,3 +39,42 @@ artifacts/
 *.mp3
 *.ogg
 *.oga
+
+# T01: additional local environments, caches, secrets and build output
+.venv-*/
+.cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.env.*
+!.env.example
+
+# New recordings and generated video/audio; metadata belongs in reports/
+audio/
+recordings/
+*.opus
+*.flac
+*.aac
+*.mp4
+*.webm
+
+# Serialized models and Hugging Face bundles, including stray output outside models/
+*.safetensors
+*.joblib
+*.pkl
+*.pickle
+*.pth
+*.onnx
+*.ckpt
+checkpoint-*/
+tokenizer.json
+tokenizer_config.json
+special_tokens_map.json
+vocab.txt
+vocab.json
+merges.txt
+spiece.model
+sentencepiece.bpe.model

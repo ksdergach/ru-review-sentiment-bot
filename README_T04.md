@@ -32,7 +32,7 @@
 ## Зависимости
 
 `numpy`, `pandas`, `pyarrow` (чтение Parquet), `scikit-learn`, `scipy`, `joblib`, `pytest` (только для тестов).
-Общий `requirements.txt` относится к задаче каркаса проекта; версии, с которыми запускалось обучение,
+Установка общего `requirements.txt` описана в [README.md](README.md); версии, с которыми запускалось обучение,
 записываются в `reports/baseline/run_metadata.json`.
 
 ## Файлы

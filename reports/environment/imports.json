@@ -1,0 +1,86 @@
+{
+  "status": "PASS",
+  "python": "3.13.7",
+  "expected_python": "3.13.7",
+  "system": "Darwin",
+  "machine": "arm64",
+  "packages": {
+    "numpy": {
+      "expected": "2.3.3",
+      "installed": "2.3.3",
+      "import": "ok"
+    },
+    "pandas": {
+      "expected": "2.3.2",
+      "installed": "2.3.2",
+      "import": "ok"
+    },
+    "pyarrow": {
+      "expected": "24.0.0",
+      "installed": "24.0.0",
+      "import": "ok"
+    },
+    "scipy": {
+      "expected": "1.15.3",
+      "installed": "1.15.3",
+      "import": "ok"
+    },
+    "scikit-learn": {
+      "expected": "1.7.2",
+      "installed": "1.7.2",
+      "import": "ok"
+    },
+    "joblib": {
+      "expected": "1.5.2",
+      "installed": "1.5.2",
+      "import": "ok"
+    },
+    "torch": {
+      "expected": "2.10.0",
+      "installed": "2.10.0",
+      "import": "ok"
+    },
+    "transformers": {
+      "expected": "5.5.0",
+      "installed": "5.5.0",
+      "import": "ok"
+    },
+    "tokenizers": {
+      "expected": "0.22.2",
+      "installed": "0.22.2",
+      "import": "ok"
+    },
+    "faster-whisper": {
+      "expected": "1.2.1",
+      "installed": "1.2.1",
+      "import": "ok"
+    },
+    "ctranslate2": {
+      "expected": "4.8.2",
+      "installed": "4.8.2",
+      "import": "ok"
+    },
+    "av": {
+      "expected": "18.1.0",
+      "installed": "18.1.0",
+      "import": "ok"
+    },
+    "psutil": {
+      "expected": "7.1.0",
+      "installed": "7.1.0",
+      "import": "ok"
+    },
+    "aiogram": {
+      "expected": "3.22.0",
+      "installed": "3.22.0",
+      "import": "ok"
+    },
+    "pytest": {
+      "expected": "8.4.2",
+      "installed": "8.4.2",
+      "import": "ok"
+    }
+  },
+  "errors": [],
+  "scope": "Versions and imports only; no training, model downloads, GPU or Telegram calls."
+}

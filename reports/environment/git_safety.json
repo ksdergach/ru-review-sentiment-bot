@@ -1,0 +1,152 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "path": ".env",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": ".env.local",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": ".env.production",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": ".venv/lib/module.py",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "data/processed/train.parquet",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "data/interim/reviews.csv",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "artifacts/audio/debug.wav",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "models/baseline/model.joblib",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "checkpoints/run/model.safetensors",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": ".cache/huggingface/tokenizer.json",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "recordings/debug.opus",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "model.pkl",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "model.onnx",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "tokenizer_config.json",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "vocab.txt",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": "checkpoint-10/config.json",
+      "expected_ignored": true,
+      "ignored": true
+    },
+    {
+      "path": ".env.example",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "requirements.txt",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "configs/data_prep.json",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "configs/baseline.json",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "configs/resource_check.json",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "reports/environment/verification.md",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "reports/baseline/train_ids.csv",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "NLP_dataset/train-00000-of-00001.parquet",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "NLP_dataset/validation-00000-of-00001.parquet",
+      "expected_ignored": false,
+      "ignored": false
+    },
+    {
+      "path": "NLP_dataset/test-00000-of-00001.parquet",
+      "expected_ignored": false,
+      "ignored": false
+    }
+  ],
+  "source_files": [
+    {
+      "path": "NLP_dataset/test-00000-of-00001.parquet",
+      "sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+      "matches_HEAD": true
+    },
+    {
+      "path": "NLP_dataset/train-00000-of-00001.parquet",
+      "sha256": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+      "matches_HEAD": true
+    },
+    {
+      "path": "NLP_dataset/validation-00000-of-00001.parquet",
+      "sha256": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae",
+      "matches_HEAD": true
+    }
+  ]
+}

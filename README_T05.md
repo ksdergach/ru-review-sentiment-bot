@@ -54,10 +54,11 @@ CUDA-режима faster-whisper/CTranslate2 нужны собственные C
 
 Все команды выполняются из корня репозитория в PowerShell.
 
-Зависимости (PyTorch — сборка с CUDA, у команды уже стоит `2.10.0+cu126`):
+Сначала установите общее окружение по [README.md](README.md), выбрав CUDA-сборку
+PyTorch (в сохранённых отчётах команды — `2.10.0+cu126`). После выбора сборки:
 
 ```powershell
-python -m pip install transformers faster-whisper psutil pandas pyarrow pytest
+python -m pip install -r requirements.txt
 ```
 
 **Защита Git.** Скрипт отказывается работать, если папка с расшифровкой или файл отладочного аудио могут попасть в коммит.
