@@ -4,8 +4,9 @@
 → `negative=0`, `neutral=1`, `positive=2`.
 [План](docs/team_plan.md) и [доска](https://github.com/users/ksdergach/projects/2).
 
-В репозитории уже есть подготовка данных (T03), обучение baseline (T04)
-и проверка ресурсов (T05). Полное обучение RuBERT, общий интерфейс инференса
+В репозитории уже есть подготовка данных (T03), обучение baseline (T04),
+проверка ресурсов (T05) и модуль распознавания голоса (T08).
+Полное обучение RuBERT, общий интерфейс классификатора
 и Telegram-бот выполняются в следующих задачах. Установка библиотек не означает,
 что бот уже готов.
 
@@ -126,6 +127,7 @@ python tools/audit_dataset.py
 | Подготовка T03 | `configs/data_prep.json` | `NLP_dataset/*.parquet` | `data/processed/`, тексты для аудита в `artifacts/data_prep/` | `reports/data_prep/` |
 | Baseline T04 | `configs/baseline.json` | Подготовленные train/validation | `models/baseline/` | `reports/baseline/` |
 | Проверка T05 | `configs/resource_check.json` | Train, метаданные T04, отдельное отладочное аудио | `artifacts/resource_check/` | `reports/resources/` |
+| Распознавание T08 | `configs/speech.json` | Локальное аудио, включая OGG/Opus | Кэш `.cache/huggingface/`, отладочные тексты в `artifacts/speech/` | `reports/speech/` |
 | Окружение T01 | `.python-version`, `requirements.txt` | Чистая `.venv/` | Установленные пакеты | `reports/environment/` |
 
 Папки `src/`, `configs/`, `tests/` и `reports/` уже содержат реальные
@@ -193,6 +195,16 @@ T01 от этого не зависит. Для другого оборудов�
 Запуск Telegram и полное обучение RuBERT будут отдельными точками входа задач
 T09 и T06. Сейчас таких команд в репозитории нет; повторный запуск обучения
 не должен становиться частью запуска бота.
+
+Распознавание отдельной отладочной записи модулем T08:
+
+```bash
+python -m src.speech artifacts/audio/debug.ogg --allow-download --show-text
+```
+
+Замените путь на свою запись. Первый запуск скачает зафиксированную модель;
+после него `--allow-download` можно убрать. Контракт для бота, обработка пустой
+речи, ошибок и временных файлов описаны в [README_T08.md](README_T08.md).
 
 ## Что хранится в Git
 

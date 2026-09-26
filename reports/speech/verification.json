@@ -1,0 +1,87 @@
+{
+  "status": "PASS",
+  "config": {
+    "model": "Systran/faster-whisper-small",
+    "revision": "536b0662742c02347bc0e980a01041f333bce120",
+    "device": "cpu",
+    "compute_type": "int8",
+    "cpu_threads": 8,
+    "beam_size": 5,
+    "language": "ru",
+    "vad_filter": true,
+    "temperature": 0.0,
+    "condition_on_previous_text": true,
+    "cache_dir": ".cache/huggingface"
+  },
+  "config_sha256": "754def54709819f315a3952c1fcd8793e8be602b3956b6c934eecbaa57075ba0",
+  "environment": {
+    "python": "3.13.7",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "packages": {
+      "faster-whisper": "1.2.1",
+      "ctranslate2": "4.8.2",
+      "av": "18.1.0",
+      "onnxruntime": "1.30.0"
+    }
+  },
+  "debug_audio_file": "teacher_debug.ogg",
+  "declared_debug_only": true,
+  "final_audio_used": false,
+  "model_reused": true,
+  "backend": {
+    "device": "cpu",
+    "compute_type": "int8_float32"
+  },
+  "results": {
+    "voice_cold": {
+      "status": "ok",
+      "error_code": null,
+      "duration_seconds": 12.0,
+      "elapsed_seconds": 61.74383720802143,
+      "model_load_seconds": 2.637040292029269,
+      "segment_count": 2,
+      "audio_sha256": "09377c63f8681413d43eb4624be52db55c4fd0bd242d427053b51b8ec9111453",
+      "audio_bytes": 110472,
+      "text_characters": 162,
+      "text_sha256": "0f7290d95a9b0ea50f0be74c5e57d5396a3cb905dece397a8f92fab749525a17"
+    },
+    "voice_warm": {
+      "status": "ok",
+      "error_code": null,
+      "duration_seconds": 12.0,
+      "elapsed_seconds": 60.07989220798481,
+      "model_load_seconds": 0.0,
+      "segment_count": 2,
+      "audio_sha256": "09377c63f8681413d43eb4624be52db55c4fd0bd242d427053b51b8ec9111453",
+      "audio_bytes": 110472,
+      "text_characters": 162,
+      "text_sha256": "0f7290d95a9b0ea50f0be74c5e57d5396a3cb905dece397a8f92fab749525a17"
+    },
+    "silence": {
+      "status": "empty",
+      "error_code": null,
+      "duration_seconds": 3.0,
+      "elapsed_seconds": 0.10532029205933213,
+      "model_load_seconds": 0.0,
+      "segment_count": 0,
+      "audio_sha256": "d303811b8c84619667cd0501342f84ec6cbe69f7aa3856dcf52fabda374c92b8",
+      "audio_bytes": 96044,
+      "text_characters": 0,
+      "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "corrupt": {
+      "status": "error",
+      "error_code": "decode_failed",
+      "duration_seconds": null,
+      "elapsed_seconds": 0.0013358340365812182,
+      "model_load_seconds": 0.0,
+      "segment_count": 0,
+      "audio_sha256": "f83af74c3509479a103420d9d9b574972f750ebba46bea687d8552651d96ab21",
+      "audio_bytes": 32,
+      "text_characters": 0,
+      "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "transcripts": "artifacts/speech/transcripts.json (not committed)"
+}
