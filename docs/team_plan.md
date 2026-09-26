@@ -111,12 +111,15 @@ Whisper используем готовым, собственную модель
 - `validation-00000-of-00001.parquet`;
 - `test-00000-of-00001.parquet`.
 
-По схеме, числу строк и размерам файлы соответствуют конфигурации `pc` корпуса
-[100k Movie Reviews from Kazakhstan](https://huggingface.co/datasets/yeshpanovrustem/100k_movie_reviews_from_kz/blob/main/README.md).
-В карточке указаны источник kino.kz, ручная разметка одним автором и лицензия
-CC BY 4.0. Перед обучением фиксируем происхождение загруженных файлов, версию
-источника, сведения о лицензии и контрольные суммы в `NLP_dataset/README.md`.
-Сходство структуры само по себе не заменяет подтверждение происхождения.
+26.09.2026 побайтовое соответствие всех трёх файлов конфигурации `pc` корпуса
+[100k Movie Reviews from Kazakhstan](https://huggingface.co/datasets/yeshpanovrustem/100k_movie_reviews_from_kz/blob/main/README.md)
+подтверждено по SHA-256 из API закреплённой ревизии
+`526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9`.
+Источник kino.kz, атрибуция, заявленная лицензия CC BY 4.0, схема и контрольные
+суммы описаны в [NLP_dataset/README.md](../NLP_dataset/README.md).
+Ручной просмотр фиксированной выборки T02 пока ожидает участника:
+[протокол](../reports/dataset/manual_review.md). Не считаем его выполненным
+до уже сохранённых запусков T04/T05.
 
 Поля:
 

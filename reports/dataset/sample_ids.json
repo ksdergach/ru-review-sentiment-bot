@@ -1,0 +1,602 @@
+[
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00059485",
+    "source_row": 59485,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00044157",
+    "source_row": 44157,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00010012",
+    "source_row": 10012,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00053148",
+    "source_row": 53148,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00019621",
+    "source_row": 19621,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00073067",
+    "source_row": 73067,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00056791",
+    "source_row": 56791,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00022463",
+    "source_row": 22463,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00026280",
+    "source_row": 26280,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00057096",
+    "source_row": 57096,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00035252",
+    "source_row": 35252,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00036212",
+    "source_row": 36212,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00037239",
+    "source_row": 37239,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00015749",
+    "source_row": 15749,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00034784",
+    "source_row": 34784,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00010843",
+    "source_row": 10843,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00069441",
+    "source_row": 69441,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00074084",
+    "source_row": 74084,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00008852",
+    "source_row": 8852,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00052533",
+    "source_row": 52533,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00037879",
+    "source_row": 37879,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00029143",
+    "source_row": 29143,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00062599",
+    "source_row": 62599,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00051626",
+    "source_row": 51626,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00077115",
+    "source_row": 77115,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00067459",
+    "source_row": 67459,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00055436",
+    "source_row": 55436,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00064391",
+    "source_row": 64391,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00041335",
+    "source_row": 41335,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00017426",
+    "source_row": 17426,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00012846",
+    "source_row": 12846,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00061404",
+    "source_row": 61404,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00079273",
+    "source_row": 79273,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00030922",
+    "source_row": 30922,
+    "label_name": "negative",
+    "label_id": 0
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00035644",
+    "source_row": 35644,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00068903",
+    "source_row": 68903,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00054315",
+    "source_row": 54315,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00046978",
+    "source_row": 46978,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00012646",
+    "source_row": 12646,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00076312",
+    "source_row": 76312,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00078544",
+    "source_row": 78544,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00040517",
+    "source_row": 40517,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00073679",
+    "source_row": 73679,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00043426",
+    "source_row": 43426,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00069497",
+    "source_row": 69497,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00074360",
+    "source_row": 74360,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00033569",
+    "source_row": 33569,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00076835",
+    "source_row": 76835,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00062806",
+    "source_row": 62806,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00058145",
+    "source_row": 58145,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00010298",
+    "source_row": 10298,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00065374",
+    "source_row": 65374,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00013842",
+    "source_row": 13842,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00072721",
+    "source_row": 72721,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00079696",
+    "source_row": 79696,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00051660",
+    "source_row": 51660,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00061158",
+    "source_row": 61158,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00043780",
+    "source_row": 43780,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00043874",
+    "source_row": 43874,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00062894",
+    "source_row": 62894,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00073391",
+    "source_row": 73391,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00023147",
+    "source_row": 23147,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00055219",
+    "source_row": 55219,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00036680",
+    "source_row": 36680,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00078737",
+    "source_row": 78737,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00035852",
+    "source_row": 35852,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00072997",
+    "source_row": 72997,
+    "label_name": "neutral",
+    "label_id": 1
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00012866",
+    "source_row": 12866,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00046362",
+    "source_row": 46362,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00029833",
+    "source_row": 29833,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00001084",
+    "source_row": 1084,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00077055",
+    "source_row": 77055,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00056894",
+    "source_row": 56894,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00061053",
+    "source_row": 61053,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00011863",
+    "source_row": 11863,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00064686",
+    "source_row": 64686,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00046830",
+    "source_row": 46830,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00018979",
+    "source_row": 18979,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00035123",
+    "source_row": 35123,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00017555",
+    "source_row": 17555,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00021938",
+    "source_row": 21938,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00074496",
+    "source_row": 74496,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00048840",
+    "source_row": 48840,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00017982",
+    "source_row": 17982,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00003036",
+    "source_row": 3036,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00019890",
+    "source_row": 19890,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00047526",
+    "source_row": 47526,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00053190",
+    "source_row": 53190,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00077307",
+    "source_row": 77307,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00013303",
+    "source_row": 13303,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00017252",
+    "source_row": 17252,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00061711",
+    "source_row": 61711,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00068090",
+    "source_row": 68090,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00040817",
+    "source_row": 40817,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00003932",
+    "source_row": 3932,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00069649",
+    "source_row": 69649,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00044738",
+    "source_row": 44738,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00025440",
+    "source_row": 25440,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00030383",
+    "source_row": 30383,
+    "label_name": "positive",
+    "label_id": 2
+  },
+  {
+    "record_id": "train-00000-of-00001.parquet#row=00022008",
+    "source_row": 22008,
+    "label_name": "positive",
+    "label_id": 2
+  }
+]

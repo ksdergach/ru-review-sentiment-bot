@@ -1,0 +1,86 @@
+{
+  "repository": "yeshpanovrustem/100k_movie_reviews_from_kz",
+  "revision": "526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9",
+  "config": "pc",
+  "checked_on": "2026-09-26",
+  "api_url": "https://huggingface.co/api/datasets/yeshpanovrustem/100k_movie_reviews_from_kz/revision/526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9?blobs=true",
+  "card_url": "https://huggingface.co/datasets/yeshpanovrustem/100k_movie_reviews_from_kz/blob/526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9/README.md",
+  "license_declared": "cc-by-4.0",
+  "gated": "auto",
+  "evidence": "SHA-256 and sizes from the public Hugging Face API LFS metadata at the pinned revision; no remote data download.",
+  "features": [
+    {
+      "name": "movie_id",
+      "dtype": "string"
+    },
+    {
+      "name": "review_text",
+      "dtype": "string"
+    },
+    {
+      "name": "review_sentiment",
+      "dtype": "string"
+    },
+    {
+      "name": "review_language",
+      "dtype": "string"
+    }
+  ],
+  "files": {
+    "train": {
+      "local_file": "train-00000-of-00001.parquet",
+      "remote_path": "pc/train-00000-of-00001.parquet",
+      "sha256": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+      "size_bytes": 19992169,
+      "rows": 80009,
+      "url": "https://huggingface.co/datasets/yeshpanovrustem/100k_movie_reviews_from_kz/blob/526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9/pc/train-00000-of-00001.parquet"
+    },
+    "validation": {
+      "local_file": "validation-00000-of-00001.parquet",
+      "remote_path": "pc/validation-00000-of-00001.parquet",
+      "sha256": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae",
+      "size_bytes": 2781706,
+      "rows": 10829,
+      "url": "https://huggingface.co/datasets/yeshpanovrustem/100k_movie_reviews_from_kz/blob/526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9/pc/validation-00000-of-00001.parquet"
+    },
+    "test": {
+      "local_file": "test-00000-of-00001.parquet",
+      "remote_path": "pc/test-00000-of-00001.parquet",
+      "sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+      "size_bytes": 2564711,
+      "rows": 9664,
+      "url": "https://huggingface.co/datasets/yeshpanovrustem/100k_movie_reviews_from_kz/blob/526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9/pc/test-00000-of-00001.parquet"
+    }
+  },
+  "manual_sample": {
+    "seed": 42,
+    "per_class": {
+      "negative": 34,
+      "neutral": 33,
+      "positive": 33
+    }
+  },
+  "plan_raw_counts": {
+    "train": {
+      "all": 80009,
+      "ru": 77022,
+      "positive": 52239,
+      "negative": 21492,
+      "neutral": 3291
+    },
+    "validation": {
+      "all": 10829,
+      "ru": 10403,
+      "positive": 7140,
+      "negative": 2825,
+      "neutral": 438
+    },
+    "test": {
+      "all": 9664,
+      "ru": 9324,
+      "positive": 6294,
+      "negative": 2619,
+      "neutral": 411
+    }
+  }
+}

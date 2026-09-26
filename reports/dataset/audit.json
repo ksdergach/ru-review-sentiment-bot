@@ -1,0 +1,191 @@
+{
+  "source_revision": "526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9",
+  "source_config": "pc",
+  "class_mapping": {
+    "negative": 0,
+    "neutral": 1,
+    "positive": 2
+  },
+  "splits": {
+    "train": {
+      "sha256": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+      "size_bytes": 19992169,
+      "matches_upstream": true,
+      "rows": 80009,
+      "schema": [
+        {
+          "name": "movie_id",
+          "dtype": "string"
+        },
+        {
+          "name": "review_text",
+          "dtype": "string"
+        },
+        {
+          "name": "review_sentiment",
+          "dtype": "string"
+        },
+        {
+          "name": "review_language",
+          "dtype": "string"
+        }
+      ],
+      "language_counts": {
+        "ru": 77022,
+        "kk": 2178,
+        "cs": 809
+      },
+      "class_counts_by_language": {
+        "ru": {
+          "negative": 21492,
+          "neutral": 3291,
+          "positive": 52239
+        },
+        "kk": {
+          "negative": 141,
+          "neutral": 73,
+          "positive": 1964
+        },
+        "cs": {
+          "negative": 134,
+          "neutral": 24,
+          "positive": 651
+        }
+      },
+      "class_counts_all": {
+        "negative": 21767,
+        "neutral": 3388,
+        "positive": 54854
+      },
+      "null_or_blank_fields": 0,
+      "unique_movies": 3953,
+      "plan_counts_match": true
+    },
+    "validation": {
+      "sha256": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae",
+      "size_bytes": 2781706,
+      "matches_upstream": true,
+      "rows": 10829,
+      "schema": [
+        {
+          "name": "movie_id",
+          "dtype": "string"
+        },
+        {
+          "name": "review_text",
+          "dtype": "string"
+        },
+        {
+          "name": "review_sentiment",
+          "dtype": "string"
+        },
+        {
+          "name": "review_language",
+          "dtype": "string"
+        }
+      ],
+      "language_counts": {
+        "ru": 10403,
+        "kk": 230,
+        "cs": 196
+      },
+      "class_counts_by_language": {
+        "ru": {
+          "negative": 2825,
+          "neutral": 438,
+          "positive": 7140
+        },
+        "kk": {
+          "negative": 23,
+          "neutral": 33,
+          "positive": 174
+        },
+        "cs": {
+          "negative": 42,
+          "neutral": 31,
+          "positive": 123
+        }
+      },
+      "class_counts_all": {
+        "negative": 2890,
+        "neutral": 502,
+        "positive": 7437
+      },
+      "null_or_blank_fields": 0,
+      "unique_movies": 495,
+      "plan_counts_match": true
+    },
+    "test": {
+      "sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+      "size_bytes": 2564711,
+      "matches_upstream": true,
+      "rows": 9664,
+      "schema": [
+        {
+          "name": "movie_id",
+          "dtype": "string"
+        },
+        {
+          "name": "review_text",
+          "dtype": "string"
+        },
+        {
+          "name": "review_sentiment",
+          "dtype": "string"
+        },
+        {
+          "name": "review_language",
+          "dtype": "string"
+        }
+      ],
+      "language_counts": {
+        "ru": 9324,
+        "kk": 231,
+        "cs": 109
+      },
+      "class_counts_by_language": {
+        "ru": {
+          "negative": 2619,
+          "neutral": 411,
+          "positive": 6294
+        },
+        "kk": {
+          "negative": 14,
+          "neutral": 21,
+          "positive": 196
+        },
+        "cs": {
+          "negative": 25,
+          "neutral": 7,
+          "positive": 77
+        }
+      },
+      "class_counts_all": {
+        "negative": 2658,
+        "neutral": 439,
+        "positive": 6567
+      },
+      "null_or_blank_fields": 0,
+      "unique_movies": 495,
+      "plan_counts_match": true
+    }
+  },
+  "movie_overlap": {
+    "train/validation": 0,
+    "train/test": 0,
+    "validation/test": 0
+  },
+  "all_match_plan": true,
+  "manual_review_status": "pending_participant",
+  "sampling": {
+    "seed": 42,
+    "per_class": {
+      "negative": 34,
+      "neutral": 33,
+      "positive": 33
+    },
+    "algorithm": "SHA-256(seed:record_id), ascending within each class",
+    "split": "train",
+    "language": "ru"
+  }
+}
