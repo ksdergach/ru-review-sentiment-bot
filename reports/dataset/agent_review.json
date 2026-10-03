@@ -1,0 +1,1195 @@
+{
+  "date": "2026-10-03",
+  "reviewer": "Codex (AI agent)",
+  "review_method": "All 100 full train texts read with original labels visible; not blind annotation and not human review. No trained project classifier predictions used.",
+  "sample_ids_sha256": "1e29a46bf4a4e6c0fe7a1a1e9291e03267e17fe2b80bfaf763d1647a221e41a4",
+  "source_train_sha256": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+  "sample_size": 100,
+  "source_class_counts": {
+    "negative": 34,
+    "neutral": 33,
+    "positive": 33
+  },
+  "decision_counts": {
+    "supported": 80,
+    "ambiguous": 15,
+    "proposed_disagreement": 5
+  },
+  "decision_counts_by_source_label": {
+    "negative": {
+      "supported": 30,
+      "ambiguous": 4
+    },
+    "neutral": {
+      "supported": 20,
+      "ambiguous": 8,
+      "proposed_disagreement": 5
+    },
+    "positive": {
+      "supported": 30,
+      "ambiguous": 3
+    }
+  },
+  "labels_modified": false,
+  "human_confirmation": "pending",
+  "priority_positions": [
+    5,
+    21,
+    25,
+    36,
+    42,
+    43,
+    49,
+    51,
+    56,
+    57,
+    60,
+    63,
+    67,
+    69,
+    94
+  ],
+  "reviews": [
+    {
+      "sample_position": 1,
+      "record_id": "train-00000-of-00001.parquet#row=00059485",
+      "source_row": 59485,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Положительные стороны перечислены, но итоговая оценка и основные претензии явно отрицательные.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 2,
+      "record_id": "train-00000-of-00001.parquet#row=00044157",
+      "source_row": 44157,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Похвала идее и эффектам противопоставлена резкому неприятию реализации и потраченных денег.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 3,
+      "record_id": "train-00000-of-00001.parquet#row=00010012",
+      "source_row": 10012,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Автор скучал и прямо не рекомендует просмотр; смех описывает насмешку над качеством.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 4,
+      "record_id": "train-00000-of-00001.parquet#row=00053148",
+      "source_row": 53148,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Похвала относится к другим картинам; оцениваемый фильм вызвал разочарование.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 5,
+      "record_id": "train-00000-of-00001.parquet#row=00019621",
+      "source_row": 19621,
+      "source_label": "negative",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Словесная оценка слабая и критическая, но упоминание пяти звёзд противоречиво без известной шкалы.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 6,
+      "record_id": "train-00000-of-00001.parquet#row=00073067",
+      "source_row": 73067,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Отсутствие впечатлений и предпочтение книги выражают отрицательное отношение к экранизации.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 7,
+      "record_id": "train-00000-of-00001.parquet#row=00056791",
+      "source_row": 56791,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Резкое недовольство и предупреждение не тратить время поддерживают negative.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 8,
+      "record_id": "train-00000-of-00001.parquet#row=00022463",
+      "source_row": 22463,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Прямое отрицательное описание скуки, продолжительности и качества поддерживает negative.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 9,
+      "record_id": "train-00000-of-00001.parquet#row=00026280",
+      "source_row": 26280,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Почти все аспекты раскритикованы; привлекательность актрисы не меняет отрицательного итога.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 10,
+      "record_id": "train-00000-of-00001.parquet#row=00057096",
+      "source_row": 57096,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Оговорка о личном вкусе не отменяет прямого неприятия фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 11,
+      "record_id": "train-00000-of-00001.parquet#row=00035252",
+      "source_row": 35252,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Автор критикует логику и постановку и отговаривает от просмотра.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 12,
+      "record_id": "train-00000-of-00001.parquet#row=00036212",
+      "source_row": 36212,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Краткое прямое указание на пустоту и недоработанность идеи поддерживает negative.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 13,
+      "record_id": "train-00000-of-00001.parquet#row=00037239",
+      "source_row": 37239,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Скука названа прямо; замечание о числе зрителей служит дополнительным доводом.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 14,
+      "record_id": "train-00000-of-00001.parquet#row=00015749",
+      "source_row": 15749,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Допущение, что любителям экшна понравится, соседствует с ясным отрицательным личным итогом.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 15,
+      "record_id": "train-00000-of-00001.parquet#row=00034784",
+      "source_row": 34784,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Однозначные скука и сожаление о потраченном времени поддерживают negative.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 16,
+      "record_id": "train-00000-of-00001.parquet#row=00010843",
+      "source_row": 10843,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Удачное начало не компенсирует отрицательный итог и прямой отказ рекомендовать.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 17,
+      "record_id": "train-00000-of-00001.parquet#row=00069441",
+      "source_row": 69441,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Предсказуемость и разочарование завершаются прямой отрицательной рекомендацией.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 18,
+      "record_id": "train-00000-of-00001.parquet#row=00074084",
+      "source_row": 74084,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Отрицательный итог прямо относится к фильму, несмотря на симпатию к актёру.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 19,
+      "record_id": "train-00000-of-00001.parquet#row=00008852",
+      "source_row": 8852,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Автор недоволен съёмкой, сюжетом и юмором и сожалеет о просмотре.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 20,
+      "record_id": "train-00000-of-00001.parquet#row=00052533",
+      "source_row": 52533,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Высокая оценка музыки не отменяет явно выраженного неприятия фильма в целом.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 21,
+      "record_id": "train-00000-of-00001.parquet#row=00037879",
+      "source_row": 37879,
+      "source_label": "negative",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Низкая оригинальность выражена сдержанно: возможно как слабое недовольство, так и нейтральная характеристика.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 22,
+      "record_id": "train-00000-of-00001.parquet#row=00029143",
+      "source_row": 29143,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Вежливая форма обращения не меняет резкой отрицательной рекомендации.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 23,
+      "record_id": "train-00000-of-00001.parquet#row=00062599",
+      "source_row": 62599,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Прямое недовольство смыслом и предсказуемостью поддерживает negative.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 24,
+      "record_id": "train-00000-of-00001.parquet#row=00051626",
+      "source_row": 51626,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Положительное слово относится к чужим отзывам; собственный итог отрицательный.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 25,
+      "record_id": "train-00000-of-00001.parquet#row=00077115",
+      "source_row": 77115,
+      "source_label": "negative",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Отрицательное отношение выводится косвенно из сравнения создателей, прямого итога о фильме мало.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 26,
+      "record_id": "train-00000-of-00001.parquet#row=00067459",
+      "source_row": 67459,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Отдельные смешные фразы и известные актёры не меняют общего резкого неприятия.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 27,
+      "record_id": "train-00000-of-00001.parquet#row=00055436",
+      "source_row": 55436,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Прямое недовольство и отказ рекомендовать сильнее частной рекомендации формата просмотра.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 28,
+      "record_id": "train-00000-of-00001.parquet#row=00064391",
+      "source_row": 64391,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Сравнение ожиданий с просмотром и описание зевоты завершаются отрицательной оценкой постановки.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 29,
+      "record_id": "train-00000-of-00001.parquet#row=00041335",
+      "source_row": 41335,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Похвала гриму и актёрам остаётся исключением на фоне общего разочарования и скуки.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 30,
+      "record_id": "train-00000-of-00001.parquet#row=00017426",
+      "source_row": 17426,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Похвала относится к прежним частям франшизы; текущая часть получает ясно отрицательный итог.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 31,
+      "record_id": "train-00000-of-00001.parquet#row=00012846",
+      "source_row": 12846,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Похвала актёрской работе в других ролях не отменяет резкой критики текущего фильма и режиссуры.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 32,
+      "record_id": "train-00000-of-00001.parquet#row=00061404",
+      "source_row": 61404,
+      "source_label": "negative",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Итог сдержанно отрицательный при высокой оценке эффектов; граница со смешанным neutral нестрогая.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 33,
+      "record_id": "train-00000-of-00001.parquet#row=00079273",
+      "source_row": 79273,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Однозначная скука и отказ рекомендовать поддерживают negative.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 34,
+      "record_id": "train-00000-of-00001.parquet#row=00030922",
+      "source_row": 30922,
+      "source_label": "negative",
+      "agent_status": "supported",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [],
+      "rationale": "Автор описывает скуку, непонятность и отсутствие впечатлений.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 35,
+      "record_id": "train-00000-of-00001.parquet#row=00035644",
+      "source_row": 35644,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Автор оспаривает завышенные ожидания, но характеризует сам фильм как обычный и приемлемый.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 36,
+      "record_id": "train-00000-of-00001.parquet#row=00068903",
+      "source_row": 68903,
+      "source_label": "neutral",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Есть отрицательная характеристика качества, смягчённая разрешением посмотреть один раз; neutral/negative неоднозначны.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 37,
+      "record_id": "train-00000-of-00001.parquet#row=00054315",
+      "source_row": 54315,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Развлекательный эффект признаётся, но выраженной итоговой полярности нет.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 38,
+      "record_id": "train-00000-of-00001.parquet#row=00046978",
+      "source_row": 46978,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Обсуждается намерение пойти и актёрский состав до просмотра; это не ясная оценка увиденного фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 39,
+      "record_id": "train-00000-of-00001.parquet#row=00012646",
+      "source_row": 12646,
+      "source_label": "neutral",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [
+        "negative"
+      ],
+      "rationale": "Начало критикует перегруженность, далее идёт философское толкование; общий оценочный итог неочевиден.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 40,
+      "record_id": "train-00000-of-00001.parquet#row=00076312",
+      "source_row": 76312,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Историческое пояснение в ответ другому комментатору не содержит оценки качества фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 41,
+      "record_id": "train-00000-of-00001.parquet#row=00078544",
+      "source_row": 78544,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Пересказ и трактовка событий не дают явного положительного или отрицательного вердикта.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 42,
+      "record_id": "train-00000-of-00001.parquet#row=00040517",
+      "source_row": 40517,
+      "source_label": "neutral",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Помимо похвалы прежним частям автор положительно оценивает собственный интерес к текущей; замечание о затянутости не обязательно делает итог нейтральным.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 43,
+      "record_id": "train-00000-of-00001.parquet#row=00073679",
+      "source_row": 73679,
+      "source_label": "neutral",
+      "agent_status": "proposed_disagreement",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Автор защищает фильм от чужой критики и утверждает, что его жанровые достоинства реализованы; скорее positive.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 44,
+      "record_id": "train-00000-of-00001.parquet#row=00043426",
+      "source_row": 43426,
+      "source_label": "neutral",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [
+        "positive"
+      ],
+      "rationale": "Описаны удивление и разнообразие переживаний, но явной рекомендации нет; возможна слабая положительная оценка.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 45,
+      "record_id": "train-00000-of-00001.parquet#row=00069497",
+      "source_row": 69497,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Радость относится к появлению рекламы и ожиданию премьеры, а не к оценке уже просмотренного фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 46,
+      "record_id": "train-00000-of-00001.parquet#row=00074360",
+      "source_row": 74360,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Оценки хорошего и плохого относятся к героям и их отношениям, а не к качеству фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 47,
+      "record_id": "train-00000-of-00001.parquet#row=00033569",
+      "source_row": 33569,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Положительные и отрицательные аспекты уравновешены; тяжёлое содержание не тождественно неприятию качества.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 48,
+      "record_id": "train-00000-of-00001.parquet#row=00076835",
+      "source_row": 76835,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Положительное ожидание основано на режиссёре и книге, а не на описанном просмотре фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 49,
+      "record_id": "train-00000-of-00001.parquet#row=00062806",
+      "source_row": 62806,
+      "source_label": "neutral",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [
+        "negative"
+      ],
+      "rationale": "Негативная реакция относится к возрастному позиционированию и личной переносимости, тогда как качество фильма частично одобряется.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 50,
+      "record_id": "train-00000-of-00001.parquet#row=00058145",
+      "source_row": 58145,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Реплика содержит утверждение об актёре, а не оценку фильма; истинность этого утверждения здесь не проверяется.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 51,
+      "record_id": "train-00000-of-00001.parquet#row=00010298",
+      "source_row": 10298,
+      "source_label": "neutral",
+      "agent_status": "proposed_disagreement",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Тяжёлые переживания прямо представлены как положительное художественное впечатление; скорее positive.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 52,
+      "record_id": "train-00000-of-00001.parquet#row=00065374",
+      "source_row": 65374,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Оценки и шутки относятся к чужим комментариям; автор прямо не определяет качество фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 53,
+      "record_id": "train-00000-of-00001.parquet#row=00013842",
+      "source_row": 13842,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Отмечены достоинства и возрастные ограничения привлекательности без ясного общего положительного итога.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 54,
+      "record_id": "train-00000-of-00001.parquet#row=00072721",
+      "source_row": 72721,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Исправление авторства литературного произведения не является оценкой фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 55,
+      "record_id": "train-00000-of-00001.parquet#row=00079696",
+      "source_row": 79696,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Одобрение гипотетической версии сюжета не даёт ясного вердикта существующему фильму.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 56,
+      "record_id": "train-00000-of-00001.parquet#row=00051660",
+      "source_row": 51660,
+      "source_label": "neutral",
+      "agent_status": "proposed_disagreement",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Преобладает недовольство интересностью и юмором фильма; симпатия к одной актрисе не меняет отрицательного итога.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 57,
+      "record_id": "train-00000-of-00001.parquet#row=00061158",
+      "source_row": 61158,
+      "source_label": "neutral",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [
+        "negative"
+      ],
+      "rationale": "Разочарование и сравнение с первой частью противостоят умеренно благоприятной заключительной оценке.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 58,
+      "record_id": "train-00000-of-00001.parquet#row=00043780",
+      "source_row": 43780,
+      "source_label": "neutral",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Слабая отрицательная оценка скуки смягчается допустимостью разового просмотра и частной симпатией; возможен negative.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 59,
+      "record_id": "train-00000-of-00001.parquet#row=00043874",
+      "source_row": 43874,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Предлагается трактовка названия и поведения персонажа без ясной оценки качества фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 60,
+      "record_id": "train-00000-of-00001.parquet#row=00062894",
+      "source_row": 62894,
+      "source_label": "neutral",
+      "agent_status": "proposed_disagreement",
+      "agent_preferred_label": "negative",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Образовательная польза признаётся, но непосредственные впечатления от просмотра преимущественно отрицательные; скорее negative.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 61,
+      "record_id": "train-00000-of-00001.parquet#row=00073391",
+      "source_row": 73391,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Собственный нейтральный итог явно отделён от отрицательного мнения спутника.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 62,
+      "record_id": "train-00000-of-00001.parquet#row=00023147",
+      "source_row": 23147,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Философское обсуждение идеи не содержит достаточного оценочного итога о качестве фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 63,
+      "record_id": "train-00000-of-00001.parquet#row=00055219",
+      "source_row": 55219,
+      "source_label": "neutral",
+      "agent_status": "proposed_disagreement",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Агрессивность адресована критикам, тогда как сам фильм и его создательница одобряются; скорее positive.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 64,
+      "record_id": "train-00000-of-00001.parquet#row=00036680",
+      "source_row": 36680,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Замечание о грамотности адресовано собеседнику; его оценка фильма не выражает автоматически позицию автора.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 65,
+      "record_id": "train-00000-of-00001.parquet#row=00078737",
+      "source_row": 78737,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Философское толкование событий не содержит ясной итоговой полярности относительно фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 66,
+      "record_id": "train-00000-of-00001.parquet#row=00035852",
+      "source_row": 35852,
+      "source_label": "neutral",
+      "agent_status": "supported",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [],
+      "rationale": "Исправление названия в собственной ассоциации не содержит оценки качества.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 67,
+      "record_id": "train-00000-of-00001.parquet#row=00072997",
+      "source_row": 72997,
+      "source_label": "neutral",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [
+        "positive"
+      ],
+      "rationale": "Похвала первой части и ожидание второй смешаны с неясной заключительной фразой; объект положительной оценки неоднозначен.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 68,
+      "record_id": "train-00000-of-00001.parquet#row=00012866",
+      "source_row": 12866,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Недовольство дубляжом не отменяет прямого удовольствия и рекомендации фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 69,
+      "record_id": "train-00000-of-00001.parquet#row=00046362",
+      "source_row": 46362,
+      "source_label": "positive",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "neutral",
+      "alternative_labels": [
+        "positive",
+        "negative"
+      ],
+      "rationale": "Начальное одобрение расходится с резкой заключительной критикой и низкой числовой оценкой; уверенный positive спорен.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 70,
+      "record_id": "train-00000-of-00001.parquet#row=00029833",
+      "source_row": 29833,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Явное одобрение содержания и юмора поддерживает positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 71,
+      "record_id": "train-00000-of-00001.parquet#row=00001084",
+      "source_row": 1084,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Прямое одобрение и рекомендация подкреплены положительными эмодзи.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 72,
+      "record_id": "train-00000-of-00001.parquet#row=00077055",
+      "source_row": 77055,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Отрицательные ожидания противопоставлены положительному впечатлению после просмотра.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 73,
+      "record_id": "train-00000-of-00001.parquet#row=00056894",
+      "source_row": 56894,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Рассуждения о рекламе сопровождаются ясной рекомендацией фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 74,
+      "record_id": "train-00000-of-00001.parquet#row=00061053",
+      "source_row": 61053,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Частные претензии к актёрской игре не перевешивают положительное описание второй части.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 75,
+      "record_id": "train-00000-of-00001.parquet#row=00011863",
+      "source_row": 11863,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Выражены сильное удовольствие, похвала постановке и рекомендация просмотра.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 76,
+      "record_id": "train-00000-of-00001.parquet#row=00064686",
+      "source_row": 64686,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Положительная оценка и желание повторного просмотра поддерживают positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 77,
+      "record_id": "train-00000-of-00001.parquet#row=00046830",
+      "source_row": 46830,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Сравнение с первой частью не в пользу текущего фильма, но прямое удовольствие от просмотра сохраняет положительный итог.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 78,
+      "record_id": "train-00000-of-00001.parquet#row=00018979",
+      "source_row": 18979,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Удовольствие от просмотра и прямая рекомендация поддерживают positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 79,
+      "record_id": "train-00000-of-00001.parquet#row=00035123",
+      "source_row": 35123,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Умеренные оговорки и сравнения не отменяют одобрения и отсутствия сожаления о просмотре.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 80,
+      "record_id": "train-00000-of-00001.parquet#row=00017555",
+      "source_row": 17555,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Негативные суждения относятся к вкусам других зрителей, собственная оценка фильма положительная.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 81,
+      "record_id": "train-00000-of-00001.parquet#row=00021938",
+      "source_row": 21938,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Краткое прямое одобрение лёгкости и юмора поддерживает positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 82,
+      "record_id": "train-00000-of-00001.parquet#row=00074496",
+      "source_row": 74496,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Положительные воспоминания сопровождаются прямым одобрением фильма и готовностью пересмотреть.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 83,
+      "record_id": "train-00000-of-00001.parquet#row=00048840",
+      "source_row": 48840,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Прямая положительная характеристика качества поддерживает positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 84,
+      "record_id": "train-00000-of-00001.parquet#row=00017982",
+      "source_row": 17982,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Оговорки о жанре и вторичности завершаются одобрением результата.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 85,
+      "record_id": "train-00000-of-00001.parquet#row=00003036",
+      "source_row": 3036,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Словесная положительная оценка подкреплена числовой, а не заменена ею.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 86,
+      "record_id": "train-00000-of-00001.parquet#row=00019890",
+      "source_row": 19890,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Похвала истории и героя даёт положительный итог; предупреждение о динамике не является отказом от фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 87,
+      "record_id": "train-00000-of-00001.parquet#row=00047526",
+      "source_row": 47526,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Отрицательные оценки относятся к другой экранизации; текущая версия получает явную похвалу.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 88,
+      "record_id": "train-00000-of-00001.parquet#row=00053190",
+      "source_row": 53190,
+      "source_label": "positive",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Разочарование ожиданий и технические претензии смягчаются общим одобрением и похвалой сцен; граница с neutral возможна.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 89,
+      "record_id": "train-00000-of-00001.parquet#row=00077307",
+      "source_row": 77307,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Критика отдельных художественных решений не отменяет итоговой рекомендации и признания достоинств.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 90,
+      "record_id": "train-00000-of-00001.parquet#row=00013303",
+      "source_row": 13303,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Прямое сильное удовольствие и рекомендация поддерживают positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 91,
+      "record_id": "train-00000-of-00001.parquet#row=00017252",
+      "source_row": 17252,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Замечание о скуке и отсутствии экшна сопровождается явной рекомендацией фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 92,
+      "record_id": "train-00000-of-00001.parquet#row=00061711",
+      "source_row": 61711,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Грусть о герое не меняет положительной оценки самого фильма.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 93,
+      "record_id": "train-00000-of-00001.parquet#row=00068090",
+      "source_row": 68090,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Прямое одобрение сюжета и эффектов поддерживает positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 94,
+      "record_id": "train-00000-of-00001.parquet#row=00040817",
+      "source_row": 40817,
+      "source_label": "positive",
+      "agent_status": "ambiguous",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [
+        "neutral"
+      ],
+      "rationale": "Краткая формула допустимости просмотра выражает слабое одобрение, но граница с neutral зависит от принятого правила.",
+      "priority_for_human_confirmation": true
+    },
+    {
+      "sample_position": 95,
+      "record_id": "train-00000-of-00001.parquet#row=00003932",
+      "source_row": 3932,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Удовольствие и благодарность создателям дают ясную положительную оценку.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 96,
+      "record_id": "train-00000-of-00001.parquet#row=00069649",
+      "source_row": 69649,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Одобрение фильма, музыки и актёра поддерживает positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 97,
+      "record_id": "train-00000-of-00001.parquet#row=00044738",
+      "source_row": 44738,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Удовольствие разных зрителей и рекомендация поддерживают positive.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 98,
+      "record_id": "train-00000-of-00001.parquet#row=00025440",
+      "source_row": 25440,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Чужие отрицательные отзывы отделены от прямого положительного впечатления автора.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 99,
+      "record_id": "train-00000-of-00001.parquet#row=00030383",
+      "source_row": 30383,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Недостатки эффектов и отступления от первоисточника не отменяют высокого общего одобрения.",
+      "priority_for_human_confirmation": false
+    },
+    {
+      "sample_position": 100,
+      "record_id": "train-00000-of-00001.parquet#row=00022008",
+      "source_row": 22008,
+      "source_label": "positive",
+      "agent_status": "supported",
+      "agent_preferred_label": "positive",
+      "alternative_labels": [],
+      "rationale": "Прямое удовольствие и отсутствие сожаления поддерживают positive; сравнение служит дополнительным доводом.",
+      "priority_for_human_confirmation": false
+    }
+  ]
+}
