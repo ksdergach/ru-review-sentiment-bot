@@ -161,7 +161,8 @@ def audit(root: Path, source: dict) -> tuple[dict, list[dict]]:
         "source_revision": source["revision"], "source_config": source["config"],
         "class_mapping": LABELS, "splits": summaries, "movie_overlap": overlaps,
         "all_match_plan": all(s["plan_counts_match"] for s in summaries.values()),
-        "manual_review_status": "pending_participant",
+        "manual_review_status": "tracked_separately",
+        "manual_review_report": "reports/dataset/manual_review.md",
         "sampling": {**source["manual_sample"], "algorithm": "SHA-256(seed:record_id), ascending within each class", "split": "train", "language": "ru"},
     }
     return report, sample
@@ -181,7 +182,8 @@ def main() -> int:
     print(json.dumps({
         "provenance": "PASS", "remote_metadata_checked": args.verify_remote,
         "plan_counts_match": report["all_match_plan"], "movie_overlap": report["movie_overlap"],
-        "manual_review": "PENDING", "sample_size": len(sample),
+        "manual_review": "SEE_PROTOCOL", "sample_size": len(sample),
+        "manual_review_report": report["manual_review_report"],
         "review_packet": "artifacts/dataset_audit/review.html",
     }, ensure_ascii=False, indent=2))
     return 0 if report["all_match_plan"] and not any(report["movie_overlap"].values()) else 1

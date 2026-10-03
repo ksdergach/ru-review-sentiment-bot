@@ -1,0 +1,178 @@
+{
+  "date": "2026-10-03",
+  "reviewer": "Пользователь проекта, подтверждение в диалоге; имя не сообщено",
+  "method": "Агент прочитал все 100 отзывов; пользователь подтвердил решения по 15 выбранным случаям. Полное чтение 100 отзывов человеком не заявляется.",
+  "sample_ids_sha256": "1e29a46bf4a4e6c0fe7a1a1e9291e03267e17fe2b80bfaf763d1647a221e41a4",
+  "agent_review_sha256": "36c7497b368dc4ba8d15b3c641672370af0e1c42843b555204dc8f458fae9ea1",
+  "reviewed_count": 15,
+  "agreed_with_agent_count": 13,
+  "overrides_count": 2,
+  "dataset_labels_modified": false,
+  "decisions": [
+    {
+      "sample_position": 5,
+      "record_id": "train-00000-of-00001.parquet#row=00019621",
+      "source_label": "negative",
+      "agent_preferred_label": "negative",
+      "user_response": "согласен",
+      "confirmed_audit_label": "negative",
+      "agrees_with_agent_preference": true,
+      "rationale": "Словесная оценка слабая и критическая, но упоминание пяти звёзд противоречиво без известной шкалы.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 21,
+      "record_id": "train-00000-of-00001.parquet#row=00037879",
+      "source_label": "negative",
+      "agent_preferred_label": "negative",
+      "user_response": "согласен",
+      "confirmed_audit_label": "negative",
+      "agrees_with_agent_preference": true,
+      "rationale": "Низкая оригинальность выражена сдержанно: возможно как слабое недовольство, так и нейтральная характеристика.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 25,
+      "record_id": "train-00000-of-00001.parquet#row=00077115",
+      "source_label": "negative",
+      "agent_preferred_label": "negative",
+      "user_response": "согласен",
+      "confirmed_audit_label": "negative",
+      "agrees_with_agent_preference": true,
+      "rationale": "Отрицательное отношение выводится косвенно из сравнения создателей, прямого итога о фильме мало.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 36,
+      "record_id": "train-00000-of-00001.parquet#row=00068903",
+      "source_label": "neutral",
+      "agent_preferred_label": "negative",
+      "user_response": "согласен",
+      "confirmed_audit_label": "negative",
+      "agrees_with_agent_preference": true,
+      "rationale": "Есть отрицательная характеристика качества, смягчённая разрешением посмотреть один раз; neutral/negative неоднозначны.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 42,
+      "record_id": "train-00000-of-00001.parquet#row=00040517",
+      "source_label": "neutral",
+      "agent_preferred_label": "positive",
+      "user_response": "согласен",
+      "confirmed_audit_label": "positive",
+      "agrees_with_agent_preference": true,
+      "rationale": "Помимо похвалы прежним частям автор положительно оценивает собственный интерес к текущей; замечание о затянутости не обязательно делает итог нейтральным.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 43,
+      "record_id": "train-00000-of-00001.parquet#row=00073679",
+      "source_label": "neutral",
+      "agent_preferred_label": "positive",
+      "user_response": "согласен",
+      "confirmed_audit_label": "positive",
+      "agrees_with_agent_preference": true,
+      "rationale": "Автор защищает фильм от чужой критики и утверждает, что его жанровые достоинства реализованы; скорее positive.",
+      "original_agent_status": "proposed_disagreement"
+    },
+    {
+      "sample_position": 49,
+      "record_id": "train-00000-of-00001.parquet#row=00062806",
+      "source_label": "neutral",
+      "agent_preferred_label": "neutral",
+      "user_response": "согласен",
+      "confirmed_audit_label": "neutral",
+      "agrees_with_agent_preference": true,
+      "rationale": "Негативная реакция относится к возрастному позиционированию и личной переносимости, тогда как качество фильма частично одобряется.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 51,
+      "record_id": "train-00000-of-00001.parquet#row=00010298",
+      "source_label": "neutral",
+      "agent_preferred_label": "positive",
+      "user_response": "согласен",
+      "confirmed_audit_label": "positive",
+      "agrees_with_agent_preference": true,
+      "rationale": "Тяжёлые переживания прямо представлены как положительное художественное впечатление; скорее positive.",
+      "original_agent_status": "proposed_disagreement"
+    },
+    {
+      "sample_position": 56,
+      "record_id": "train-00000-of-00001.parquet#row=00051660",
+      "source_label": "neutral",
+      "agent_preferred_label": "negative",
+      "user_response": "согласен",
+      "confirmed_audit_label": "negative",
+      "agrees_with_agent_preference": true,
+      "rationale": "Преобладает недовольство интересностью и юмором фильма; симпатия к одной актрисе не меняет отрицательного итога.",
+      "original_agent_status": "proposed_disagreement"
+    },
+    {
+      "sample_position": 57,
+      "record_id": "train-00000-of-00001.parquet#row=00061158",
+      "source_label": "neutral",
+      "agent_preferred_label": "neutral",
+      "user_response": "согласен",
+      "confirmed_audit_label": "neutral",
+      "agrees_with_agent_preference": true,
+      "rationale": "Разочарование и сравнение с первой частью противостоят умеренно благоприятной заключительной оценке.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 60,
+      "record_id": "train-00000-of-00001.parquet#row=00062894",
+      "source_label": "neutral",
+      "agent_preferred_label": "negative",
+      "user_response": "согласен",
+      "confirmed_audit_label": "negative",
+      "agrees_with_agent_preference": true,
+      "rationale": "Образовательная польза признаётся, но непосредственные впечатления от просмотра преимущественно отрицательные; скорее negative.",
+      "original_agent_status": "proposed_disagreement"
+    },
+    {
+      "sample_position": 63,
+      "record_id": "train-00000-of-00001.parquet#row=00055219",
+      "source_label": "neutral",
+      "agent_preferred_label": "positive",
+      "user_response": "оставь neutral",
+      "confirmed_audit_label": "neutral",
+      "agrees_with_agent_preference": false,
+      "rationale": "Пользователь выбрал neutral; дополнительное объяснение не предоставлено.",
+      "original_agent_status": "proposed_disagreement"
+    },
+    {
+      "sample_position": 67,
+      "record_id": "train-00000-of-00001.parquet#row=00072997",
+      "source_label": "neutral",
+      "agent_preferred_label": "neutral",
+      "user_response": "согласен",
+      "confirmed_audit_label": "neutral",
+      "agrees_with_agent_preference": true,
+      "rationale": "Похвала первой части и ожидание второй смешаны с неясной заключительной фразой; объект положительной оценки неоднозначен.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 69,
+      "record_id": "train-00000-of-00001.parquet#row=00046362",
+      "source_label": "positive",
+      "agent_preferred_label": "neutral",
+      "user_response": "согласен",
+      "confirmed_audit_label": "neutral",
+      "agrees_with_agent_preference": true,
+      "rationale": "Начальное одобрение расходится с резкой заключительной критикой и низкой числовой оценкой; уверенный positive спорен.",
+      "original_agent_status": "ambiguous"
+    },
+    {
+      "sample_position": 94,
+      "record_id": "train-00000-of-00001.parquet#row=00040817",
+      "source_label": "positive",
+      "agent_preferred_label": "positive",
+      "user_response": "neutral",
+      "confirmed_audit_label": "neutral",
+      "agrees_with_agent_preference": false,
+      "rationale": "Пользователь выбрал neutral; дополнительное объяснение не предоставлено.",
+      "original_agent_status": "ambiguous"
+    }
+  ]
+}

@@ -176,7 +176,8 @@
     "validation/test": 0
   },
   "all_match_plan": true,
-  "manual_review_status": "pending_participant",
+  "manual_review_status": "tracked_separately",
+  "manual_review_report": "reports/dataset/manual_review.md",
   "sampling": {
     "seed": 42,
     "per_class": {

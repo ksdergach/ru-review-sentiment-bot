@@ -49,7 +49,8 @@ def test_audit_raw_counts_and_train_only_sample(tmp_path):
     assert all(r["record_id"].startswith("train.parquet#row=") for r in sample)
     assert all(r["review_language"] == "ru" for r in sample)
     assert report["splits"]["train"]["class_counts_all"] == dict.fromkeys(LABELS, 15)
-    assert report["manual_review_status"] == "pending_participant"
+    assert report["manual_review_status"] == "tracked_separately"
+    assert report["manual_review_report"] == "reports/dataset/manual_review.md"
     assert all("review_text" not in row for row in sample_metadata(sample))
     assert select_sample(list(reversed(sample)), **source["manual_sample"]) == sample
 
