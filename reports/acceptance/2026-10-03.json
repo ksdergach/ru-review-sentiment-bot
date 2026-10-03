@@ -1,0 +1,179 @@
+{
+  "date": "2026-10-03",
+  "reviewed_commit": "5f290f61c9697c7ef42393cb8f79bda9afd1fe72",
+  "tests": {
+    "passed": 345,
+    "seconds": 13.0,
+    "scope": [
+      "test_prepare_data.py",
+      "test_train_baseline.py",
+      "test_resource_check.py"
+    ]
+  },
+  "T03": {
+    "status": "accepted",
+    "checks_passed": 100,
+    "checks_failed": 0,
+    "two_pipeline_runs": true,
+    "outputs_match_committed": {
+      "audit.json": true,
+      "split_ids.csv": true,
+      "excluded_ids.csv": true,
+      "near_duplicate_candidates.csv": true,
+      "label_conflicts.csv": true
+    },
+    "manual_decisions": "Existing team decisions from configs/near_duplicate_decisions.csv; no new human review claimed."
+  },
+  "T04": {
+    "status": "in_review",
+    "windows_metrics": [
+      {
+        "C": 0.5,
+        "macro_f1": 0.70418731
+      },
+      {
+        "C": 1.0,
+        "macro_f1": 0.71597888
+      },
+      {
+        "C": 2.0,
+        "macro_f1": 0.72249892
+      }
+    ],
+    "macos_first_metrics": [
+      {
+        "C": 0.5,
+        "macro_f1": 0.70444617
+      },
+      {
+        "C": 1.0,
+        "macro_f1": 0.71617288
+      },
+      {
+        "C": 2.0,
+        "macro_f1": 0.71853259
+      }
+    ],
+    "macos_second_metrics": [
+      {
+        "C": 0.5,
+        "macro_f1": 0.70444617
+      },
+      {
+        "C": 1.0,
+        "macro_f1": 0.71617288
+      },
+      {
+        "C": 2.0,
+        "macro_f1": 0.71853259
+      }
+    ],
+    "data_config_code_match": {
+      "script_sha256": true,
+      "config_sha256": true,
+      "config_canonical_sha256": true,
+      "train_parquet_sha256": true,
+      "validation_parquet_sha256": true,
+      "train_ids_sha256": true,
+      "validation_ids_sha256": true,
+      "train_class_distribution": true,
+      "validation_class_distribution": true,
+      "class_weights": true
+    },
+    "macos_repeat": {
+      "script_sha256": true,
+      "config_sha256": true,
+      "config_canonical_sha256": true,
+      "train_parquet_sha256": true,
+      "validation_parquet_sha256": true,
+      "train_ids_sha256": true,
+      "validation_ids_sha256": true,
+      "train_class_distribution": true,
+      "validation_class_distribution": true,
+      "class_weights": true,
+      "tfidf_state_sha256": true,
+      "winner_C": true,
+      "winner_validation_macro_f1": true
+    },
+    "windows_tfidf_sha256": "87c3bf68185b15b23c7418fa8385f3ac114142ac02dd0753756e3b68268efbb7",
+    "macos_tfidf_sha256": "0abc1e52eb0fc5533a1574109bc9b4a84ab8f2c72d70a469b4267d22a235596b",
+    "windows_bundle_sha256": "4f3d3cca2a1f7bdf98a8ba1baad783015e6375532c8df6227b62484db22185d4",
+    "macos_first_bundle_sha256": "8b7759d82a58c0a8727291440e4678e0df9f2753d9122b91d42371c36ebd6627",
+    "macos_second_bundle_sha256": "9f723f2da0134374cc69be63475e7259e2c6c87e17871d9a4348db22495b470e",
+    "macos_roundtrip": {
+      "fixed_texts": {
+        "num_texts": 3,
+        "passed": true,
+        "predicted_label_ids": [
+          2,
+          0,
+          1
+        ],
+        "predicted_labels": [
+          "positive",
+          "negative",
+          "neutral"
+        ],
+        "probabilities_max_abs_diff": 0.0,
+        "probability_class_ids": [
+          0,
+          1,
+          2
+        ],
+        "text_sha256": [
+          "5a75385f9a81f9de988e71ec840389d6d898f76e7aba13b2571877a8e8b40bc4",
+          "32f85b841cdf369446e8c988889170d8aaee278ebb438238e687fd5e9af4d127",
+          "37e0d05b71cb0f74a7681c5b14e9b0f3981da3afd7d6067d5111dba11169564b"
+        ]
+      },
+      "validation_macro_f1_after_load": 0.7185325879377858,
+      "validation_predictions_identical_after_load": true
+    },
+    "open_question": "TF-IDF state and validation metrics differ across Windows/macOS; cause not established. Original Windows bundle unavailable locally. Byte-identical serialization across fresh fits not claimed."
+  },
+  "T05": {
+    "status": "accepted_from_saved_hardware_runs",
+    "new_gpu_run": false,
+    "profiles": {
+      "primary": {
+        "report": "reports/resources/primary/resource_report.json",
+        "sha256": "1b23edd569c4df0339de23d3f26a44fd5c03217728b855c62d15b346460322a0",
+        "checks": {
+          "report_pass": true,
+          "encoder_updated": true,
+          "head_updated": true,
+          "joint_load": true,
+          "logits_preserved": true,
+          "train_parquet": true,
+          "train_ids_file": true,
+          "train_ids": true,
+          "profile_matches_config": true
+        }
+      },
+      "reserve": {
+        "report": "reports/resources/reserve/resource_report.json",
+        "sha256": "2cf337dab168490bb355c3f305b3ba462610ecd40c0fcbd67762b236ec5919ef",
+        "checks": {
+          "report_pass": true,
+          "encoder_updated": true,
+          "head_updated": true,
+          "joint_load": true,
+          "logits_preserved": true,
+          "train_parquet": true,
+          "train_ids_file": true,
+          "train_ids": true,
+          "profile_matches_config": true
+        }
+      }
+    }
+  },
+  "T02": {
+    "status": "open",
+    "human_review": "Not completed, confirmed by user."
+  },
+  "T06": {
+    "status": "not_started",
+    "full_training_run": false,
+    "prerequisite": "Complete T02 manual review before new full training; training machine not confirmed in this review."
+  }
+}
