@@ -16,11 +16,6 @@ WER = 0% (0 ошибок / 24 слова). N01 завершена; резуль�
 T03/T05 приняты, у T04 проверяется расхождение TF-IDF и validation-метрик
 между Windows и Mac.
 
-Для N02 подготовлены [метрики и разбор 40 ошибок](reports/nlp/baseline_analysis.md)
-отдельного воспроизводимого Mac-комплекта. Полная validation: accuracy 88,9861%,
-macro-F1 0,718533; финальный test не использован. [Протокол](reports/nlp/baseline_reproducibility.md)
-фиксирует ограничение Windows/Mac и ожидающую человеческую проверку.
-
 T02 завершена: [аудит 100 отзывов агентом](reports/dataset/agent_review.md)
 и [подтверждение пользователем 15 случаев](reports/dataset/manual_review.md).
 В №63 и №94 согласован neutral; исходная разметка датасета сохранена.
