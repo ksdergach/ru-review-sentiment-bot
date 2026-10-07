@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 import sklearn
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -733,6 +733,39 @@ def build_vectorizer(tfidf_config: dict[str, Any]) -> TfidfVectorizer:
     return TfidfVectorizer(**params)
 
 
+
+def fit_vectorizer_on_train(vectorizer: TfidfVectorizer, texts: list[str]) -> dict[str, Any]:
+    """Resolve max_features ties by Unicode term order, using train counts only.
+
+    CountVectorizer applies min_df/max_df without a feature cap first. A fixed
+    vocabulary then lets the ordinary, serializable TfidfVectorizer learn IDF
+    without relying on NumPy's unspecified ordering of equal frequencies.
+    """
+    params = {key: value for key, value in vectorizer.get_params().items()
+              if key in CountVectorizer().get_params()}
+    params.update(max_features=None, vocabulary=None, dtype=np.int64)
+    counter = CountVectorizer(**params)
+    counts = counter.fit_transform(texts)
+    terms = counter.get_feature_names_out()
+    frequencies = np.asarray(counts.sum(axis=0)).ravel()
+    limit = vectorizer.max_features
+    order = sorted(range(len(terms)), key=lambda i: (-int(frequencies[i]), str(terms[i])))
+    selected = order if limit is None else order[:limit]
+    selected_terms = sorted(str(terms[i]) for i in selected)
+    cutoff = int(frequencies[selected[-1]])
+    above = int(np.count_nonzero(frequencies > cutoff))
+    selection = {
+        "policy": "train_term_frequency_desc_then_unicode_term_asc_v1",
+        "eligible_features": len(terms), "selected_features": len(selected),
+        "cutoff_term_frequency": cutoff,
+        "features_above_cutoff": above,
+        "features_tied_at_cutoff": int(np.count_nonzero(frequencies == cutoff)),
+        "selected_at_cutoff": len(selected) - above,
+    }
+    vectorizer.set_params(vocabulary={term: i for i, term in enumerate(selected_terms)})
+    return {"x": vectorizer.fit_transform(texts), "vocabulary_selection": selection}
+
+
 def build_classifier(
     *,
     c_value: float,
@@ -1159,7 +1192,7 @@ def run_training(config_path: Path, project_root: Path | None = None) -> dict[st
     fitted_train: dict[str, Any] = {}
     start = time.perf_counter()
     _, vectorizer_warnings = _fit_capturing_warnings(
-        lambda: fitted_train.update(x=vectorizer.fit_transform(train[text_column].tolist()))
+        lambda: fitted_train.update(fit_vectorizer_on_train(vectorizer, train[text_column].tolist()))
     )
     vectorizer_fit_seconds = time.perf_counter() - start
     x_train = fitted_train["x"]
@@ -1239,6 +1272,7 @@ def run_training(config_path: Path, project_root: Path | None = None) -> dict[st
             split: (source_files.get(split) or {}).get("sha256_after") for split in INPUT_SPLITS_FOR_T04
         },
         "tfidf_vocabulary_size": int(len(vectorizer.vocabulary_)),
+        "vocabulary_selection": fitted_train["vocabulary_selection"],
         "tfidf_state_sha256": vectorizer_state_sha256,
         "tfidf_warnings": vectorizer_warnings,
         "class_weight_mode": class_weight_mode,

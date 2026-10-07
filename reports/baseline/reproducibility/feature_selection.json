@@ -1,0 +1,38 @@
+{
+  "train_rows": 76971,
+  "eligible_features": 288560,
+  "limit": 100000,
+  "cutoff_term_frequency": 4,
+  "above_cutoff": 91032,
+  "tied_at_cutoff": 25751,
+  "tie_slots": 8968,
+  "train_parquet_sha256": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
+  "library_versions": {
+    "python": "3.13.7",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "numpy": "2.3.3",
+    "pandas": "2.3.2",
+    "scikit-learn": "1.7.2",
+    "scipy": "1.15.3",
+    "joblib": "1.5.2",
+    "pyarrow": "24.0.0"
+  },
+  "script_sha256": "b9c1cd15e3ac507e2eef2be3c96707a5229e1bc042c54e9548fdcd274df16d6a",
+  "historical_acceptance_sha256": "8aa2efb3f3724683c2dd1d90264d7e6af86c370758b6fb73b8cdb00df37654b6",
+  "candidate_states": {
+    "quicksort": {
+      "tfidf_state_sha256": "0abc1e52eb0fc5533a1574109bc9b4a84ab8f2c72d70a469b4267d22a235596b",
+      "symmetric_difference_from_quicksort": 0
+    },
+    "heapsort": {
+      "tfidf_state_sha256": "79078eb3b999f20d3c298814201e696dfe2263bf29d70815548c81039d17f064",
+      "symmetric_difference_from_quicksort": 10354
+    },
+    "stable": {
+      "tfidf_state_sha256": "5e7e2cd53315e896afc9d37224370102c136f8dfdcf38aad9e7dfc8bfa5f9f15",
+      "symmetric_difference_from_quicksort": 12694
+    }
+  },
+  "final_test_used": false,
+  "scope": "Different equal-frequency tie policies on the same train; not a rerun on Windows."
+}
