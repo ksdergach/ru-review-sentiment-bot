@@ -1,0 +1,35 @@
+{
+  "annotation_model_state_sha256": "bff6e95ae2626ea061f9f4cab94e5e0734d003aac1018cb60e38cde8fd477c2c",
+  "confusion_pairs_covered": 6,
+  "evaluation_runs": 2,
+  "existing_T03_T04_unchanged": true,
+  "final_test_open_guard": "enabled; no attempts",
+  "human_review_status": "pending",
+  "local_artifacts_git_ignored": true,
+  "model_bundle_unchanged": true,
+  "outputs_byte_identical": true,
+  "outputs_sha256": {
+    "artifacts/nlp/baseline_errors.html": "4cdc00ac0366dd3a9b7bc15beb0f399f4c61376e4ad8592c9921bb29a7640b9e",
+    "artifacts/nlp/baseline_errors.json": "e0e2370ce82d12b87aa773ed1af6e02ff30fc5fdd1eaf55016faae821b4cdc01",
+    "reports/nlp/baseline_analysis.md": "3d32d8896f24114960904a7e15f0c3922c49f334fda2a2adfbca9cba1f1764f9",
+    "reports/nlp/baseline_errors.csv": "bf75415b22fa8b03b36087744a662e2ca279e8d54559e196f0c8097da97cba63",
+    "reports/nlp/baseline_metrics.json": "bdb12a19b70fe276c36d5778bf7c92e64afb1fea3f354ab473b43e12c409cbde"
+  },
+  "parquet_file_names_opened": [
+    "train.parquet",
+    "validation.parquet"
+  ],
+  "report_relative_links_valid": true,
+  "review_regressions": {
+    "missing_annotations_preserve_outputs": true,
+    "preparation_writes_local_packet_only": true,
+    "same_labels_changed_model_rejected": true
+  },
+  "selected_errors": 40,
+  "status": "PASS",
+  "tests": {
+    "command": "python -m pytest -q tests/test_nlp_baseline.py tests/test_train_baseline.py",
+    "failed": 0,
+    "passed": 145
+  }
+}

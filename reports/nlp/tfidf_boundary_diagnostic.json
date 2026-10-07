@@ -1,0 +1,14 @@
+{
+  "available_slots_at_cutoff": 8968,
+  "conclusion": "Boundary ties are present; different selection across original Windows/Mac runs is a hypothesis, not proven without the original Windows bundle. IDF floating point differences also not excluded.",
+  "cutoff_term_frequency": 4,
+  "eligible_features": 288560,
+  "features_above_cutoff": 91032,
+  "features_at_cutoff": 25751,
+  "implementation": "CountVectorizer._limit_features uses (-tfs[mask]).argsort() without stable=True or an explicit secondary key",
+  "max_features": 100000,
+  "selected_tied_features": 8968,
+  "train_only": true,
+  "train_sha256": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
+  "windows_bundle_available": false
+}
