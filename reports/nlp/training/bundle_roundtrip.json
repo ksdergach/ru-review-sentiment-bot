@@ -1,0 +1,29 @@
+{
+  "fixed_texts": {
+    "num_texts": 3,
+    "passed": true,
+    "predicted_label_ids": [
+      2,
+      0,
+      1
+    ],
+    "predicted_labels": [
+      "positive",
+      "negative",
+      "neutral"
+    ],
+    "probabilities_max_abs_diff": 0.0,
+    "probability_class_ids": [
+      0,
+      1,
+      2
+    ],
+    "text_sha256": [
+      "5a75385f9a81f9de988e71ec840389d6d898f76e7aba13b2571877a8e8b40bc4",
+      "32f85b841cdf369446e8c988889170d8aaee278ebb438238e687fd5e9af4d127",
+      "37e0d05b71cb0f74a7681c5b14e9b0f3981da3afd7d6067d5111dba11169564b"
+    ]
+  },
+  "validation_macro_f1_after_load": 0.7180146428367195,
+  "validation_predictions_identical_after_load": true
+}

@@ -1,0 +1,95 @@
+{
+  "bundle_format_version": 3,
+  "bundle_git_ignored": true,
+  "bundle_path": "models/nlp_baseline/tfidf_logreg_baseline.joblib",
+  "bundle_sha256": "389a768bcd108721c79ebf3a7b9dc5212ec100f5c2e1b06cf519ed076cd9bee3",
+  "class_weight_mode": "balanced_train",
+  "class_weights": {
+    "0": 1.1943487570989666,
+    "1": 7.7984802431610944,
+    "2": 0.49152282610777986
+  },
+  "config_canonical_sha256": "cfd9b710fdbde7365986c2cedc7a8fd737e2890dbe3d2716e790036f85640161",
+  "config_path": "configs/nlp_baseline.json",
+  "config_sha256": "74ff00ab59a2a881eb5c7724a9d800ae57ecb530ee5b80be4f6a5e2d0c1e5619",
+  "data_prep_audit_path": "reports/data_prep/audit.json",
+  "data_prep_split_ids_path": "reports/data_prep/split_ids.csv",
+  "final_test_used": false,
+  "git_commit": "1ccc1a43d525f3079c822988a1cf83102e9f6c8f",
+  "library_versions": {
+    "joblib": "1.5.2",
+    "numpy": "2.3.3",
+    "pandas": "2.3.2",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "pyarrow": "24.0.0",
+    "python": "3.13.7",
+    "scikit-learn": "1.7.2",
+    "scipy": "1.15.3"
+  },
+  "report_paths": {
+    "bundle_roundtrip": "reports/nlp/training/bundle_roundtrip.json",
+    "train_ids": "reports/nlp/training/train_ids.csv",
+    "validation_results": "reports/nlp/training/validation_results.csv",
+    "validation_summary": "reports/nlp/training/validation_summary.md"
+  },
+  "script_sha256": "ae889bbc7a2863ff3bca45788b9a7fc0cacb097b763eada9bc05fbb5b9fc0e70",
+  "seed": 42,
+  "selection_metric": "validation_macro_f1",
+  "selection_tie_break": "smaller_C",
+  "split_independence": {
+    "movie_id_overlap": 0,
+    "normalized_text_overlap": 0,
+    "record_id_overlap": 0
+  },
+  "t03_audit_sha256": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
+  "t03_audit_status": "completed",
+  "t03_source_parquet_sha256": {
+    "train": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+    "validation": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae"
+  },
+  "t03_split_check": {
+    "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+    "train_rows": 76971,
+    "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+    "validation_rows": 10396
+  },
+  "t03_split_ids_sha256": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
+  "tfidf_fit_seconds": 6.392008041002555,
+  "tfidf_state_sha256": "5e7e2cd53315e896afc9d37224370102c136f8dfdcf38aad9e7dfc8bfa5f9f15",
+  "tfidf_vocabulary_size": 100000,
+  "tfidf_warnings": [],
+  "train_class_distribution": {
+    "negative": 21482,
+    "neutral": 3290,
+    "positive": 52199
+  },
+  "train_full_rows": 76971,
+  "train_ids_file_sha256": null,
+  "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+  "train_is_subset": false,
+  "train_parquet_sha256": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
+  "train_rows": 76971,
+  "train_selection_source": "all_prepared_train",
+  "validation_class_distribution": {
+    "negative": 2825,
+    "neutral": 436,
+    "positive": 7135
+  },
+  "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+  "validation_parquet_sha256": "f95a9223e216c4fe3be1e4a9a23a0dfd65ea81e8b37c0a680c0a4b1fe411c214",
+  "validation_rows": 10396,
+  "validation_transform_seconds": 0.29745691700372845,
+  "vocabulary_selection": {
+    "cutoff_term_frequency": 4,
+    "eligible_features": 288560,
+    "features_above_cutoff": 91032,
+    "features_tied_at_cutoff": 25751,
+    "policy": "train_term_frequency_desc_then_unicode_term_asc_v1",
+    "selected_at_cutoff": 8968,
+    "selected_features": 100000
+  },
+  "winner_C": 2.0,
+  "winner_convergence_warning": false,
+  "winner_run_name": "run_3_C_2",
+  "winner_validation_macro_f1": 0.7180146428367195
+}
