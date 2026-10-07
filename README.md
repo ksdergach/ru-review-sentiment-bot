@@ -4,6 +4,11 @@
 → `negative=0`, `neutral=1`, `positive=2`.
 [План](docs/team_plan.md) и [доска](https://github.com/users/ksdergach/projects/2).
 
+Текущий приоритет — [сдача NLP без трансформеров](docs/nlp_submission.md):
+TF-IDF + Logistic Regression, качество данных, анализ ошибок и короткий отчёт.
+[Milestone](https://github.com/ksdergach/ru-review-sentiment-bot/milestone/1)
+собирает задачи этой сдачи; RuBERT остаётся в дальнейшем плане.
+
 [Приёмка T03–T05 от 03.10.2026](reports/acceptance/2026-10-03.md):
 T03/T05 приняты, у T04 проверяется расхождение TF-IDF и validation-метрик
 между Windows и Mac.
