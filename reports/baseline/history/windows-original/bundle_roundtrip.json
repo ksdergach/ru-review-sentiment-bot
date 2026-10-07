@@ -24,6 +24,6 @@
       "37e0d05b71cb0f74a7681c5b14e9b0f3981da3afd7d6067d5111dba11169564b"
     ]
   },
-  "validation_macro_f1_after_load": 0.7180146428367195,
+  "validation_macro_f1_after_load": 0.7224989150144149,
   "validation_predictions_identical_after_load": true
 }

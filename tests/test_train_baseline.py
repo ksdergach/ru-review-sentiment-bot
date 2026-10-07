@@ -995,3 +995,33 @@ def test_real_parquet_roundtrip_when_pyarrow_is_available(tmp_path: Path) -> Non
     validation.to_parquet(data_dir / "validation.parquet", index=False)
     result = run_training(config_path, project_root=tmp_path)
     assert result["bundle_path"].exists() and result["final_test_used"] is False
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_feature_cap_uses_lexical_tie_break_after_df_filter(reverse):
+    texts = ["яблоко банан", "груша банан", "яблоко груша", "слива"]
+    if reverse:
+        texts.reverse()
+    v = TfidfVectorizer(min_df=2, max_features=2)
+    result = tb.fit_vectorizer_on_train(v, texts)
+    # Three equally frequent terms compete for two slots; сливa fails min_df.
+    assert v.vocabulary_ == {"банан": 0, "груша": 1}
+    assert result["x"].shape == (4, 2)
+    assert np.allclose(v.idf_, np.log(5 / 3) + 1)
+    assert result["vocabulary_selection"]["features_tied_at_cutoff"] == 3
+    assert result["vocabulary_selection"]["selected_at_cutoff"] == 2
+
+
+def test_feature_cap_ranks_term_frequency_not_document_frequency():
+    v = TfidfVectorizer(max_features=1)
+    tb.fit_vectorizer_on_train(v, ["яблоко " * 6, "груша", "груша", "груша"])
+    assert v.vocabulary_ == {"яблоко": 0}
+
+
+def test_feature_selection_respects_max_df_and_uncapped_mode():
+    texts = ["общий яблоко груша", "общий банан груша", "общий яблоко банан"]
+    v = TfidfVectorizer(min_df=2, max_df=0.9, max_features=None)
+    tb.fit_vectorizer_on_train(v, texts)
+    assert v.vocabulary_ == {"банан": 0, "груша": 1, "яблоко": 2}
+    reference = TfidfVectorizer(min_df=2, max_df=0.9).fit(texts)
+    assert tb._vectorizer_state_sha256(v) == tb._vectorizer_state_sha256(reference)
