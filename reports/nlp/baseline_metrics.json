@@ -51,7 +51,7 @@
     "configs/nlp_baseline.json": "74ff00ab59a2a881eb5c7724a9d800ae57ecb530ee5b80be4f6a5e2d0c1e5619",
     "reports/data_prep/audit.json": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
     "reports/data_prep/split_ids.csv": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
-    "reports/nlp/baseline_error_annotations.json": "0e13a616162c115b8c0047d2ef77f92d9490829e72882edd073744b293ca9f8d",
+    "reports/nlp/baseline_error_annotations.json": "637972f9e7be685e07072d9cab5750867538f3214a46bb0e3039d055e9d14de3",
     "reports/nlp/baseline_reproducibility.md": "988f8d0201b84042f25c802afcbe63c57654a5cc09bdde1c8f89d0a297184ce6",
     "reports/nlp/retraining_verification.json": "172370b7a3ce0ac188144f634b4677d1af31f6d4376c0a8f371bcdb06c032e3a",
     "reports/nlp/tfidf_boundary_diagnostic.json": "8b0167201e1a969094b120d0a56f47e126345448dc9a2c41f7eaa01c2a4597a8",
