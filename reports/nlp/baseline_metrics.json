@@ -1,0 +1,169 @@
+{
+  "accuracy": 0.8898614851866102,
+  "analysis_author": "Codex (AI agent)",
+  "confusion_matrix": {
+    "class_order": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "columns": "predicted",
+    "matrix": [
+      [
+        2484,
+        194,
+        147
+      ],
+      [
+        120,
+        193,
+        123
+      ],
+      [
+        249,
+        312,
+        6574
+      ]
+    ],
+    "rows": "true"
+  },
+  "correct": 9251,
+  "data": {
+    "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+    "train_parquet_sha256": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
+    "train_rows": 76971,
+    "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+    "validation_parquet_sha256": "f95a9223e216c4fe3be1e4a9a23a0dfd65ea81e8b37c0a680c0a4b1fe411c214",
+    "validation_rows": 10396
+  },
+  "errors": 1145,
+  "evaluation_versions": {
+    "joblib": "1.5.2",
+    "numpy": "2.3.3",
+    "pandas": "2.3.2",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "pyarrow": "24.0.0",
+    "python": "3.13.7",
+    "scikit-learn": "1.7.2",
+    "scipy": "1.15.3"
+  },
+  "evidence_sha256": {
+    "configs/nlp_baseline.json": "74ff00ab59a2a881eb5c7724a9d800ae57ecb530ee5b80be4f6a5e2d0c1e5619",
+    "reports/data_prep/audit.json": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
+    "reports/data_prep/split_ids.csv": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
+    "reports/nlp/baseline_error_annotations.json": "74385ae8876647759a9b64011919ada56ddef5be21a78a0c4338237d72a5d81f",
+    "reports/nlp/baseline_reproducibility.md": "acc4e2767f33076be56a5e333c9e5b1d798ca8b7ee4da37d8dbe8fac7132651b",
+    "reports/nlp/retraining_verification.json": "cab013bc9c4f117d8f14f7ad30c4f0c38a6d895c56eeb2384cf5bad5179e9674",
+    "reports/nlp/tfidf_boundary_diagnostic.json": "447c9dacffcacf4b1ef2934e1cbf2d32e67586f4d684515296ecc1d1304db20b",
+    "reports/nlp/training/bundle_roundtrip.json": "bfc270b0d5fd187d01142b835c99a6f5fccb29895149fd9b3abcd0526a4bd84b",
+    "reports/nlp/training/run_metadata.json": "363b23061a4bb3a750cc2fec9364f1a688c74b61a3459fcb7dcb407e7f324938",
+    "reports/nlp/training/winner_config.json": "bbbc42a9b0d3c26b462820979b44d233f69d7a9e34a0bf9315c9a6018c6d4b38",
+    "src/train_baseline.py": "5c9482aeef3b4353723d5c005b2bf6bb41edd103253ebaff7aab5cf9bcc356e1",
+    "tools/diagnose_nlp_tfidf.py": "263b4a29586adbbe21ff7b616be9f09ca62d4e1911a667cb6b1807ff780ae213",
+    "tools/report_nlp_baseline.py": "87b735226d94f620fcf4e9b306e2d56ad3a1a291eb250a3d2238a5a0f9f99d9d",
+    "tools/restore_nlp_splits.py": "1ea489a356b2910e7edb8f8fdb325e6a1853a7d16911d665b28ee6038135f466"
+  },
+  "final_test_used": false,
+  "human_review_status": "pending",
+  "independent_test": false,
+  "macro_f1": 0.7185325879377858,
+  "model": {
+    "C": 2.0,
+    "config": {
+      "bundle_name": "tfidf_logreg_baseline.joblib",
+      "data_prep_audit_path": "reports/data_prep/audit.json",
+      "data_prep_split_ids_path": "reports/data_prep/split_ids.csv",
+      "id_column": "record_id",
+      "label_column": "label_id",
+      "label_mapping": {
+        "negative": 0,
+        "neutral": 1,
+        "positive": 2
+      },
+      "logistic_regression": {
+        "C_values": [
+          0.5,
+          1.0,
+          2.0
+        ],
+        "class_weight_mode": "balanced_train",
+        "max_iter": 1000,
+        "solver": "lbfgs",
+        "tol": 0.0001
+      },
+      "model_dir": "models/nlp_baseline",
+      "report_dir": "reports/nlp/training",
+      "seed": 42,
+      "text_column": "review_text",
+      "text_processing": {
+        "manual_normalization": "none",
+        "truncation": null
+      },
+      "tfidf": {
+        "analyzer": "word",
+        "lowercase": true,
+        "max_df": 0.98,
+        "max_features": 100000,
+        "min_df": 2,
+        "ngram_range": [
+          1,
+          2
+        ],
+        "norm": "l2",
+        "smooth_idf": true,
+        "sublinear_tf": true,
+        "token_pattern": "(?u)\\b\\w\\w+\\b",
+        "use_idf": true
+      },
+      "train_ids_path": null,
+      "train_path": "data/processed/train.parquet",
+      "validation_path": "data/processed/validation.parquet"
+    },
+    "path": "models/nlp_baseline/tfidf_logreg_baseline.joblib",
+    "sha256": "e541cc6165fc9f84c967315cbe8587ff447673edf3b84d48426c98d661a677b5",
+    "state_sha256": "bff6e95ae2626ea061f9f4cab94e5e0734d003aac1018cb60e38cde8fd477c2c",
+    "tfidf_state_sha256": "0abc1e52eb0fc5533a1574109bc9b4a84ab8f2c72d70a469b4267d22a235596b",
+    "training_versions": {
+      "joblib": "1.5.2",
+      "numpy": "2.3.3",
+      "pandas": "2.3.2",
+      "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+      "pyarrow": "24.0.0",
+      "python": "3.13.7",
+      "scikit-learn": "1.7.2",
+      "scipy": "1.15.3"
+    }
+  },
+  "per_class": {
+    "negative": {
+      "f1": 0.8749559704121169,
+      "precision": 0.8706624605678234,
+      "recall": 0.8792920353982301,
+      "support": 2825
+    },
+    "neutral": {
+      "f1": 0.34008810572687226,
+      "precision": 0.2761087267525036,
+      "recall": 0.4426605504587156,
+      "support": 436
+    },
+    "positive": {
+      "f1": 0.9405536876743686,
+      "precision": 0.9605493863237873,
+      "recall": 0.9213735108619482,
+      "support": 7135
+    }
+  },
+  "rows": 10396,
+  "selection": {
+    "algorithm": "four shortest errors (whitespace words), then round-robin six confusion cells; SHA-256(seed:record_id) ranking",
+    "representative_sample": false,
+    "requested_size": 40,
+    "seed": 42,
+    "selected_ids_sha256": "356b9257a78d9b44d2cc19a57c9839db22fe996f2fe0a846616aa34b63023a5b",
+    "selected_size": 40
+  },
+  "split": "validation",
+  "validation_predictions_sha256": "253a7adfbeebedb46a5f0b642316f7b8d0e396f19e6b957779f4175b32852b0e",
+  "validation_used_for_C_selection": true
+}
