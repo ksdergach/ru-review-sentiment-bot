@@ -259,8 +259,15 @@
     "sha256": "09377c63f8681413d43eb4624be52db55c4fd0bd242d427053b51b8ec9111453",
     "transcript_sha256": "0f7290d95a9b0ea50f0be74c5e57d5396a3cb905dece397a8f92fab749525a17",
     "saved_run_date": "2026-09-26",
-    "wer_status": "pending_human_reference",
-    "wer": null
+    "wer_status": "human_verified_reference",
+    "wer": 0.0,
+    "word_edits": 0,
+    "reference_words": 24,
+    "hypothesis_words": 24,
+    "reference_sha256": "0f7290d95a9b0ea50f0be74c5e57d5396a3cb905dece397a8f92fab749525a17",
+    "reference_file_sha256": "a6ab8c00242fae2bd6ccb231f2c1b98e2c2f8ea56f5d2728ec1a8df6cf34515e",
+    "reviewer": "Пользователь проекта, явное подтверждение в диалоге после прослушивания",
+    "verified_on": "2026-10-07"
   },
   "model_test_evaluation_performed": false,
   "evidence_sha256": {
