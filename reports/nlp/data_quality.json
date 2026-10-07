@@ -1,0 +1,275 @@
+{
+  "source_revision": "526df6aa3fdfc99cdbb2e2ce79406ae67816c1f9",
+  "source_files_verified": true,
+  "source_total": 100502,
+  "source_ru": 96749,
+  "prepared_total": 96691,
+  "source_splits": {
+    "train": {
+      "sha256": "c749cfd841f995259be122135d1c9c5da530c4de07b27e43c016a547524c32da",
+      "size_bytes": 19992169,
+      "matches_upstream": true,
+      "rows": 80009,
+      "schema": [
+        {
+          "name": "movie_id",
+          "dtype": "string"
+        },
+        {
+          "name": "review_text",
+          "dtype": "string"
+        },
+        {
+          "name": "review_sentiment",
+          "dtype": "string"
+        },
+        {
+          "name": "review_language",
+          "dtype": "string"
+        }
+      ],
+      "language_counts": {
+        "ru": 77022,
+        "kk": 2178,
+        "cs": 809
+      },
+      "class_counts_by_language": {
+        "ru": {
+          "negative": 21492,
+          "neutral": 3291,
+          "positive": 52239
+        },
+        "kk": {
+          "negative": 141,
+          "neutral": 73,
+          "positive": 1964
+        },
+        "cs": {
+          "negative": 134,
+          "neutral": 24,
+          "positive": 651
+        }
+      },
+      "class_counts_all": {
+        "negative": 21767,
+        "neutral": 3388,
+        "positive": 54854
+      },
+      "null_or_blank_fields": 0,
+      "unique_movies": 3953,
+      "plan_counts_match": true
+    },
+    "validation": {
+      "sha256": "ecd03e961597e3df087884bc08c34f5b60a010ddb0f687550db727e1ad0863ae",
+      "size_bytes": 2781706,
+      "matches_upstream": true,
+      "rows": 10829,
+      "schema": [
+        {
+          "name": "movie_id",
+          "dtype": "string"
+        },
+        {
+          "name": "review_text",
+          "dtype": "string"
+        },
+        {
+          "name": "review_sentiment",
+          "dtype": "string"
+        },
+        {
+          "name": "review_language",
+          "dtype": "string"
+        }
+      ],
+      "language_counts": {
+        "ru": 10403,
+        "kk": 230,
+        "cs": 196
+      },
+      "class_counts_by_language": {
+        "ru": {
+          "negative": 2825,
+          "neutral": 438,
+          "positive": 7140
+        },
+        "kk": {
+          "negative": 23,
+          "neutral": 33,
+          "positive": 174
+        },
+        "cs": {
+          "negative": 42,
+          "neutral": 31,
+          "positive": 123
+        }
+      },
+      "class_counts_all": {
+        "negative": 2890,
+        "neutral": 502,
+        "positive": 7437
+      },
+      "null_or_blank_fields": 0,
+      "unique_movies": 495,
+      "plan_counts_match": true
+    },
+    "test": {
+      "sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+      "size_bytes": 2564711,
+      "matches_upstream": true,
+      "rows": 9664,
+      "schema": [
+        {
+          "name": "movie_id",
+          "dtype": "string"
+        },
+        {
+          "name": "review_text",
+          "dtype": "string"
+        },
+        {
+          "name": "review_sentiment",
+          "dtype": "string"
+        },
+        {
+          "name": "review_language",
+          "dtype": "string"
+        }
+      ],
+      "language_counts": {
+        "ru": 9324,
+        "kk": 231,
+        "cs": 109
+      },
+      "class_counts_by_language": {
+        "ru": {
+          "negative": 2619,
+          "neutral": 411,
+          "positive": 6294
+        },
+        "kk": {
+          "negative": 14,
+          "neutral": 21,
+          "positive": 196
+        },
+        "cs": {
+          "negative": 25,
+          "neutral": 7,
+          "positive": 77
+        }
+      },
+      "class_counts_all": {
+        "negative": 2658,
+        "neutral": 439,
+        "positive": 6567
+      },
+      "null_or_blank_fields": 0,
+      "unique_movies": 495,
+      "plan_counts_match": true
+    }
+  },
+  "prepared_splits": {
+    "test": {
+      "negative": 2619,
+      "neutral": 411,
+      "positive": 6294,
+      "rows": 9324,
+      "unique_movie_id": 492
+    },
+    "train": {
+      "negative": 21482,
+      "neutral": 3290,
+      "positive": 52199,
+      "rows": 76971,
+      "unique_movie_id": 3941
+    },
+    "validation": {
+      "negative": 2825,
+      "neutral": 436,
+      "positive": 7135,
+      "rows": 10396,
+      "unique_movie_id": 495
+    }
+  },
+  "language_counts": {
+    "ru": 96749,
+    "kk": 2639,
+    "cs": 1114
+  },
+  "non_ru_excluded": {
+    "count": 3753,
+    "denominator": 100502,
+    "percent": 3.734254044695628
+  },
+  "technical_invalid_rows": {
+    "count": 0,
+    "denominator": 100502,
+    "percent": 0.0
+  },
+  "exact_removed": {
+    "count": 9,
+    "denominator": 96749,
+    "percent": 0.009302421730457162
+  },
+  "near_removed": {
+    "count": 49,
+    "denominator": 96749,
+    "percent": 0.05064651831026677
+  },
+  "all_duplicates_removed": {
+    "count": 58,
+    "denominator": 96749,
+    "percent": 0.05994894004072394
+  },
+  "retained_ru": {
+    "count": 96691,
+    "denominator": 96749,
+    "percent": 99.94005105995927
+  },
+  "semantic_noise_fraction": null,
+  "guaranteed_clean_fraction": null,
+  "near_duplicate_test_rows_preserved": {
+    "count": 14,
+    "denominator": 9324,
+    "percent": 0.15015015015015015
+  },
+  "final_movie_id_overlap": {
+    "train__test": 0,
+    "train__validation": 0,
+    "validation__test": 0
+  },
+  "final_exact_text_overlap": {
+    "train__test": 0,
+    "train__validation": 0,
+    "validation__test": 0
+  },
+  "label_conflict_groups": 0,
+  "agent_review": {
+    "supported": 80,
+    "ambiguous": 15,
+    "proposed_disagreement": 5
+  },
+  "human_confirmation_count": 15,
+  "debug_audio": {
+    "codec": "opus",
+    "sample_rate_hz": 48000,
+    "channels": 1,
+    "duration_seconds": 12.0,
+    "bytes": 110472,
+    "sha256": "09377c63f8681413d43eb4624be52db55c4fd0bd242d427053b51b8ec9111453",
+    "transcript_sha256": "0f7290d95a9b0ea50f0be74c5e57d5396a3cb905dece397a8f92fab749525a17",
+    "saved_run_date": "2026-09-26",
+    "wer_status": "pending_human_reference",
+    "wer": null
+  },
+  "model_test_evaluation_performed": false,
+  "evidence_sha256": {
+    "configs/dataset_source.json": "0f1a975ffb44d9c616b1722815d5a5ce0184073dbf3919630529ee2bee2e2071",
+    "configs/baseline.json": "a46ddac79bc00305e7e4deb6944fceac9ccb980a4c6656dcac243b7140386c35",
+    "src/prepare_data.py": "599b7d5e9efe0ca3bcd391835554b07ef85150ec7eaab902b53f0cc5b37853cf",
+    "reports/data_prep/audit.json": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
+    "reports/dataset/agent_review.json": "36c7497b368dc4ba8d15b3c641672370af0e1c42843b555204dc8f458fae9ea1",
+    "reports/dataset/human_confirmation.json": "a5b68bc0127b92d4d53cd6017f3f916ce58effbadfadd64149ecab5e3e33c707",
+    "reports/speech/verification.json": "9f6e2c4d4db2b0039f040a001fa821db093d65e8956532e5f67f4fcbb4eb6394"
+  }
+}

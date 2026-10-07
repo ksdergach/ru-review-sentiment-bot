@@ -8,6 +8,8 @@
 TF-IDF + Logistic Regression, качество данных, анализ ошибок и короткий отчёт.
 [Milestone](https://github.com/ksdergach/ru-review-sentiment-bot/milestone/1)
 собирает задачи этой сдачи; RuBERT остаётся в дальнейшем плане.
+[Качество данных и транскрипций](reports/nlp/data_quality.md): показатели
+корпуса проверены; для WER пока требуется подтверждённый человеком эталон.
 
 [Приёмка T03–T05 от 03.10.2026](reports/acceptance/2026-10-03.md):
 T03/T05 приняты, у T04 проверяется расхождение TF-IDF и validation-метрик
