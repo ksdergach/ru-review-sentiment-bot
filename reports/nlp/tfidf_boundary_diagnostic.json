@@ -1,6 +1,6 @@
 {
   "available_slots_at_cutoff": 8968,
-  "conclusion": "Boundary ties are present; different selection across original Windows/Mac runs is a hypothesis, not proven without the original Windows bundle. IDF floating point differences also not excluded.",
+  "conclusion": "2026-10-07 (T04/#6): this tie structure is a confirmed, reproducible ambiguity capable of changing the TF-IDF vocabulary and answers. src/train_baseline.py now breaks ties with an explicit rule (train frequency desc, then Unicode string asc); two independent runs produce identical vocabulary, IDF, coefficients and predictions, so the defect is fixed for new training runs. This does NOT prove it was the cause of the original Windows/Mac discrepancy: the original Windows bundle is unavailable and no tested policy reproduced its hash. See reports/baseline/reproducibility/README.md (same caveat). IDF floating-point differences on the original Windows bundle remain unexamined.",
   "cutoff_term_frequency": 4,
   "eligible_features": 288560,
   "features_above_cutoff": 91032,

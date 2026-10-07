@@ -2,7 +2,7 @@
   "bundle_format_version": 3,
   "bundle_git_ignored": true,
   "bundle_path": "models/nlp_baseline/tfidf_logreg_baseline.joblib",
-  "bundle_sha256": "e541cc6165fc9f84c967315cbe8587ff447673edf3b84d48426c98d661a677b5",
+  "bundle_sha256": "389a768bcd108721c79ebf3a7b9dc5212ec100f5c2e1b06cf519ed076cd9bee3",
   "class_weight_mode": "balanced_train",
   "class_weights": {
     "0": 1.1943487570989666,
@@ -15,7 +15,7 @@
   "data_prep_audit_path": "reports/data_prep/audit.json",
   "data_prep_split_ids_path": "reports/data_prep/split_ids.csv",
   "final_test_used": false,
-  "git_commit": "ed8a6fa1b769f512b05e472b419cc64709342082",
+  "git_commit": "1ccc1a43d525f3079c822988a1cf83102e9f6c8f",
   "library_versions": {
     "joblib": "1.5.2",
     "numpy": "2.3.3",
@@ -32,7 +32,7 @@
     "validation_results": "reports/nlp/training/validation_results.csv",
     "validation_summary": "reports/nlp/training/validation_summary.md"
   },
-  "script_sha256": "5c9482aeef3b4353723d5c005b2bf6bb41edd103253ebaff7aab5cf9bcc356e1",
+  "script_sha256": "ae889bbc7a2863ff3bca45788b9a7fc0cacb097b763eada9bc05fbb5b9fc0e70",
   "seed": 42,
   "selection_metric": "validation_macro_f1",
   "selection_tie_break": "smaller_C",
@@ -54,8 +54,8 @@
     "validation_rows": 10396
   },
   "t03_split_ids_sha256": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
-  "tfidf_fit_seconds": 5.824812874998315,
-  "tfidf_state_sha256": "0abc1e52eb0fc5533a1574109bc9b4a84ab8f2c72d70a469b4267d22a235596b",
+  "tfidf_fit_seconds": 6.392008041002555,
+  "tfidf_state_sha256": "5e7e2cd53315e896afc9d37224370102c136f8dfdcf38aad9e7dfc8bfa5f9f15",
   "tfidf_vocabulary_size": 100000,
   "tfidf_warnings": [],
   "train_class_distribution": {
@@ -78,9 +78,18 @@
   "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
   "validation_parquet_sha256": "f95a9223e216c4fe3be1e4a9a23a0dfd65ea81e8b37c0a680c0a4b1fe411c214",
   "validation_rows": 10396,
-  "validation_transform_seconds": 0.36698099999921396,
+  "validation_transform_seconds": 0.29745691700372845,
+  "vocabulary_selection": {
+    "cutoff_term_frequency": 4,
+    "eligible_features": 288560,
+    "features_above_cutoff": 91032,
+    "features_tied_at_cutoff": 25751,
+    "policy": "train_term_frequency_desc_then_unicode_term_asc_v1",
+    "selected_at_cutoff": 8968,
+    "selected_features": 100000
+  },
   "winner_C": 2.0,
   "winner_convergence_warning": false,
   "winner_run_name": "run_3_C_2",
-  "winner_validation_macro_f1": 0.7185325879377858
+  "winner_validation_macro_f1": 0.7180146428367195
 }

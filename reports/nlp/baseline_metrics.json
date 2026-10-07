@@ -1,5 +1,5 @@
 {
-  "accuracy": 0.8898614851866102,
+  "accuracy": 0.8893805309734514,
   "analysis_author": "Codex (AI agent)",
   "confusion_matrix": {
     "class_order": [
@@ -11,23 +11,23 @@
     "matrix": [
       [
         2484,
-        194,
-        147
+        195,
+        146
       ],
       [
-        120,
+        117,
         193,
-        123
+        126
       ],
       [
-        249,
-        312,
-        6574
+        251,
+        315,
+        6569
       ]
     ],
     "rows": "true"
   },
-  "correct": 9251,
+  "correct": 9246,
   "data": {
     "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
     "train_parquet_sha256": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
@@ -36,7 +36,7 @@
     "validation_parquet_sha256": "f95a9223e216c4fe3be1e4a9a23a0dfd65ea81e8b37c0a680c0a4b1fe411c214",
     "validation_rows": 10396
   },
-  "errors": 1145,
+  "errors": 1150,
   "evaluation_versions": {
     "joblib": "1.5.2",
     "numpy": "2.3.3",
@@ -51,14 +51,14 @@
     "configs/nlp_baseline.json": "74ff00ab59a2a881eb5c7724a9d800ae57ecb530ee5b80be4f6a5e2d0c1e5619",
     "reports/data_prep/audit.json": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
     "reports/data_prep/split_ids.csv": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
-    "reports/nlp/baseline_error_annotations.json": "74385ae8876647759a9b64011919ada56ddef5be21a78a0c4338237d72a5d81f",
-    "reports/nlp/baseline_reproducibility.md": "acc4e2767f33076be56a5e333c9e5b1d798ca8b7ee4da37d8dbe8fac7132651b",
-    "reports/nlp/retraining_verification.json": "cab013bc9c4f117d8f14f7ad30c4f0c38a6d895c56eeb2384cf5bad5179e9674",
-    "reports/nlp/tfidf_boundary_diagnostic.json": "447c9dacffcacf4b1ef2934e1cbf2d32e67586f4d684515296ecc1d1304db20b",
-    "reports/nlp/training/bundle_roundtrip.json": "bfc270b0d5fd187d01142b835c99a6f5fccb29895149fd9b3abcd0526a4bd84b",
-    "reports/nlp/training/run_metadata.json": "363b23061a4bb3a750cc2fec9364f1a688c74b61a3459fcb7dcb407e7f324938",
-    "reports/nlp/training/winner_config.json": "bbbc42a9b0d3c26b462820979b44d233f69d7a9e34a0bf9315c9a6018c6d4b38",
-    "src/train_baseline.py": "5c9482aeef3b4353723d5c005b2bf6bb41edd103253ebaff7aab5cf9bcc356e1",
+    "reports/nlp/baseline_error_annotations.json": "0e13a616162c115b8c0047d2ef77f92d9490829e72882edd073744b293ca9f8d",
+    "reports/nlp/baseline_reproducibility.md": "988f8d0201b84042f25c802afcbe63c57654a5cc09bdde1c8f89d0a297184ce6",
+    "reports/nlp/retraining_verification.json": "172370b7a3ce0ac188144f634b4677d1af31f6d4376c0a8f371bcdb06c032e3a",
+    "reports/nlp/tfidf_boundary_diagnostic.json": "8b0167201e1a969094b120d0a56f47e126345448dc9a2c41f7eaa01c2a4597a8",
+    "reports/nlp/training/bundle_roundtrip.json": "337687d4e6e85f1fb7960104874eb3e884c6daa4b7e52cab09b7aed2f74573a3",
+    "reports/nlp/training/run_metadata.json": "1499b4f14572ebcbaf864b1e865add01e7472e26d7ae48e745d50ee72f531ad6",
+    "reports/nlp/training/winner_config.json": "158b2fb9540ff8b1169babb4c7e4e56d2ae434c45e1bb217c7cd259e87a96057",
+    "src/train_baseline.py": "ae889bbc7a2863ff3bca45788b9a7fc0cacb097b763eada9bc05fbb5b9fc0e70",
     "tools/diagnose_nlp_tfidf.py": "263b4a29586adbbe21ff7b616be9f09ca62d4e1911a667cb6b1807ff780ae213",
     "tools/report_nlp_baseline.py": "87b735226d94f620fcf4e9b306e2d56ad3a1a291eb250a3d2238a5a0f9f99d9d",
     "tools/restore_nlp_splits.py": "1ea489a356b2910e7edb8f8fdb325e6a1853a7d16911d665b28ee6038135f466"
@@ -66,7 +66,7 @@
   "final_test_used": false,
   "human_review_status": "pending",
   "independent_test": false,
-  "macro_f1": 0.7185325879377858,
+  "macro_f1": 0.7180146428367195,
   "model": {
     "C": 2.0,
     "config": {
@@ -120,9 +120,9 @@
       "validation_path": "data/processed/validation.parquet"
     },
     "path": "models/nlp_baseline/tfidf_logreg_baseline.joblib",
-    "sha256": "e541cc6165fc9f84c967315cbe8587ff447673edf3b84d48426c98d661a677b5",
-    "state_sha256": "bff6e95ae2626ea061f9f4cab94e5e0734d003aac1018cb60e38cde8fd477c2c",
-    "tfidf_state_sha256": "0abc1e52eb0fc5533a1574109bc9b4a84ab8f2c72d70a469b4267d22a235596b",
+    "sha256": "389a768bcd108721c79ebf3a7b9dc5212ec100f5c2e1b06cf519ed076cd9bee3",
+    "state_sha256": "273359cc83c7773ddd7b2dde96372d9caf13253a52f12bb8fa6d0ac5c30a63a4",
+    "tfidf_state_sha256": "5e7e2cd53315e896afc9d37224370102c136f8dfdcf38aad9e7dfc8bfa5f9f15",
     "training_versions": {
       "joblib": "1.5.2",
       "numpy": "2.3.3",
@@ -136,21 +136,21 @@
   },
   "per_class": {
     "negative": {
-      "f1": 0.8749559704121169,
-      "precision": 0.8706624605678234,
+      "f1": 0.8751100933591686,
+      "precision": 0.8709677419354839,
       "recall": 0.8792920353982301,
       "support": 2825
     },
     "neutral": {
-      "f1": 0.34008810572687226,
-      "precision": 0.2761087267525036,
+      "f1": 0.3388937664618086,
+      "precision": 0.27453769559032715,
       "recall": 0.4426605504587156,
       "support": 436
     },
     "positive": {
-      "f1": 0.9405536876743686,
-      "precision": 0.9605493863237873,
-      "recall": 0.9213735108619482,
+      "f1": 0.9400400686891814,
+      "precision": 0.9602397310334746,
+      "recall": 0.9206727400140154,
       "support": 7135
     }
   },
@@ -160,10 +160,10 @@
     "representative_sample": false,
     "requested_size": 40,
     "seed": 42,
-    "selected_ids_sha256": "356b9257a78d9b44d2cc19a57c9839db22fe996f2fe0a846616aa34b63023a5b",
+    "selected_ids_sha256": "8d438b7d5d8e926c0fc6c5fe1db63dc40c1b7fb3854661f1adcae44ea4240e61",
     "selected_size": 40
   },
   "split": "validation",
-  "validation_predictions_sha256": "253a7adfbeebedb46a5f0b642316f7b8d0e396f19e6b957779f4175b32852b0e",
+  "validation_predictions_sha256": "a293a8808ce9ced7a0bbe01998b4132e8c89f6c317c5ec0e17992bc1b38ac2a6",
   "validation_used_for_C_selection": true
 }

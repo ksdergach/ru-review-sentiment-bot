@@ -19,9 +19,10 @@ T03/T05 приняты по [проверке 03.10.2026](reports/acceptance/202
 исходные Windows-результаты сохранены в архиве.
 
 Для N02 подготовлены [метрики и разбор 40 ошибок](reports/nlp/baseline_analysis.md)
-отдельного воспроизводимого Mac-комплекта. Полная validation: accuracy 88,9861%,
-macro-F1 0,718533; финальный test не использован. [Протокол](reports/nlp/baseline_reproducibility.md)
-фиксирует ограничение Windows/Mac и ожидающую человеческую проверку.
+на принятом 07.10.2026 детерминированном Mac-комплекте (после T04). Полная validation:
+accuracy 88,9381%, macro-F1 0,718015; финальный test не использован.
+[Протокол](reports/nlp/baseline_reproducibility.md) фиксирует решение по отбору признаков;
+человеческая проверка 40 ошибок ожидается.
 
 T02 завершена: [аудит 100 отзывов агентом](reports/dataset/agent_review.md)
 и [подтверждение пользователем 15 случаев](reports/dataset/manual_review.md).

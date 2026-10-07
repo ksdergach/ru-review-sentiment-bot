@@ -1,4 +1,5 @@
 {
+  "note": "Historical: two-run check on the pre-fix (non-deterministic-tie) bundle, superseded 2026-10-07 by T04/#6's fix and by reports/baseline/reproducibility/repeat_runs.json, which verifies the same two-run identity on the corrected, accepted bundle. Numbers below are not the current N02 result (see baseline_metrics.json).",
   "accuracy": 0.8898614851866102,
   "coefficients_identical": true,
   "errors_read_before_retraining": false,
