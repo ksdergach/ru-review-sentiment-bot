@@ -14,7 +14,8 @@ ctranslate2==4.8.2
 av==18.1.0
 psutil==7.1.0
 
-# Telegram implementation will be added in T09.
+# Text Telegram mode is implemented in N03 (#26).
+# Voice integration remains for T09.
 aiogram==3.22.0
 
 # Existing regression tests (no model downloads or Telegram token needed).
