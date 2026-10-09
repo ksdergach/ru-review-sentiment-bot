@@ -91,12 +91,12 @@ Macro-F1 не подставляем вместо accuracy. Сохраняем �
 
 ## Последовательность работ
 
-| Задача | Результат | Статус на 07.10.2026 |
+| Задача | Результат | Статус на 09.10.2026 |
 |---|---|---|
 | [N01 · #24](https://github.com/ksdergach/ru-review-sentiment-bot/issues/24) | Описать качество данных и транскрипций для сдачи NLP | Done |
-| [N02 · #25](https://github.com/ksdergach/ru-review-sentiment-bot/issues/25) | Зафиксировать метрики baseline и разобрать ошибки для сдачи NLP | Ready |
-| [N03 · #26](https://github.com/ksdergach/ru-review-sentiment-bot/issues/26) | Подключить baseline к текстовым сообщениям Telegram для сдачи NLP | Ready |
-| [N04 · #27](https://github.com/ksdergach/ru-review-sentiment-bot/issues/27) | Собрать открытый отчёт и зафиксировать версию сдачи NLP | Backlog |
+| [N02 · #25](https://github.com/ksdergach/ru-review-sentiment-bot/issues/25) | Зафиксировать метрики baseline и разобрать ошибки для сдачи NLP | Done |
+| [N03 · #26](https://github.com/ksdergach/ru-review-sentiment-bot/issues/26) | Подключить baseline к текстовым сообщениям Telegram для сдачи NLP | In review (PR #29) |
+| [N04 · #27](https://github.com/ksdergach/ru-review-sentiment-bot/issues/27) | Собрать открытый отчёт и зафиксировать версию сдачи NLP | In progress |
 
 N01 завершена: [отчёт о качестве данных](../reports/nlp/data_quality.md) содержит
 WER = 0% (0 ошибок / 24 слова) на 12-секундном отладочном фрагменте.
@@ -132,3 +132,7 @@ baseline/text-части T07/T09 в тех же модулях, без отде�
 в сданном отчёте фиксируем на тег/commit. Проверяем доступ к самому файлу без
 входа в аккаунт. Готовая ссылка не означает отправку: прикрепление в ЛМС
 отмечаем отдельно только после фактического действия или подтверждения пользователя.
+
+N04 начата 09.10.2026: [черновик отчёта](../reports/nlp/report.md),
+[PDF](../output/pdf/nlp-report.pdf), [оставшиеся действия](../reports/nlp/submission_status.md).
+Статус N03 здесь отражает открытый PR; карточка доски может ещё оставаться In progress.
