@@ -1,0 +1,433 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-09",
+  "timezone": "Europe/Moscow",
+  "human_review_status": "confirmed",
+  "reviewer": "Пользователь проекта в текущем диалоге; отдельное имя не запрашивалось.",
+  "recorded_by": "Codex (AI agent)",
+  "confirmation_basis": "Пользователь сообщил о завершении проверки всех пунктов, исправил оставшиеся пометки в №29 и №30 и явно разрешил оформить итоговый JSON и статус confirmed.",
+  "review_method": "Пользователь проверил и отредактировал черновик ИИ с видимыми текстами, исходными метками, прогнозами и объяснениями. Сохранённые комментарии могут включать принятые формулировки ИИ; они не заявляются как независимо написанные человеком.",
+  "blind_review": false,
+  "independent_annotation": false,
+  "status_meaning": "Подтверждён факт проверки всех 40 случаев, включая частичное согласие; не заявляется безоговорочное принятие всех объяснений или независимая техническая проверка модели человеком.",
+  "source": {
+    "path": "artifacts/nlp/human_review_notes.md",
+    "sha256": "2f600f50e404871b85bd97c27552e47d3601922ce510a4036aa0dbc9eca832ad",
+    "contains_full_texts": true,
+    "git_ignored": true
+  },
+  "analysis_snapshot": {
+    "path": "reports/nlp/baseline_error_annotations.json",
+    "sha256": "e72b9701e6bcbb783b499aa6d436b49c749cc5b59251856549fb2a0000258e2c",
+    "hashed_fields": [
+      "author",
+      "analysis_date",
+      "model_state_sha256",
+      "validation_predictions_sha256",
+      "errors"
+    ],
+    "serialization": "UTF-8 JSON, ensure_ascii=False, sort_keys=True, separators=(comma,colon)"
+  },
+  "model_state_sha256": "273359cc83c7773ddd7b2dde96372d9caf13253a52f12bb8fa6d0ac5c30a63a4",
+  "validation_predictions_sha256": "a293a8808ce9ced7a0bbe01998b4132e8c89f6c317c5ec0e17992bc1b38ac2a6",
+  "selected_ids_sha256": "8d438b7d5d8e926c0fc6c5fe1db63dc40c1b7fb3854661f1adcae44ea4240e61",
+  "reviewed_count": 40,
+  "agreement_counts": {
+    "да": 30,
+    "частично": 10,
+    "нет": 0
+  },
+  "partial_agreement_positions": [
+    2,
+    5,
+    11,
+    14,
+    15,
+    21,
+    25,
+    31,
+    32,
+    33
+  ],
+  "original_labels_changed": false,
+  "model_changed": false,
+  "final_test_used": false,
+  "contains_full_review_texts": false,
+  "comment_policy": "Комментарии перенесены дословно, включая короткие цитаты; полные исходные отзывы и архив предыдущих ответов не включены.",
+  "recorder_caveats": [
+    {
+      "sample_position": 2,
+      "note": "Мнение пользователя сохранено. Восклицательные знаки сами по себе не доказывают положительную тональность."
+    },
+    {
+      "sample_position": 22,
+      "note": "Мнение пользователя о разметке сохранено. Без правил аннотирования дефект исходной метки не установлен; относительно исходной метки прогноз остаётся ошибкой в метриках."
+    },
+    {
+      "sample_position": 36,
+      "note": "Согласие пользователя сохранено. Наличие сарказма не доказывает состав и знаки вкладов всех признаков; независимая проверка этих вкладов человеком не заявляется."
+    }
+  ],
+  "reviews": [
+    {
+      "sample_position": 1,
+      "record_id": "validation-00000-of-00001.parquet#row=00007583",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "234c3f2a0d1a36c0cf7692e44a79696771ccfa59081bd32eebbe0c9da0604ed3",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Радостное междометие поддерживает positive. В сохранённом журнале указано ноль ненулевых признаков, что согласуется с объяснением через свободные члены классификатора."
+    },
+    {
+      "sample_position": 2,
+      "record_id": "validation-00000-of-00001.parquet#row=00001777",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "2c7f5987abe1dd28a77cb7855b1cc693d22043db21805f35deb1137eeac5b904",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Двусмысленно («очень понравился» vs «оче не понравился»), но восклицательные знаки скорее указывают на позитив — positive разумна. С объяснением агента согласна."
+    },
+    {
+      "sample_position": 3,
+      "record_id": "validation-00000-of-00001.parquet#row=00007099",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "997c56a0a2d248755b910f3254cdb31cdf5f25f604c5a065a976c51af0fcd81d",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Однозначная похвала графике поддерживает positive. Два ненулевых признака подтверждены журналом; оснований объяснять ошибку неоднозначностью исходной метки здесь нет."
+    },
+    {
+      "sample_position": 4,
+      "record_id": "validation-00000-of-00001.parquet#row=00000814",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "53cbd8c1727d1b6f945c3a37976dd1b2cec64609ca6aa2a8f9b220087038ab66",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Согласен по сохранённым данным: один ненулевой признак и разница оценок 0,1857 согласуются с объяснением. Отдельные коэффициенты при этой повторной проверке заново из модели не извлекались; они приведены по предыдущей проверке. Признак «тема» нельзя называть нулевым или почти нулевым."
+    },
+    {
+      "sample_position": 5,
+      "record_id": "validation-00000-of-00001.parquet#row=00003614",
+      "true_label_id": 0,
+      "predicted_label_id": 1,
+      "text_sha256": "5443301e408e1c395c54e3940b5f768ec5574169e6324ecc462abeb7ebe97794",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Разочарование атмосферой и недостатком страха поддерживает negative; neutral также допустим как трактовка умеренной оценки. Рейтинг 5/10 сам по себе не определяет класс. Утверждение, что прогноз neutral отражает среднюю оценку, следует обозначить как гипотезу о причине ответа модели."
+    },
+    {
+      "sample_position": 6,
+      "record_id": "validation-00000-of-00001.parquet#row=00005915",
+      "true_label_id": 0,
+      "predicted_label_id": 2,
+      "text_sha256": "f45a4e45e5098a5dfb85ded06399e236f6460f79c3066e6c9ad3cc8563703c1c",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Критика неестественности задаёт отрицательный акцент; допущение разового просмотра её не отменяет. Возможное влияние финальной уступки на positive корректно обозначено как гипотеза."
+    },
+    {
+      "sample_position": 7,
+      "record_id": "validation-00000-of-00001.parquet#row=00008792",
+      "true_label_id": 1,
+      "predicted_label_id": 0,
+      "text_sha256": "fa74945409499e88d8877d407513e36252610cba08cad4a047b803e023f81fd0",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Без контекста реплика не даёт ясной оценки фильма. Neutral разумен; связь прогноза negative с сожалением остаётся гипотезой, точная причина не установлена."
+    },
+    {
+      "sample_position": 8,
+      "record_id": "validation-00000-of-00001.parquet#row=00006037",
+      "true_label_id": 1,
+      "predicted_label_id": 2,
+      "text_sha256": "3eedcef7f65c54da105df2335a65c3cb0dbad2a9891d8723176fc5ef055983ec",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Автор прямо сообщает смешанное отношение и оценивает разные аспекты противоположно. Neutral обоснован, но наличие похвалы и критики не является универсальным правилом присвоения neutral."
+    },
+    {
+      "sample_position": 9,
+      "record_id": "validation-00000-of-00001.parquet#row=00010376",
+      "true_label_id": 2,
+      "predicted_label_id": 0,
+      "text_sha256": "4413a9e2131e33a05fe80b60931498dc86e9fa76cf567ac89fb65602afd70e41",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Тяжёлые переживания после просмотра не равны отрицательной оценке качества фильма. Positive возможен, однако сила впечатления сама по себе его не доказывает. Осторожная формулировка объяснения уместна."
+    },
+    {
+      "sample_position": 10,
+      "record_id": "validation-00000-of-00001.parquet#row=00004414",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "0dd24ef6b866cbc1dd104f80ca52d261c0529eb75dd682e52fe16812aab3bf5a",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Похвала зрелищности сочетается с предложением отказаться от требований к логике. Positive допустим, neutral тоже содержательно понятен. Защитный или воодушевлённый тон — возможное прочтение, а не однозначный факт."
+    },
+    {
+      "sample_position": 11,
+      "record_id": "validation-00000-of-00001.parquet#row=00005025",
+      "true_label_id": 0,
+      "predicted_label_id": 1,
+      "text_sha256": "8109bc9e034e9f7d8b57f1045213d13c85ec60567467cbde76a253c56e01e4cc",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Negative обоснован прямой критикой фильма и сожалением о времени и деньгах. Разрыв 0,0697 подтверждён CSV. Формулировку «не на самой границе принятия решения» лучше убрать: критерий близости к границе не задан, а разность оценок не является нормированным расстоянием до неё."
+    },
+    {
+      "sample_position": 12,
+      "record_id": "validation-00000-of-00001.parquet#row=00004136",
+      "true_label_id": 0,
+      "predicted_label_id": 2,
+      "text_sha256": "2593186d2f0ae2a0d196a6ca85297189bed8fb6f2e71cc71043097fce6a47d1c",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Повторённое разочарование актёрской передачей эмоций поддерживает negative, несмотря на похвалу сценарию и эффектам. Конфликт аспектов описан верно."
+    },
+    {
+      "sample_position": 13,
+      "record_id": "validation-00000-of-00001.parquet#row=00006279",
+      "true_label_id": 1,
+      "predicted_label_id": 0,
+      "text_sha256": "921764163469ed40f5668f8a61af72bb7e4a7b478a06148158fcc9085988367d",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Согласен с объяснением: ограничение аудитории может быть нейтральным описанием или скрытой критикой. Без контекста негативный подтекст не доказан; neutral допустим."
+    },
+    {
+      "sample_position": 14,
+      "record_id": "validation-00000-of-00001.parquet#row=00010144",
+      "true_label_id": 1,
+      "predicted_label_id": 2,
+      "text_sha256": "b9af7918a13893e9a524ce43c7ee300ee7f06a60612f623adc55d735ea190db7",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Похвала относится к книге. Neutral оправдан при оценке отношения именно к фильму, но само сообщение содержит положительную оценку другого объекта. Вывод зависит от правил разметки. Утверждение о том, что модель выбрала positive именно из-за переноса оценки с книги, остаётся гипотезой."
+    },
+    {
+      "sample_position": 15,
+      "record_id": "validation-00000-of-00001.parquet#row=00006448",
+      "true_label_id": 2,
+      "predicted_label_id": 0,
+      "text_sha256": "7717b0eb59f5a93b988fd181ec27dfe6ebda08a37a97ae7c9744ce7ce1f28041",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Три слова, без контекста — согласна с агентом, что ни positive, ни negative не следуют однозначно. Склоняюсь, что это скорее нейтральная информация, чем явная позиция в любую сторону."
+    },
+    {
+      "sample_position": 16,
+      "record_id": "validation-00000-of-00001.parquet#row=00008944",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "8e69d89ab70f2894bacc2c0039f7770833476db0b6f0237790ddf29d9cd7b6ce",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Слово «уместна» выражает сдержанное одобрение сцены. Positive правдоподобен, но оценка фильма в целом выражена слабо; neutral содержательно понятен."
+    },
+    {
+      "sample_position": 17,
+      "record_id": "validation-00000-of-00001.parquet#row=00010619",
+      "true_label_id": 0,
+      "predicted_label_id": 1,
+      "text_sha256": "53b2e7c164ecf49348a07acd5b5cb8f8d669b047ee8466560aab64f2f757b40b",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Заключительная критика сценария и режиссуры поддерживает negative. Ироническое прочтение возможно, но тег sarcasm не следует считать подтверждённым случаем сарказма. Влияние длинного вступления на neutral — гипотеза, а не измеренная причина."
+    },
+    {
+      "sample_position": 18,
+      "record_id": "validation-00000-of-00001.parquet#row=00004322",
+      "true_label_id": 0,
+      "predicted_label_id": 2,
+      "text_sha256": "37acfa54f2f9997586fd57e6f9fa1c9dc2d6393ce148d5ec921c70944832abc8",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Текущий фильм в целом отвергается, развёрнутая похвала относится к другому произведению. Есть и небольшая уступка текущему фильму: в конце стало интереснее. Это не отменяет отрицательного итога. Смешение объектов оценки — правдоподобная интерпретация ошибки, не доказанный механизм."
+    },
+    {
+      "sample_position": 19,
+      "record_id": "validation-00000-of-00001.parquet#row=00003813",
+      "true_label_id": 1,
+      "predicted_label_id": 0,
+      "text_sha256": "c50eb365b8fdce2b2a24fd3dbf86270325103ce0f2cd1452510636cb5611a0da",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Резкая критика музыкального формата сочетается с признанием качества и оценкой 7/10. Neutral допустим как трактовка смешанного впечатления, но не является обязательным результатом сочетания похвалы и критики. Причина ответа модели отдельно не проверена."
+    },
+    {
+      "sample_position": 20,
+      "record_id": "validation-00000-of-00001.parquet#row=00004974",
+      "true_label_id": 1,
+      "predicted_label_id": 2,
+      "text_sha256": "3018df4a8668776ade4e8247949e338cc82fe015ed5cca2292ae7d01b0c729a3",
+      "agreement_with_agent_explanation": "да",
+      "comment": "В тексте сочетаются похвала идее, музыке и монтажу и критика актёрской игры. Neutral обоснован, но равный вес этих аспектов автор не задаёт. Фраза о сохранении только одной стороны описывает интерпретацию результата, а не доказанный механизм модели."
+    },
+    {
+      "sample_position": 21,
+      "record_id": "validation-00000-of-00001.parquet#row=00010127",
+      "true_label_id": 2,
+      "predicted_label_id": 0,
+      "text_sha256": "100b9a15a7bfe192d533ccd316bce6ba173114abc0d6fc8ad78778ada4903ea6",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Рекомендация и похвала актёру поддерживают positive, но рекомендация ограничена, а шкала оценки «на 4-ку» не указана. Считать положительный итог однозначным слишком категорично; отношение смешанное и допускает разные трактовки."
+    },
+    {
+      "sample_position": 22,
+      "record_id": "validation-00000-of-00001.parquet#row=00010073",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "361fa8803c8011100983920f7b8f5c205001438e89a91722516b83458e18c524",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Автор ещё не смотрел фильм, хвалит книгу и ждёт экранизацию — это не оценка просмотренного фильма. Ограничение самой разметки, не ошибка модели."
+    },
+    {
+      "sample_position": 23,
+      "record_id": "validation-00000-of-00001.parquet#row=00004651",
+      "true_label_id": 0,
+      "predicted_label_id": 1,
+      "text_sha256": "56d2fe8c5002da9c8e4e56f9a2aa92c0bacda3f1e61f8204e3e09892b0b55d7c",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Согласен с объяснением: «не плохой, но ничего особенного» допускает neutral, исходный negative спорен. Это не отменяет расхождения с исходной меткой при подсчёте метрик, но не доказывает ошибку смыслового понимания."
+    },
+    {
+      "sample_position": 24,
+      "record_id": "validation-00000-of-00001.parquet#row=00010783",
+      "true_label_id": 0,
+      "predicted_label_id": 2,
+      "text_sha256": "225c7b20bad04a2269d02a0da1ca240dc80fd5044840eb73faa6e93aa95ad730",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Похвала визуальной стороне и актёрам сочетается с явным неприятием сюжета и итоговым «не моё». Negative обоснован. Возможная переоценка отдельных похвал моделью остаётся гипотезой."
+    },
+    {
+      "sample_position": 25,
+      "record_id": "validation-00000-of-00001.parquet#row=00005929",
+      "true_label_id": 1,
+      "predicted_label_id": 0,
+      "text_sha256": "7074d1393904cfa3a637fab9f51205203cadc053b326fb69ac8e3d287f6f51ab",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Отдельного вердикта о конкретном фильме нет, поэтому neutral допустим. Однако не все отрицательные конструкции направлены на чужую критику: «пусть получается не очень» признаёт недостатки самого кино. Эту оговорку нужно добавить к объяснению."
+    },
+    {
+      "sample_position": 26,
+      "record_id": "validation-00000-of-00001.parquet#row=00006027",
+      "true_label_id": 1,
+      "predicted_label_id": 2,
+      "text_sha256": "8e33e9c2b68463909b4da297f701180135cc5633e496359cffb11e209bdd5c5c",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Согласен с агентом: восторженная рекомендация убедительно поддерживает positive, исходный neutral выглядит сомнительно. Несогласие с исходной меткой не означает несогласия с объяснением. Без изменения протокола исходную метку сохраняем."
+    },
+    {
+      "sample_position": 27,
+      "record_id": "validation-00000-of-00001.parquet#row=00007474",
+      "true_label_id": 2,
+      "predicted_label_id": 0,
+      "text_sha256": "32f89e43e6479901f5028697263b89a74be6fdf726e6cd62f54ca85708d89439",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Общая похвала зрелищности и музыке вместе с явной оценкой 4/5 поддерживает positive. Отдельная критика танцев и сюжетной линии не отменяет общего положительного впечатления."
+    },
+    {
+      "sample_position": 28,
+      "record_id": "validation-00000-of-00001.parquet#row=00009221",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "dc5d1a252d89f8f67b354efcfbb2d7a63c33474b65ede9aee5f308945026533f",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Согласен с объяснением: резкая критика и ограниченная рекомендация делают neutral понятным, а исходный positive — сомнительным. Рейтинг 3/5 сам по себе не определяет класс. Конкретного противоречия между прежним комментарием и объяснением нет."
+    },
+    {
+      "sample_position": 29,
+      "record_id": "validation-00000-of-00001.parquet#row=00005246",
+      "true_label_id": 0,
+      "predicted_label_id": 1,
+      "text_sha256": "f32f85b5295af8f57870477eb2a76ed797aba882d3049ccef5d4c5e949ddcb3e",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Похвала относится к предыдущей части, а текущий просмотр явно разочаровал автора. Negative хорошо обоснован; смешение объектов и времён остаётся гипотезой о причине neutral."
+    },
+    {
+      "sample_position": 30,
+      "record_id": "validation-00000-of-00001.parquet#row=00010331",
+      "true_label_id": 0,
+      "predicted_label_id": 2,
+      "text_sha256": "ab0fde5ec8dfb89d634e88830f50c2e5fcc143870a0bf2fa3660ed2275efa157",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Отрицательная позиция касается и режиссёра, и содержания фильма, несмотря на признание технического качества. Negative обоснован именно этим сочетанием; одна личная критика режиссёра сама по себе ещё не определяет оценку фильма."
+    },
+    {
+      "sample_position": 31,
+      "record_id": "validation-00000-of-00001.parquet#row=00008237",
+      "true_label_id": 1,
+      "predicted_label_id": 0,
+      "text_sha256": "221c987778f1dab97009971ae2db41dac0e06e3df349255155b301bdcaff73c8",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Двойственное отношение заявлено, но оценка исполнения преимущественно отрицательная. Поощрение попытки не равнозначно одобрению результата. Формула «впечатление двоякое» не гарантирует neutral; прогноз negative содержательно объясним, хотя расходится с исходной меткой."
+    },
+    {
+      "sample_position": 32,
+      "record_id": "validation-00000-of-00001.parquet#row=00010133",
+      "true_label_id": 1,
+      "predicted_label_id": 2,
+      "text_sha256": "89cf764076fbddd2fc4d841741c0b244cc5b589973f6664b0050308ca28a6dd0",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Прямой оценки просмотренной экранизации нет, поэтому neutral допустим. При этом выражен положительный интерес к будущему просмотру. Вывод зависит от объекта и правил разметки; перенос отношения к книге как причина positive отдельно не проверен."
+    },
+    {
+      "sample_position": 33,
+      "record_id": "validation-00000-of-00001.parquet#row=00000921",
+      "true_label_id": 2,
+      "predicted_label_id": 0,
+      "text_sha256": "605e9ffa24fd2a2dca6965eb7bbbfa3e4a3765a02ab1dfa8eafd8ac7e3c054f3",
+      "agreement_with_agent_explanation": "частично",
+      "comment": "Рекомендация и похвала визуальной стороне поддерживают positive, но рекомендация ограниченная и сопровождается серьёзным недовольством. Ни рекомендация, ни 6/10 сами по себе не определяют класс. Утверждение о том, чем вызван negative модели, следует оставить гипотезой."
+    },
+    {
+      "sample_position": 34,
+      "record_id": "validation-00000-of-00001.parquet#row=00003245",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "dcb2508137d20a021c2e10d37cfa4297c9e5652ba776df9467d2fcab4894472a",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Прямое «мне понравился» поддерживает positive при смешанной оценке отдельных аспектов. Объяснение содержательно обосновано; влияние смешанности на neutral отдельно не измерено."
+    },
+    {
+      "sample_position": 35,
+      "record_id": "validation-00000-of-00001.parquet#row=00003025",
+      "true_label_id": 0,
+      "predicted_label_id": 1,
+      "text_sha256": "f75bbdc9c26c84bec221239f8ee84455c427f38f96849f6bbfbbcecfead8d933",
+      "agreement_with_agent_explanation": "да",
+      "comment": "«Не советую» и «слабо для комедии» поддерживают negative. Похвала Асель не отменяет общего вердикта. Из текста нельзя установить, хвалят ли её именно как человека, за работу или по иной причине."
+    },
+    {
+      "sample_position": 36,
+      "record_id": "validation-00000-of-00001.parquet#row=00001067",
+      "true_label_id": 0,
+      "predicted_label_id": 2,
+      "text_sha256": "13ecb12abcc2e04b20390daa8754f10b66d8da0341165545d4606e5d86074406",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Подтверждённый случай сарказма: «Это шутка» в конце буквально переворачивает всю предшествующую похвалу. Объяснение агента точное и перепроверено."
+    },
+    {
+      "sample_position": 37,
+      "record_id": "validation-00000-of-00001.parquet#row=00007706",
+      "true_label_id": 1,
+      "predicted_label_id": 0,
+      "text_sha256": "a4fcce88c5e105ffd83114eaa528679a08d50acbf50d1f8a446212f8196491e1",
+      "agreement_with_agent_explanation": "да",
+      "comment": "По смыслу отзыв допускает пограничное отношение neutral/negative. Это не означает близость решения модели к границе: сохранённая разница оценок negative и исходного neutral составляет около 2,1664. Смысловую неоднозначность нужно отделять от численной разницы оценок."
+    },
+    {
+      "sample_position": 38,
+      "record_id": "validation-00000-of-00001.parquet#row=00003320",
+      "true_label_id": 1,
+      "predicted_label_id": 2,
+      "text_sha256": "b921d8a440d961ddb5c0aafe616083b8e9f03cbdb4f4847235fc0b2c9557eb20",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Описаны переживания и мотивы героини без ясной оценки качества фильма. Neutral обоснован; причина positive корректно оставлена неизвестной."
+    },
+    {
+      "sample_position": 39,
+      "record_id": "validation-00000-of-00001.parquet#row=00008451",
+      "true_label_id": 2,
+      "predicted_label_id": 0,
+      "text_sha256": "c45e22ddabec4c9c826d12affd659eab14db1d64ccb67ffdedcfaeedafba7edf",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Финальное прямое признание хорошего впечатления поддерживает positive вопреки многочисленным претензиям. Объяснение смыслового расхождения обосновано; конкретные вклады признаков отдельно не проверялись."
+    },
+    {
+      "sample_position": 40,
+      "record_id": "validation-00000-of-00001.parquet#row=00004072",
+      "true_label_id": 2,
+      "predicted_label_id": 1,
+      "text_sha256": "5334b5da266399fe4c642ea242840eae97a2ba39e2df8deafdff35d66a24f703",
+      "agreement_with_agent_explanation": "да",
+      "comment": "Согласен с оговоркой: упоминание глубины мыслей поддерживает косвенную похвалу, но положительная оценка выражена слабо и neutral содержательно понятен. Такая осторожная трактовка соответствует объяснению; несогласие с ним не требуется только из-за неоднозначности текста."
+    }
+  ]
+}
