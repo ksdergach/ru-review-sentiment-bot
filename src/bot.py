@@ -14,11 +14,13 @@ from typing import Any
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
+from aiogram.utils.token import TokenValidationError, validate_token
 
 from src.classifier import (
     MAX_TEXT_LENGTH,
     ClassifierError,
     EmptyTextError,
+    InvalidTextError,
     TextTooLongError,
     predict,
 )
@@ -26,6 +28,8 @@ from src.classifier import (
 
 router = Router()
 logger = logging.getLogger(__name__)
+_classification_lock = asyncio.Lock()
+BUSY_MESSAGE = "Сейчас обрабатывается другой отзыв. Повторите запрос чуть позже."
 
 
 START_TEXT = (
@@ -99,6 +103,8 @@ def classify_text_for_bot(text: str) -> str:
         return EMPTY_TEXT_MESSAGE
     except TextTooLongError:
         return TOO_LONG_MESSAGE
+    except InvalidTextError:
+        return EMPTY_TEXT_MESSAGE
     except ClassifierError:
         logger.exception("Baseline classification failed")
         return MODEL_ERROR_MESSAGE
@@ -118,7 +124,13 @@ async def help_handler(message: Message) -> None:
     await message.answer(HELP_TEXT)
 
 
-@router.message(F.text.startswith("/"))
+def is_bot_command(message: Message) -> bool:
+    """Only Telegram-marked commands, not every slash-prefixed review."""
+    return any(entity.type == "bot_command" and entity.offset == 0
+               for entity in (message.entities or []))
+
+
+@router.message(is_bot_command)
 async def unknown_command_handler(message: Message) -> None:
     """Не отправлять неизвестные команды в классификатор."""
     await message.answer(UNKNOWN_COMMAND_MESSAGE)
@@ -128,7 +140,18 @@ async def unknown_command_handler(message: Message) -> None:
 async def text_handler(message: Message) -> None:
     """Классифицировать обычное текстовое сообщение."""
     text = message.text or ""
-    await message.answer(classify_text_for_bot(text))
+    if _classification_lock.locked():
+        await message.answer(BUSY_MESSAGE)
+        return
+    async with _classification_lock:
+        task = asyncio.create_task(asyncio.to_thread(classify_text_for_bot, text))
+        try:
+            answer = await asyncio.shield(task)
+        except asyncio.CancelledError:
+            # Cancellation does not stop a running thread. Keep the slot until it exits.
+            await task
+            raise
+    await message.answer(answer)
 
 
 @router.message()
@@ -146,6 +169,10 @@ def get_bot_token() -> str:
             "Environment variable TELEGRAM_BOT_TOKEN is not set"
         )
 
+    try:
+        validate_token(token)
+    except TokenValidationError:
+        raise RuntimeError("Environment variable TELEGRAM_BOT_TOKEN has invalid format") from None
     return token
 
 

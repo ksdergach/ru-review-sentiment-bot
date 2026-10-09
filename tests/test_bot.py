@@ -186,10 +186,10 @@ def test_token_is_read_from_environment(
 ) -> None:
     monkeypatch.setenv(
         "TELEGRAM_BOT_TOKEN",
-        "test-token",
+        "123456:LOCAL_TEST",
     )
 
-    assert bot.get_bot_token() == "test-token"
+    assert bot.get_bot_token() == "123456:LOCAL_TEST"
 
 
 def test_token_is_stripped(
@@ -197,10 +197,10 @@ def test_token_is_stripped(
 ) -> None:
     monkeypatch.setenv(
         "TELEGRAM_BOT_TOKEN",
-        "  test-token  ",
+        "  123456:LOCAL_TEST  ",
     )
 
-    assert bot.get_bot_token() == "test-token"
+    assert bot.get_bot_token() == "123456:LOCAL_TEST"
 
 
 def test_missing_token_is_rejected(
@@ -265,3 +265,78 @@ def test_2001_characters_are_rejected_before_model() -> None:
     )
 
     assert answer == bot.TOO_LONG_MESSAGE
+
+@pytest.mark.parametrize("text", [None, 42, ["отзыв"]])
+def test_invalid_input_returns_message(text):
+    assert bot.classify_text_for_bot(text) == bot.EMPTY_TEXT_MESSAGE
+
+
+@pytest.mark.parametrize("token", ["not-a-token", "123:", "abc:secret", "123:has space"])
+def test_bad_token_is_reported_without_exposing_secret(monkeypatch, token):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", token)
+    with pytest.raises(RuntimeError, match="invalid format") as error:
+        bot.get_bot_token()
+    assert token not in str(error.value)
+    assert error.value.__suppress_context__
+
+
+@pytest.mark.parametrize("text,command", [("/10, отличный фильм", False), ("/5 скучный фильм", False), ("/settings", True)])
+def test_real_router_distinguishes_commands_from_slash_reviews(monkeypatch, text, command):
+    from datetime import datetime, timezone
+    from aiogram.types import Message, Chat, MessageEntity
+    answers = []
+    async def answer(self, method, **kwargs):
+        answers.append(method.text)
+    monkeypatch.setattr(bot.Bot, "__call__", answer)
+    monkeypatch.setattr(bot, "classify_text_for_bot", lambda text: "classified: " + text)
+    async def run():
+        client = bot.Bot("123456:LOCAL_TEST")
+        message = Message(message_id=1, date=datetime.now(timezone.utc), chat=Chat(id=1, type="private"), text=text,
+                          entities=[MessageEntity(type="bot_command", offset=0, length=len(text))] if command else []).as_(client)
+        try:
+            await bot.router.propagate_event(update_type="message", event=message, bot=client)
+        finally:
+            await client.session.close()
+    asyncio.run(run())
+    assert answers == [bot.UNKNOWN_COMMAND_MESSAGE if command else "classified: " + text]
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_inference_does_not_block_help_or_start_second_job(monkeypatch, cancel):
+    from threading import Event
+    started, release = Event(), Event()
+    calls = []
+    def slow_predict(text):
+        calls.append(text)
+        started.set()
+        assert release.wait(5), "worker was not released"
+        return "classification result"
+    monkeypatch.setattr(bot, "classify_text_for_bot", slow_predict)
+    async def run():
+        monkeypatch.setattr(bot, "_classification_lock", asyncio.Lock())
+        first = asyncio.create_task(bot.text_handler(FakeMessage("первый")))
+        try:
+            # Event-based synchronisation: fails if inference runs on this loop.
+            for _ in range(500):
+                if started.is_set(): break
+                await asyncio.sleep(.001)
+            assert started.is_set()
+            if cancel:
+                first.cancel()
+                await asyncio.sleep(0)
+            help_message = FakeMessage()
+            await asyncio.wait_for(bot.help_handler(help_message), .5)
+            assert help_message.answers == [bot.HELP_TEXT]
+            second = FakeMessage("второй")
+            await asyncio.wait_for(bot.text_handler(second), .5)
+            assert second.answers == [bot.BUSY_MESSAGE]
+            assert calls == ["первый"]
+        finally:
+            release.set()
+            if cancel:
+                with pytest.raises(asyncio.CancelledError):
+                    await first
+            else:
+                await first
+        assert not bot._classification_lock.locked()
+    asyncio.run(run())

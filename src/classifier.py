@@ -5,26 +5,23 @@
 
 from __future__ import annotations
 
+import json
+from threading import Lock
 from pathlib import Path
 from typing import Any
 
-from src.train_baseline import load_bundle, predict_texts
+from src.train_baseline import (
+    CLASS_IDS as EXPECTED_CLASS_IDS,
+    CLASS_NAMES as EXPECTED_CLASS_NAMES,
+    EXPECTED_LABEL_MAPPING,
+    load_bundle,
+    predict_texts,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
-DEFAULT_MODEL_PATH = (
-    ROOT / "models" / "nlp_baseline" / "tfidf_logreg_baseline.joblib"
-)
-
-EXPECTED_LABEL_MAPPING = {
-    "negative": 0,
-    "neutral": 1,
-    "positive": 2,
-}
-
-EXPECTED_CLASS_IDS = [0, 1, 2]
-EXPECTED_CLASS_NAMES = ["negative", "neutral", "positive"]
+DEFAULT_CONFIG_PATH = ROOT / "configs" / "nlp_baseline.json"
 
 MAX_TEXT_LENGTH = 2000
 
@@ -52,8 +49,9 @@ class TextTooLongError(InvalidTextError):
 class BaselineClassifier:
     """Ленивая обёртка над сохранённым TF-IDF + Logistic Regression."""
 
-    def __init__(self, model_path: str | Path = DEFAULT_MODEL_PATH) -> None:
-        self.model_path = Path(model_path)
+    def __init__(self, model_path: str | Path | None = None) -> None:
+        self.model_path = Path(model_path) if model_path is not None else None
+        self._load_lock = Lock()
         self._bundle: dict[str, Any] | None = None
 
     def _get_bundle(self) -> dict[str, Any]:
@@ -61,25 +59,22 @@ class BaselineClassifier:
         if self._bundle is not None:
             return self._bundle
 
-        if not self.model_path.is_file():
-            raise ModelUnavailableError(
-                f"Baseline model not found: {self.model_path}"
-            )
-
-        try:
-            bundle = load_bundle(self.model_path)
-        except Exception as exc:
-            raise ModelUnavailableError(
-                f"Could not load baseline model: {self.model_path}"
-            ) from exc
-
-        if bundle.get("label_mapping") != EXPECTED_LABEL_MAPPING:
-            raise ModelUnavailableError(
-                "Unexpected label mapping in baseline model"
-            )
-
-        self._bundle = bundle
-        return bundle
+        # to_thread and direct callers may race on the first request.
+        with self._load_lock:
+            if self._bundle is not None:
+                return self._bundle
+            try:
+                if self.model_path is None:
+                    config = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+                    model_dir, bundle_name = config["model_dir"], config["bundle_name"]
+                    if not all(isinstance(v, str) and v.strip() for v in (model_dir, bundle_name)):
+                        raise ValueError("Invalid model location in baseline configuration")
+                    self.model_path = ROOT / model_dir / bundle_name
+                # load_bundle validates the shared class mapping and fitted components.
+                self._bundle = load_bundle(self.model_path)
+            except Exception as exc:
+                raise ModelUnavailableError("Could not load configured baseline model") from exc
+            return self._bundle
 
     @staticmethod
     def _validate_text(text: str) -> None:

@@ -211,28 +211,13 @@ def test_corrupted_model_has_clear_error(tmp_path: Path) -> None:
         model.predict("Обычный отзыв")
 
 
-def test_wrong_label_mapping_is_rejected(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    model_path = make_fake_model(tmp_path)
-
-    monkeypatch.setattr(
-        classifier,
-        "load_bundle",
-        lambda path: {
-            "label_mapping": {
-                "negative": 2,
-                "neutral": 1,
-                "positive": 0,
-            }
-        },
-    )
-
-    model = classifier.BaselineClassifier(model_path)
-
+def test_wrong_label_mapping_is_rejected(tmp_path: Path) -> None:
+    model_path = make_real_bundle(tmp_path)
+    bundle = tb.load_bundle(model_path)
+    bundle["label_mapping"] = {"negative": 2, "neutral": 1, "positive": 0}
+    tb.save_bundle(model_path, bundle)
     with pytest.raises(classifier.ModelUnavailableError):
-        model.predict("Обычный отзыв")
+        classifier.BaselineClassifier(model_path).predict("Обычный отзыв")
 
 
 def test_wrong_probability_order_is_rejected(
@@ -352,3 +337,42 @@ def test_real_bundle_contract(tmp_path: Path) -> None:
     assert result["label_id"] == (
         classifier.EXPECTED_LABEL_MAPPING[result["label"]]
     )
+
+def test_default_model_path_follows_configuration(tmp_path, monkeypatch):
+    import json
+    model_path = make_real_bundle(tmp_path)
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"model_dir": str(tmp_path), "bundle_name": model_path.name}))
+    monkeypatch.setattr(classifier, "DEFAULT_CONFIG_PATH", config)
+    model = classifier.BaselineClassifier()
+    assert model.predict("отличный фильм")["label"] == "positive"
+    assert model.model_path == model_path
+
+
+def test_invalid_configuration_is_model_error(tmp_path, monkeypatch):
+    config = tmp_path / "config.json"
+    config.write_text('{"model_dir": 123}')
+    monkeypatch.setattr(classifier, "DEFAULT_CONFIG_PATH", config)
+    with pytest.raises(classifier.ModelUnavailableError):
+        classifier.BaselineClassifier().predict("Фильм")
+
+
+def test_concurrent_first_predictions_load_once(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    model_path = make_real_bundle(tmp_path)
+    original = classifier.load_bundle
+    calls = []
+    def load(path):
+        calls.append(path)
+        return original(path)
+    monkeypatch.setattr(classifier, "load_bundle", load)
+    model = classifier.BaselineClassifier(model_path)
+    gate = Barrier(4)
+    def predict(_):
+        gate.wait(timeout=5)
+        return model.predict("отличный фильм")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(predict, range(4)))
+    assert len(calls) == 1
+    assert all(result == results[0] for result in results)
