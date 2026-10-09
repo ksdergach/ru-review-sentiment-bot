@@ -66,9 +66,9 @@ def build(font_dir: Path, output: Path) -> None:
     def footer(canvas, doc):
         canvas.saveState();canvas.setStrokeColor(colors.HexColor('#BACBD1'));canvas.line(44,38,A4[0]-44,38)
         canvas.setFont('Body',7.5);canvas.setFillColor(colors.HexColor('#536D79'))
-        canvas.drawString(44,25,'NLP · Киноотзывы · nlp-v1 · 09.10.2026')
+        canvas.drawString(44,25,'NLP · Киноотзывы · nlp-v1.1 · 09.10.2026')
         canvas.drawRightString(A4[0]-44,25,str(doc.page));canvas.restoreState()
-    doc=SimpleDocTemplate(str(output),pagesize=A4,rightMargin=44,leftMargin=44,topMargin=37,bottomMargin=51,title='Анализ тональности киноотзывов - промежуточный отчёт NLP',author='Команда ru-review-sentiment-bot',pageCompression=1)
+    doc=SimpleDocTemplate(str(output),pagesize=A4,rightMargin=44,leftMargin=44,topMargin=37,bottomMargin=51,title='Анализ тональности киноотзывов - отчёт NLP',author='Команда ru-review-sentiment-bot',pageCompression=1)
     doc.build(story,onFirstPage=footer,onLaterPages=footer)
     print(output)
 
