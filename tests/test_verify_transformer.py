@@ -148,3 +148,90 @@ def test_bundle_pack_refuses_bundle_not_matching_run(completed_run, tmp_path_fac
     archive = tmp_path_factory.mktemp("storage") / "t06.tar"
     assert transformer_bundle.main(["pack", "--root", str(root), "--out", str(archive)]) == 1
     assert not archive.exists()
+
+
+def _rewrite_archive(archive, extra):
+    """Copy a packed archive, append members via ``extra(tar)`` and refresh the sidecar digest."""
+    import tarfile
+    source = archive.read_bytes()
+    with tarfile.open(archive, "w", format=tarfile.PAX_FORMAT) as out, \
+            tarfile.open(fileobj=__import__("io").BytesIO(source)) as src:
+        for member in src.getmembers():
+            out.addfile(member, src.extractfile(member))
+        extra(out)
+    archive.with_name(archive.name + ".sha256").write_text(
+        f"{base.sha256_file(archive)}  {archive.name}\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize("attack", ["duplicate", "symlink", "traversal", "unexpected"])
+def test_bundle_restore_rejects_malicious_members(completed_run, tmp_path_factory, attack):
+    import io
+    import tarfile
+    root, config = completed_run
+    bundle = root / config["model_dir"]
+    archive = tmp_path_factory.mktemp("storage") / "t06.tar"
+    assert transformer_bundle.main(["pack", "--root", str(root), "--out", str(archive)]) == 0
+    shutil.rmtree(bundle)
+
+    def extra(tar):
+        if attack == "symlink":
+            info = tarfile.TarInfo("transformer/link")
+            info.type, info.linkname = tarfile.SYMTYPE, "/etc/passwd"
+            tar.addfile(info)
+            return
+        name = {"duplicate": "transformer/label_mapping.json", "traversal": "transformer/../escape",
+                "unexpected": "transformer/stray.bin"}[attack]
+        info = tarfile.TarInfo(name)
+        info.size = 1
+        tar.addfile(info, io.BytesIO(b"x"))
+
+    _rewrite_archive(archive, extra)
+    assert transformer_bundle.main(["restore", "--root", str(root), "--archive", str(archive)]) == 1
+    assert not bundle.exists()
+    assert not (root / "models" / "escape").exists() and not (root / "escape").exists()
+    # The staging directory is removed even when restore fails part-way.
+    assert not list((root / "models").glob(".restore-*"))
+
+
+def test_bundle_pack_rejects_symlinked_file(completed_run, tmp_path_factory):
+    root, config = completed_run
+    bundle = root / config["model_dir"]
+    real = tmp_path_factory.mktemp("elsewhere") / "label_mapping.json"
+    shutil.move(bundle / "label_mapping.json", real)
+    (bundle / "label_mapping.json").symlink_to(real)
+    archive = tmp_path_factory.mktemp("storage") / "t06.tar"
+    assert transformer_bundle.main(["pack", "--root", str(root), "--out", str(archive)]) == 1
+    assert not archive.exists()
+    with pytest.raises(vt.VerificationError, match="bundle_file_set"):
+        run(root)
+
+
+def test_verifier_rejects_stray_subdirectory_in_bundle(completed_run):
+    root, config = completed_run
+    (root / config["model_dir"] / "checkpoint-old").mkdir()
+    with pytest.raises(vt.VerificationError, match="bundle_file_set"):
+        run(root)
+
+
+@pytest.mark.parametrize("tamper", [None, "weights"])
+def test_bundle_reconstruct_requires_bitwise_identical_repeat(completed_run, tmp_path_factory, tamper):
+    root, config = completed_run
+    bundle = root / config["model_dir"]
+    # A repeat run differs only in its own training_config.json and metadata.json.
+    source = tmp_path_factory.mktemp("repeat") / "transformer_repeat"
+    shutil.copytree(bundle, source)
+    base.write_json(source / "training_config.json", {**config, "model_dir": "models/transformer_repeat"})
+    base.write_json(source / "metadata.json", {"elapsed_seconds": -1})
+    if tamper == "weights":
+        with (source / "model.safetensors").open("ab") as fh:
+            fh.write(b"\0")
+    original = {p.name: base.sha256_file(p) for p in bundle.iterdir()}
+    shutil.rmtree(bundle)
+    code = transformer_bundle.main(["reconstruct", "--root", str(root), "--source", str(source)])
+    if tamper:
+        assert code == 1 and not bundle.exists()
+    else:
+        assert code == 0
+        assert {p.name: base.sha256_file(p) for p in bundle.iterdir()} == original
+        assert run(root)["status"] == "passed"
+    assert not list((root / "models").glob(".reconstruct-*"))

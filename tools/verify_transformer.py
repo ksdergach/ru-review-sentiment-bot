@@ -227,8 +227,10 @@ def verify_bundle(root, config, metadata, bundle, check, evidence, args) -> dict
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     expected = metadata["bundle_files_sha256"]
-    present = sorted(p.name for p in bundle.iterdir() if p.is_file())
-    check("bundle_file_set", present == sorted(expected), f"present={present}")
+    # Every entry counts: a stray subdirectory or symlink is not part of the recorded bundle.
+    present = sorted(p.name for p in bundle.iterdir())
+    check("bundle_file_set", present == sorted(expected) and all(
+        (bundle / n).is_file() and not (bundle / n).is_symlink() for n in present), f"present={present}")
     for name, digest in sorted(expected.items()):
         check(f"bundle_checksum:{name}", sha256_file(bundle / name) == digest)
     if bundle.is_relative_to(root):

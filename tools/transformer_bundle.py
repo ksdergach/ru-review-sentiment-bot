@@ -2,6 +2,7 @@
 
     python tools/transformer_bundle.py pack    --out /storage/t06_bundle.tar
     python tools/transformer_bundle.py restore --archive /storage/t06_bundle.tar
+    python tools/transformer_bundle.py reconstruct --source models/transformer_repeat
 
 ``pack`` refuses to archive a bundle whose files differ from
 ``reports/transformer/run_metadata.json::bundle_files_sha256`` and writes
@@ -9,6 +10,13 @@
 and every member, extracts into a temporary sibling directory and installs it
 with a single ``rename``; an interrupted restore never leaves a mixed bundle.
 Existing non-empty bundle directories are never overwritten.
+
+``reconstruct`` rebuilds the recorded bundle from a repeat run of the same
+configuration (``configs/transformer_repeat.json``): weights, tokenizer, HF config
+and mapping are copied, while ``training_config.json`` and ``metadata.json`` are
+re-serialized from the committed ``config.json`` and ``run_metadata.json``. It
+succeeds only if all files equal ``bundle_files_sha256``, so a repeat run that is
+not bitwise identical can never pass for the original checkpoint.
 """
 from __future__ import annotations
 
@@ -16,7 +24,6 @@ import argparse
 import hashlib
 import io
 import json
-import shutil
 import sys
 import tarfile
 import tempfile
@@ -41,7 +48,9 @@ def expected_files(root: Path, report_dir: str) -> dict[str, str]:
 
 def check_directory(bundle: Path, expected: dict[str, str]) -> None:
     present = sorted(p.name for p in bundle.iterdir())
-    if present != sorted(expected) or not all((bundle / n).is_file() for n in present):
+    # Symlinks are rejected: tarfile would archive the link itself, not the weights.
+    if present != sorted(expected) or not all(
+            (bundle / n).is_file() and not (bundle / n).is_symlink() for n in present):
         raise ValueError(f"Bundle files {present} differ from run metadata {sorted(expected)}")
     for name, digest in expected.items():
         if sha256_file(bundle / name) != digest:
@@ -68,8 +77,11 @@ def pack(bundle: Path, out: Path, expected: dict[str, str]) -> str:
         info.size, info.mode = len(manifest), 0o644
         tar.addfile(info, io.BytesIO(manifest))
     digest = sha256_file(partial)
+    sidecar = out.with_name(out.name + ".sha256")
+    sidecar_partial = sidecar.with_name(sidecar.name + ".partial")
+    sidecar_partial.write_text(f"{digest}  {out.name}\n", encoding="utf-8")
     partial.rename(out)
-    out.with_name(out.name + ".sha256").write_text(f"{digest}  {out.name}\n", encoding="utf-8")
+    sidecar_partial.rename(sidecar)
     return digest
 
 
@@ -89,14 +101,56 @@ def restore(archive: Path, bundle: Path, expected: dict[str, str], archive_sha25
         staging = Path(tmp) / PREFIX
         staging.mkdir()
         with tarfile.open(archive, "r") as tar:
+            seen = set()
             for member in tar.getmembers():
-                # Only expected regular files; no links, absolute paths or traversal.
+                # Only expected regular files, each once; no links, absolute paths or traversal.
                 if not member.isfile() or member.name not in allowed:
                     raise ValueError(f"Unexpected archive member: {member.name}")
+                if member.name in seen:
+                    raise ValueError(f"Duplicate archive member: {member.name}")
+                seen.add(member.name)
+                name = Path(member.name).name
                 source = tar.extractfile(member)
-                with (staging / Path(member.name).name).open("wb") as fh:
-                    shutil.copyfileobj(source, fh)
+                digest = hashlib.sha256()
+                with (staging / name).open("wb") as fh:
+                    for chunk in iter(lambda: source.read(1 << 20), b""):
+                        digest.update(chunk)
+                        fh.write(chunk)
+                # Fail on the first bad member instead of after unpacking the whole archive.
+                if name in expected and digest.hexdigest() != expected[name]:
+                    raise ValueError(f"Checksum mismatch: {name}")
         (staging / "BUNDLE_SHA256SUMS.json").unlink(missing_ok=True)
+        check_directory(staging, expected)
+        if bundle.exists():
+            bundle.rmdir()  # empty, checked above
+        staging.rename(bundle)
+
+
+def _json_bytes(data) -> bytes:
+    # Same serialization as src.train_baseline.write_json used by the training run.
+    return (json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def reconstruct(source: Path, bundle: Path, root: Path, report_dir: str, expected: dict[str, str]) -> None:
+    if bundle.exists() and any(bundle.iterdir()):
+        raise FileExistsError(f"Bundle directory is not empty: {bundle}")
+    report = root / report_dir
+    metadata = json.loads((report / "run_metadata.json").read_text(encoding="utf-8"))
+    metadata.pop("bundle_files_sha256")
+    generated = {"training_config.json": _json_bytes(json.loads((report / "config.json").read_text(encoding="utf-8"))),
+                 "metadata.json": _json_bytes(metadata)}
+    bundle.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".reconstruct-", dir=bundle.parent) as tmp:
+        staging = Path(tmp) / PREFIX
+        staging.mkdir()
+        for name in expected:
+            if name in generated:
+                (staging / name).write_bytes(generated[name])
+            else:
+                path = source / name
+                if path.is_symlink() or not path.is_file():
+                    raise ValueError(f"Source bundle lacks regular file: {name}")
+                (staging / name).write_bytes(path.read_bytes())
         check_directory(staging, expected)
         if bundle.exists():
             bundle.rmdir()  # empty, checked above
@@ -105,13 +159,14 @@ def restore(archive: Path, bundle: Path, expected: dict[str, str], archive_sha25
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=("pack", "restore", "check"))
+    parser.add_argument("command", choices=("pack", "restore", "check", "reconstruct"))
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--report-dir", default="reports/transformer")
     parser.add_argument("--bundle", type=Path, help="default: <root>/models/transformer")
     parser.add_argument("--out", type=Path, help="pack: archive path outside Git")
     parser.add_argument("--archive", type=Path, help="restore: archive path")
     parser.add_argument("--sha256", help="restore: expected archive SHA-256 (else <archive>.sha256)")
+    parser.add_argument("--source", type=Path, help="reconstruct: bundle of a repeat run with the same config")
     args = parser.parse_args(argv)
     bundle = args.bundle or args.root / "models/transformer"
     try:
@@ -125,6 +180,11 @@ def main(argv=None) -> int:
                 parser.error("restore requires --archive")
             restore(args.archive, bundle, expected, args.sha256)
             print(f"Restored and verified {len(expected)} files into {bundle}")
+        elif args.command == "reconstruct":
+            if not args.source:
+                parser.error("reconstruct requires --source")
+            reconstruct(args.source, bundle, args.root, args.report_dir, expected)
+            print(f"Reconstructed and verified {len(expected)} files into {bundle}")
         else:
             check_directory(bundle, expected)
             print(f"Bundle matches run metadata: {len(expected)} files")
