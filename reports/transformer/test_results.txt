@@ -7,13 +7,13 @@
 ..............................................                           [100%]
 =============================== warnings summary ===============================
 .venv/lib/python3.12/site-packages/joblib/_multiprocessing_helpers.py:44
-  /home/workagent/dev-workspaces/ru-review-sentiment-bot/issue-8/.venv/lib/python3.12/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 2] No such file or directory.  joblib will operate in serial mode
+  .venv/lib/python3.12/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 2] No such file or directory.  joblib will operate in serial mode
     warnings.warn("%s.  joblib will operate in serial mode" % (e,))
 
 tests/test_train_transformer.py::test_local_bundle_and_right_truncation
 tests/test_train_transformer.py::test_end_to_end_training_updates_encoder_and_head
 tests/test_train_transformer.py::test_pilot_discards_weights_without_validation
-  /home/workagent/dev-workspaces/ru-review-sentiment-bot/issue-8/.venv/lib/python3.12/site-packages/transformers/models/bert/tokenization_bert.py:104: DeprecationWarning: Deprecated in 0.9.0: WordPiece.__init__ will not create from files anymore, try `WordPiece.from_file` instead
+  .venv/lib/python3.12/site-packages/transformers/models/bert/tokenization_bert.py:104: DeprecationWarning: Deprecated in 0.9.0: WordPiece.__init__ will not create from files anymore, try `WordPiece.from_file` instead
     self._tokenizer = Tokenizer(WordPiece(self._vocab, unk_token=str(unk_token)))
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html

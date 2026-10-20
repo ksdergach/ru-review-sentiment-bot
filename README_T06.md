@@ -21,16 +21,50 @@ python3 -m venv .venv
 HF_HOME=.cache/huggingface .venv/bin/python -m src.train_transformer --config configs/transformer.json --pilot
 HF_HOME=.cache/huggingface .venv/bin/python -m src.train_transformer --config configs/transformer.json
 .venv/bin/python -m src.train_transformer --verify-bundle models/transformer
-.venv/bin/python -m pytest tests/test_train_transformer.py -q
-HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py
+.venv/bin/python -m pytest tests/test_train_transformer.py tests/test_verify_transformer.py -q
+HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py --full-validation --pretrained-check
 ```
 
 Первое скачивание модели требует доступа к публичному Hugging Face Hub. Токен
 не нужен и не передаётся. Модель и токенизатор привязаны к revision
 `e8ed3b0c8bbf4fb6984c3de043bf7d2f4e5969ae` (тот же commit, что в T05).
 Вызов `--verify-bundle` использует `local_files_only=True`.
-Для всего набора тестов проекта дополнительно нужен `aiogram==3.22.0`, как в
-`requirements.txt`; он установлен в этом локальном окружении.
+Для всего набора тестов проекта дополнительно нужны пакеты из `requirements.txt`
+(`aiogram`, `faster-whisper`, `ctranslate2`, `av`).
+
+### Проверка на отдельной машине
+
+Нужны Linux, Python 3.12 (исходный запуск и повторная проверка — 3.12.3; на 3.13.7
+из `.python-version` тесты T06 не прогонялись), около 3 ГБ свободной RAM и 3 ГБ диска. `sudo` не требуется:
+всё ставится в локальное `.venv` внутри клона.
+
+```bash
+git clone https://github.com/ksdergach/ru-review-sentiment-bot.git && cd ru-review-sentiment-bot
+git checkout vds/issue-8
+python3 -m venv .venv
+.venv/bin/python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+.venv/bin/python -m pip install -r requirements.txt   # torch уже установлен, версия совпадает
+.venv/bin/python tools/restore_nlp_splits.py           # train/validation из NLP_dataset/, test не открывается
+HF_HUB_OFFLINE=1 .venv/bin/python -m pytest -q
+.venv/bin/python tools/verify_transformer.py --no-bundle   # доказательства и данные без весов
+# после восстановления комплекта (см. «Хранение и перенос комплекта»):
+.venv/bin/python tools/transformer_bundle.py restore --archive <путь>/t06_rubert_bundle.tar
+HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py --full-validation
+```
+
+`tools/verify_transformer.py` не импортирует `src/*`. Контрольные суммы, упорядоченные
+ID/label, метрики из матриц ошибок и правило выбора реализованы в нём заново.
+Комплект загружается напрямую через `AutoModelForSequenceClassification` и
+`AutoTokenizer` с `local_files_only=True`. Результат выводится в stdout, при `--output` —
+в указанный файл. Закоммиченный `reports/transformer/verification.json` скрипт не
+перезаписывает: это исторический результат прежней версии проверки на исходном
+комплекте, полученный 20.10.2026. Ключи:
+`--full-validation` заново прогоняет все 10 396 validation-текстов и сверяет матрицу
+ошибок победителя; `--pretrained-check` сравнивает энкодер победителя с закреплённой
+pretrained-ревизией из локального кэша HF и требует отличий в каждом блоке;
+`--no-bundle` проверяет только данные и журналы, а статус `passed_without_bundle`
+явно означает, что веса не проверялись. Без комплекта обычный запуск завершается
+с кодом 2, а не «успехом».
 
 Скрипт отказывается перезаписывать непустые каталоги отчётов и весов. Для
 повторения создайте копию JSON с новыми `report_dir` и `model_dir`, например
@@ -81,6 +115,12 @@ word TF-IDF с lowercase, униграммами/биграммами, без у
 Укороченный лимит выбран **по ресурсам, до просмотра validation**. Это
 ограниченный CPU-эксперимент; он не устанавливает потолок качества RuBERT.
 
+Оба pilot выполнены **более ранней версией скрипта**: в их `run_metadata.json`
+`script_sha256 = 964ce3…`, а закоммиченный код и основной запуск — `c31da4…`.
+Поэтому pilot-журналы нельзя побайтно воспроизвести текущим кодом. Они служат только
+оценкой времени и памяти и в выборе checkpoint не участвуют. Основной запуск
+соответствует закоммиченному скрипту, это проверяет `training_script_checksum`.
+
 Основной запуск: AdamW, постоянный learning rate `2e-5`, weight decay `0.01`,
 clip grad norm `1.0`, balanced train class weights, 2 CPU threads, детерминированные
 операции PyTorch. Все 29 194 707 параметров обучаются. Shuffle без возвращения,
@@ -107,7 +147,7 @@ validation. Иных конфигураций по качеству не иск�
   из `src/train_baseline.py::_smoke_texts()`; тексты в отчёте заменены SHA-256.
 - `models/transformer/`: `model.safetensors`, tokenizer, HF config,
   `training_config.json`, `label_mapping.json`, `metadata.json`. Комплект
-  локальный, исключён из Git. Для переноса копируется весь каталог.
+  локальный, исключён из Git. Перенос: см. «Хранение и перенос комплекта».
 - `artifacts/transformer/`: локальные консольные журналы, исключённые из Git.
 
 `train_seconds` измеряет forward/backward/optimizer, с синхронизацией CUDA
@@ -132,8 +172,55 @@ CSV с `pytest.approx`, поскольку парсинг decimal менял п�
 При прерывании сохраняйте прежние журналы и каталог модели; повторите ту же
 конфигурацию с новыми каталогами вывода. Не смешивайте результаты разных запусков.
 
+Скрипт обучения записывает комплект поверх промежуточного победителя без
+временного каталога. Если запись прервётся, комплект может оказаться смешанным.
+Такой комплект не пройдёт сверку с `bundle_files_sha256`: её выполняют
+`tools/transformer_bundle.py` и `tools/verify_transformer.py`. Атомарную запись и вынос
+`clip_grad_norm` в конфиг в `src/train_transformer.py` намеренно **не** добавляли.
+Любое изменение скрипта меняет `script_sha256`, и принятый запуск перестал бы
+соответствовать коду. Атомарность обеспечена при переносе: `restore` распаковывает
+архив во временный каталог, проверяет его и устанавливает одним `rename`.
+`clip_grad_norm = 1.0` зафиксирован в коде и описан выше.
+
+## Хранение и перенос комплекта
+
+Веса не помещаются в Git. Источник истины для комплекта —
+`reports/transformer/run_metadata.json::bundle_files_sha256` (7 файлов).
+
+```bash
+# на машине, где есть комплект: детерминированный tar + <архив>.sha256
+.venv/bin/python tools/transformer_bundle.py check
+.venv/bin/python tools/transformer_bundle.py pack --out <хранилище>/t06_rubert_bundle.tar
+# на машине проверяющего:
+.venv/bin/python tools/transformer_bundle.py restore --archive <хранилище>/t06_rubert_bundle.tar
+HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py --full-validation
+```
+
+`pack` не архивирует комплект, если набор файлов или хотя бы одна сумма отличаются
+от метаданных запуска. `restore` проверяет SHA-256 архива и каждого файла, допускает
+только ожидаемые обычные файлы (без ссылок и `..`) и не перезаписывает непустой
+каталог. Хранилище — GitHub Release asset этого репозитория или общий диск
+команды. Публикация архива выполняется только с разрешения владельца репозитория.
+
+**Состояние на 20.10.2026.** Исходный каталог обучения на VDS удалён. Комплект с
+`model.safetensors = 57d96aea…` в доступных рабочих каталогах не найден, во внешнее
+хранилище он не выгружался. Пока архив не найдётся, C4 нельзя подтвердить на
+исходном checkpoint. Повторное обучение той же командой займёт около 37 минут на
+2 CPU и потребует около 2 ГБ RAM. Оно даст **новый** комплект, который сохраняется в
+отдельные `reports/transformer_repeat/` и `models/transformer_repeat/` и сверяется
+с исходными метриками. Совпадение SHA-256 весов детерминированные алгоритмы
+PyTorch не гарантируют, его нужно подтвердить фактически.
+
 Полный локальный regression suite: **478 passed**, фактический вывод —
-`reports/transformer/test_results.txt`. Первоначальные два падения тестов речи
+`reports/transformer/test_results.txt` (абсолютные пути к `.venv` в предупреждениях
+заменены на относительные; результаты не менялись). После исправлений по ревью:
+**495 passed**, вывод в `reports/transformer/test_results_review_fix.txt`.
+Добавлены тест правого усечения на различимых токенах и реальная загрузка
+локального энкодера через `load_pretrained` без подмены, в том числе отказ на
+неполном энкодере. Добавлено сравнение весов победителя из `model.safetensors`
+с исходными и тесты независимого верификатора и переноса комплекта. В
+end-to-end тестах подменяется только источник pretrained-модели, это не
+интеграция с RuBERT. Первоначальные два падения тестов речи
 устранены установкой уже закреплённых в проекте пакетов faster-whisper,
 ctranslate2 и av в `.venv`; исходный код речи не менялся.
 
@@ -154,11 +241,20 @@ train-пример за полную эпоху. Победил checkpoint 1203 
 P(neutral)=0,368508, P(positive)=0,375531. Этот ответ сохранён без замены текста;
 правильный порядок классов не означает безошибочную классификацию.
 
-Отдельный процесс `HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py`
-завершился с кодом 0. Он проверил версию данных, полноту бюджета обучения,
-контрольные суммы всех файлов комплекта, выбор checkpoint и macro-F1 по матрицам
-ошибок, локальную загрузку и повторяемость ответов. Результат:
-`reports/transformer/verification.json`. Число выполненных проверок: 33.
+Прежняя версия `tools/verify_transformer.py` в среде обучения завершилась с кодом 0.
+Она выполнила 33 проверки, включая загрузку комплекта; результат сохранён в
+`reports/transformer/verification.json`. Эта версия использовала функции
+`src/train_transformer.py`, поэтому подтверждала внутреннюю согласованность, а не
+независимую проверку.
 
-Блокирующих зависимостей для T06 не осталось. Это локальные автоматические
-проверки, а не независимое подтверждение качества или финальная test-оценка.
+Повторная проверка 20.10.2026 выполнена новой, независимой версией в чистом клоне
+и отдельном `.venv`: `verify_transformer.py --no-bundle` дал 32 успешные проверки.
+Подтверждены побайтовые SHA-256 восстановленных Parquet и T03, упорядоченные ID
+train и validation, совпадающие с baseline, отсутствие пересечений и test-ID,
+SHA скрипта и конфига, бюджет 1203 шага, точки validation 602/1203, метрики из
+матриц ошибок, правило выбора и разность с baseline.
+
+**Открытый блокер C4:** исходного комплекта весов в доступной среде нет (см. «Хранение
+и перенос комплекта»). Загрузку и предсказания на исходном checkpoint повторно
+проверить нельзя, пока не найден архив или не согласовано повторное обучение.
+Это локальные автоматические проверки, а не оценка качества и не финальная test-оценка.

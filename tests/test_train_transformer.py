@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-from transformers import BertConfig, BertForSequenceClassification, BertTokenizer
+from safetensors.torch import load_file
+from transformers import BertConfig, BertForSequenceClassification, BertModel, BertTokenizer
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -127,13 +128,25 @@ def test_selection_uses_macro_f1_and_earlier_step():
         tt.select_checkpoint([{"step": 1, "macro_f1": float("nan")}])
 
 
-def test_local_bundle_and_right_truncation(tmp_path, config, tiny_model):
+def test_right_truncation_keeps_beginning(config, tiny_model):
+    _, tokenizer = tiny_model
+    config.update(max_length=8)
+    ids = lambda *words: tokenizer.convert_tokens_to_ids(list(words))
+    # Distinct start/end tokens: left truncation would keep "validation" and drop "train".
+    text = "train оценка " + "фильм " * 20 + "validation"
+    tokenizer.truncation_side = "left"
+    left = tokenizer([text], truncation=True, max_length=8)["input_ids"][0]
+    assert ids("validation")[0] in left and ids("train")[0] not in left
+    inputs = tt.encode(tokenizer, [text], config)
+    assert tokenizer.truncation_side == "right"
+    expected = [tokenizer.cls_token_id, *ids("train", "оценка", *["фильм"] * 4), tokenizer.sep_token_id]
+    assert inputs["input_ids"][0].tolist() == expected
+
+
+def test_local_bundle_roundtrip(tmp_path, config, tiny_model):
     model, tokenizer = tiny_model
     config.update(max_length=8, num_threads=1)
     tt.setup(config)
-    inputs = tt.encode(tokenizer, ["фильм " * 100], config)
-    assert inputs["input_ids"].shape == (1, 8)
-    assert inputs["input_ids"][0, -1] == tokenizer.sep_token_id
     before = tt.predict_texts(model, tokenizer, tt.FIXED_TEXTS, config)
     bundle = tmp_path / "bundle"
     tt.save_bundle(bundle, model, tokenizer, config, {"fixture_only": True})
@@ -154,6 +167,7 @@ def test_end_to_end_training_updates_encoder_and_head(project, config, tiny_mode
                   eval_every_steps=2, log_every_steps=1)
     path = root / "config.json"
     base.write_json(path, config)
+    initial = {k: v.detach().clone() for k, v in model.state_dict().items()}
     monkeypatch.setattr(tt, "load_pretrained", lambda c: (tokenizer, model, {"fixture_only": True}))
     result = tt.run_training(path, root)
     assert result["steps"] == result["steps_budget"] == 4
@@ -167,6 +181,12 @@ def test_end_to_end_training_updates_encoder_and_head(project, config, tiny_mode
     assert len(rows) == 2
     assert result["winner"]["macro_f1"] == pytest.approx(rows.macro_f1.max())
     assert result["delta_vs_baseline"] == result["winner"]["macro_f1"] - 0.72
+    # The saved winner holds fine-tuned weights in every encoder block and the head, read back
+    # directly from model.safetensors rather than from the in-memory training model.
+    saved = load_file(root / config["model_dir"] / "model.safetensors")
+    changed = {k for k, v in saved.items() if v.is_floating_point() and not torch.equal(v, initial[k])}
+    for prefix in ("bert.embeddings.", "bert.encoder.layer.0.", "bert.encoder.layer.1.", "classifier."):
+        assert any(k.startswith(prefix) for k in changed), prefix
     with pytest.raises(FileExistsError):
         tt.run_training(path, root)
 
@@ -186,3 +206,41 @@ def test_pilot_discards_weights_without_validation(project, config, tiny_model, 
     assert result["weights_discarded"]
     assert not (root / config["model_dir"]).exists()
     assert not (root / config["report_dir"] / "validation_results.csv").exists()
+
+
+def _save_encoder(path, tokenizer, layers=2, declared_layers=None):
+    """A local 'pretrained' encoder checkpoint without a classification head."""
+    encoder = BertModel(BertConfig(
+        vocab_size=len(tokenizer), hidden_size=16, intermediate_size=32, num_hidden_layers=layers,
+        num_attention_heads=2, max_position_embeddings=64))
+    encoder.save_pretrained(path)
+    tokenizer.save_pretrained(path)
+    if declared_layers is not None:
+        cfg = base.read_json(path / "config.json")
+        cfg["num_hidden_layers"] = declared_layers
+        base.write_json(path / "config.json", cfg)
+    return encoder
+
+
+def test_load_pretrained_real_encoder_is_complete_and_trainable(tmp_path, config, tiny_model):
+    """No substitution of load_pretrained: real from_pretrained on a local encoder directory."""
+    _, tokenizer = tiny_model
+    encoder = _save_encoder(tmp_path / "encoder", tokenizer)
+    config.update(model_name=str(tmp_path / "encoder"))
+    tok, model, loading = tt.load_pretrained(config)
+    assert loading["only_new_head_missing"] and loading["mismatched_keys_count"] == 0
+    assert sorted(loading["missing_keys"]) == ["classifier.bias", "classifier.weight"]
+    assert all(p.requires_grad for p in model.parameters())
+    assert model.config.id2label == tt.ID2LABEL and model.config.label2id == tt.MAPPING
+    for key, value in encoder.state_dict().items():
+        assert torch.equal(model.bert.state_dict()[key], value), key
+    assert tok.convert_tokens_to_ids("фильм") == tokenizer.convert_tokens_to_ids("фильм")
+
+
+def test_load_pretrained_rejects_incomplete_encoder(tmp_path, config, tiny_model):
+    _, tokenizer = tiny_model
+    # The config declares 3 layers but the checkpoint has 2: layer 2 would be randomly initialized.
+    _save_encoder(tmp_path / "encoder", tokenizer, layers=2, declared_layers=3)
+    config.update(model_name=str(tmp_path / "encoder"))
+    with pytest.raises(RuntimeError, match="not loaded completely"):
+        tt.load_pretrained(config)
