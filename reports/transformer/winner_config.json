@@ -1,0 +1,70 @@
+{
+  "config": {
+    "baseline_metadata_path": "reports/baseline/run_metadata.json",
+    "baseline_train_ids_path": "reports/baseline/train_ids.csv",
+    "batch_size": 64,
+    "class_weight_mode": "balanced_train",
+    "data_prep_audit_path": "reports/data_prep/audit.json",
+    "data_prep_split_ids_path": "reports/data_prep/split_ids.csv",
+    "device": "cpu",
+    "epochs": 1,
+    "eval_every_steps": 602,
+    "label_mapping": {
+      "negative": 0,
+      "neutral": 1,
+      "positive": 2
+    },
+    "learning_rate": 2e-05,
+    "log_every_steps": 100,
+    "max_length": 64,
+    "model_dir": "models/transformer",
+    "model_name": "cointegrated/rubert-tiny2",
+    "num_threads": 2,
+    "pilot_steps": 3,
+    "report_dir": "reports/transformer",
+    "revision": "e8ed3b0c8bbf4fb6984c3de043bf7d2f4e5969ae",
+    "seed": 42,
+    "train_path": "data/processed/train.parquet",
+    "truncation_side": "right",
+    "validation_path": "data/processed/validation.parquet",
+    "weight_decay": 0.01
+  },
+  "winner": {
+    "accuracy": 0.8183916891111966,
+    "confusion_matrix": [
+      [
+        2296,
+        429,
+        100
+      ],
+      [
+        90,
+        280,
+        66
+      ],
+      [
+        287,
+        916,
+        5932
+      ]
+    ],
+    "epoch": 1,
+    "examples_seen": 76971,
+    "macro_f1": 0.6678240259861936,
+    "negative_f1": 0.8352128046562386,
+    "negative_precision": 0.8589599700710812,
+    "negative_recall": 0.8127433628318584,
+    "negative_support": 2825,
+    "neutral_f1": 0.2717127607957302,
+    "neutral_precision": 0.1723076923076923,
+    "neutral_recall": 0.6422018348623854,
+    "neutral_support": 436,
+    "positive_f1": 0.8965465125066122,
+    "positive_precision": 0.972777959986881,
+    "positive_recall": 0.8313945339873862,
+    "positive_support": 7135,
+    "step": 1203,
+    "train_seconds": 2036.3690660013817,
+    "validation_seconds": 45.673152233008295
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "baseline_validation_macro_f1": 0.7180146428367195,
+  "checks": [
+    "accepted_baseline_data_version",
+    "no_final_test_used",
+    "full_training_budget_completed",
+    "config_checksum",
+    "training_script_checksum",
+    "bundle_checksum:config.json",
+    "bundle_git_ignored:config.json",
+    "bundle_checksum:label_mapping.json",
+    "bundle_git_ignored:label_mapping.json",
+    "bundle_checksum:metadata.json",
+    "bundle_git_ignored:metadata.json",
+    "bundle_checksum:model.safetensors",
+    "bundle_git_ignored:model.safetensors",
+    "bundle_checksum:tokenizer.json",
+    "bundle_git_ignored:tokenizer.json",
+    "bundle_checksum:tokenizer_config.json",
+    "bundle_git_ignored:tokenizer_config.json",
+    "bundle_checksum:training_config.json",
+    "bundle_git_ignored:training_config.json",
+    "bundle_metadata_matches_run",
+    "encoder_and_head_updated",
+    "real_training_log_complete",
+    "validation_table_matches_log",
+    "validation_row:602",
+    "macro_f1_from_confusion:602",
+    "validation_row:1203",
+    "macro_f1_from_confusion:1203",
+    "winner_is_max_validation_macro_f1",
+    "honest_baseline_delta",
+    "validation_roundtrip_recorded",
+    "fixed_text_class_order",
+    "fixed_text_predictions_reproduced",
+    "three_finite_probabilities"
+  ],
+  "delta_vs_baseline": -0.05019061685052584,
+  "final_test_used": false,
+  "fixed_predictions": {
+    "label_ids": [
+      2,
+      0,
+      2
+    ],
+    "labels": [
+      "positive",
+      "negative",
+      "positive"
+    ],
+    "probabilities": [
+      [
+        0.006064471788704395,
+        0.0190151147544384,
+        0.974920392036438
+      ],
+      [
+        0.9610050320625305,
+        0.02961183711886406,
+        0.009383078664541245
+      ],
+      [
+        0.2559608817100525,
+        0.36850816011428833,
+        0.37553098797798157
+      ]
+    ],
+    "probability_class_ids": [
+      0,
+      1,
+      2
+    ],
+    "probability_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ]
+  },
+  "note": "Local automated verification; not an independent quality assessment.",
+  "passed": true,
+  "validation_macro_f1": 0.6678240259861936,
+  "winner_step": 1203
+}

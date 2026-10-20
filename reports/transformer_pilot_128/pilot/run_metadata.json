@@ -1,0 +1,77 @@
+{
+  "class_weights": {
+    "0": 1.1943487570989666,
+    "1": 7.7984802431610944,
+    "2": 0.49152282610777986
+  },
+  "config_sha256": "13bb236b52e4835a75936bc9a1f97497976c7e48a8aece2a5871eb9a5478a17d",
+  "data_version": {
+    "baseline_metadata_sha256": "8cdd958d235473942609bf8aee1a650c7e5c1aa3f8e4921362236f2633141de4",
+    "baseline_train_ids_file_sha256": "ba4e73ceb3e52eb5e958afdde4515242b4145cb2736066e7e84db226e96228d5",
+    "baseline_validation_macro_f1": 0.7180146428367195,
+    "checksums": {
+      "data_prep_audit_path": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
+      "data_prep_split_ids_path": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
+      "train_path": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
+      "validation_path": "f95a9223e216c4fe3be1e4a9a23a0dfd65ea81e8b37c0a680c0a4b1fe411c214"
+    },
+    "final_test_used": false,
+    "split_independence": {
+      "movie_id_overlap": 0,
+      "normalized_text_overlap": 0,
+      "record_id_overlap": 0
+    },
+    "t03_split_check": {
+      "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+      "train_rows": 76971,
+      "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+      "validation_rows": 10396
+    },
+    "train_ids_equal_baseline": true,
+    "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+    "train_rows": 76971,
+    "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+    "validation_rows": 10396
+  },
+  "elapsed_seconds": 12.173501960933208,
+  "examples_seen": 48,
+  "final_test_used": false,
+  "memory": {
+    "cuda_peak_allocated_mib": null,
+    "cuda_peak_reserved_mib": null,
+    "rss_current_mib": 1540.7734375,
+    "rss_peak_mib": 1740.0859375
+  },
+  "mode": "pilot",
+  "parameter_updates": {
+    "encoder_max_abs_update": 2.008676528930664e-05,
+    "encoder_sentinel_parameters": [
+      "bert.encoder.layer.0.attention.output.dense.weight",
+      "bert.encoder.layer.2.attention.output.dense.weight"
+    ],
+    "encoder_tensors_changed": 2,
+    "encoder_tensors_snapshotted": 2,
+    "encoder_updated": true,
+    "head_max_abs_update": 2.0012259483337402e-05,
+    "head_sentinel_parameters": [
+      "classifier.bias",
+      "classifier.weight"
+    ],
+    "head_tensors_changed": 2,
+    "head_tensors_snapshotted": 2,
+    "head_updated": true,
+    "sentinel_grad_norms": {
+      "bert.encoder.layer.0.attention.output.dense.weight": 0.144967183470726,
+      "bert.encoder.layer.2.attention.output.dense.weight": 0.1024213507771492,
+      "classifier.bias": 0.45763516426086426,
+      "classifier.weight": 0.7688694000244141
+    },
+    "snapshot_max_elements_per_tensor": 2000000
+  },
+  "projected_train_seconds": 8246.296562859168,
+  "script_sha256": "964ce3bce7595846cdd67d6d5e41c5aff3dbe3193731c6ab989825be570e5d92",
+  "steps": 3,
+  "steps_budget": 3,
+  "train_seconds": 5.14215125516057,
+  "weights_discarded": true
+}

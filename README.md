@@ -7,7 +7,8 @@
 Текущий приоритет — [сдача NLP без трансформеров](docs/nlp_submission.md):
 TF-IDF + Logistic Regression, качество данных, анализ ошибок и короткий отчёт.
 [Milestone](https://github.com/ksdergach/ru-review-sentiment-bot/milestone/1)
-собирает задачи этой сдачи; RuBERT остаётся в дальнейшем плане.
+собирает задачи этой сдачи; RuBERT не входит в её обязательный объём.
+Отдельный эксперимент [T06](README_T06.md) дообучает RuBERT на том же train.
 [Качество данных и транскрипций](reports/nlp/data_quality.md): показатели
 корпуса проверены; пользователь подтвердил эталон 12-секундного фрагмента,
 WER = 0% (0 ошибок / 24 слова). N01 завершена; результат ASR относится только к этому фрагменту.
@@ -31,8 +32,9 @@ T02 завершена: [аудит 100 отзывов агентом](reports/d
 В репозитории уже есть подготовка данных (T03), обучение baseline (T04),
 проверка ресурсов (T05) и модуль распознавания голоса (T08).
 Baseline-часть общего интерфейса классификатора и текстовый Telegram-бот
-реализуются в N03 (#26). Полное обучение RuBERT и голосовая интеграция
-Telegram-бота остаются следующими задачами.
+реализуются в N03 (#26). Для RuBERT выполнена полная эпоха [T06](README_T06.md):
+validation macro-F1 0,667824 против 0,718015 у baseline; преимущества нет.
+Голосовая интеграция Telegram-бота остаётся следующей задачей.
 
 ## Установка
 
@@ -151,6 +153,7 @@ python tools/audit_dataset.py
 | Подготовка T03 | `configs/data_prep.json` | `NLP_dataset/*.parquet` | `data/processed/`, тексты для аудита в `artifacts/data_prep/` | `reports/data_prep/` |
 | Baseline T04 | `configs/baseline.json` | Подготовленные train/validation | `models/baseline/` | `reports/baseline/` |
 | Проверка T05 | `configs/resource_check.json` | Train, метаданные T04, отдельное отладочное аудио | `artifacts/resource_check/` | `reports/resources/` |
+| RuBERT T06 | `configs/transformer.json` | Те же train-ID baseline, validation для выбора checkpoint | `models/transformer/` | `reports/transformer/` |
 | Распознавание T08 | `configs/speech.json` | Локальное аудио, включая OGG/Opus | Кэш `.cache/huggingface/`, отладочные тексты в `artifacts/speech/` | `reports/speech/` |
 | Окружение T01 | `.python-version`, `requirements.txt` | Чистая `.venv/` | Установленные пакеты | `reports/environment/` |
 
@@ -202,6 +205,10 @@ python src/train_baseline.py --config configs/baseline.json
 Проверяйте изменения отчётов перед коммитом. T03 проверяет целостность всех
 сплитов; T04 обучается на train и выбирает параметры по validation, не оценивая
 финальный test. Подробности: [T03](README_T03.md), [T04](README_T04.md).
+
+Дообучение RuBERT: [команды, бюджет и обработка текстов T06](README_T06.md).
+Точка входа — `python -m src.train_transformer --config configs/transformer.json`;
+она сверяет train-ID и версию данных с baseline и выбирает checkpoint по validation macro-F1.
 
 Проверка ресурсов после получения локальных данных T03 и артефактов T04:
 
