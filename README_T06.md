@@ -17,13 +17,31 @@ python3 -m venv .venv
 .venv/bin/python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
 .venv/bin/python -m pip install numpy==2.3.3 pandas==2.3.2 pyarrow==24.0.0 scipy==1.15.3 scikit-learn==1.7.2 joblib==1.5.2 transformers==5.5.0 tokenizers==0.22.2 psutil==7.1.0 pytest==8.4.2
 .venv/bin/python tools/restore_nlp_splits.py
-.venv/bin/python -m src.train_transformer --config configs/transformer.json --check-data
-HF_HOME=.cache/huggingface .venv/bin/python -m src.train_transformer --config configs/transformer.json --pilot
-HF_HOME=.cache/huggingface .venv/bin/python -m src.train_transformer --config configs/transformer.json
-.venv/bin/python -m src.train_transformer --verify-bundle models/transformer
+# Исторические отчёты уже есть в Git. Новый запуск пишет в отдельные каталоги.
+.venv/bin/python - <<'PYCONFIG'
+import json
+from pathlib import Path
+config = json.loads(Path("configs/transformer.json").read_text())
+config.update(report_dir="artifacts/transformer_reproduction/report",
+              model_dir="models/transformer_reproduction")
+path = Path("artifacts/transformer_reproduction/config.json")
+path.parent.mkdir(parents=True, exist_ok=True)
+with path.open("x") as stream:
+    json.dump(config, stream, indent=2)
+PYCONFIG
+export HF_HOME="$PWD/.cache/huggingface"
+.venv/bin/python -m src.train_transformer --config artifacts/transformer_reproduction/config.json --check-data
+.venv/bin/python -m src.train_transformer --config artifacts/transformer_reproduction/config.json --pilot
+.venv/bin/python -m src.train_transformer --config artifacts/transformer_reproduction/config.json
+.venv/bin/python -m src.train_transformer --verify-bundle models/transformer_reproduction
 .venv/bin/python -m pytest tests/test_train_transformer.py tests/test_verify_transformer.py -q
-HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py --full-validation --pretrained-check
+HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py --config artifacts/transformer_reproduction/config.json --full-validation --pretrained-check
 ```
+
+Этот блок создаёт новый запуск, не меняя отчёты принятой модели. При повторении
+выберите новые каталоги или сохраните прежние результаты отдельно. `open("x")`
+защищает конфиг от случайной перезаписи. `HF_HOME` общий для скачивания и
+офлайн-проверки. Для проверки исходного комплекта используйте инструкции ниже.
 
 Первое скачивание модели требует доступа к публичному Hugging Face Hub. Токен
 не нужен и не передаётся. Модель и токенизатор привязаны к revision
@@ -268,6 +286,10 @@ SHA скрипта и конфига, бюджет 1203 шага, точки val
 Python 3.12.3, те же версии библиотек). Скрипт не менялся (`script_sha256 = c31da4…`).
 Конфиг `configs/transformer_repeat.json` отличается от принятого только `report_dir`
 и `model_dir`. Исходные отчёты `reports/transformer/` не перезаписывались.
+
+Ниже сохранены команды исторического запуска. В новом клоне каталог
+`reports/transformer_repeat` уже заполнен; для нового обучения используйте
+блок «Воспроизведение» в начале документа с отдельными каталогами.
 
 ```bash
 .venv/bin/python tools/restore_nlp_splits.py
