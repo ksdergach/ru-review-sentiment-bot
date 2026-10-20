@@ -346,6 +346,45 @@ $actual -eq $acceptedMetadata.bundle_sha256
 с контрольной суммой именно из принятого состояния репозитория.
 
 
+### Выбор модели и общий интерфейс (T07)
+
+По умолчанию используется baseline. Для RuBERT восстановите комплект T06
+по `README_T06.md` и выберите backend перед запуском процесса:
+
+```bash
+export CLASSIFIER_BACKEND=rubert
+python tools/predict_text.py 'Отличный фильм, понравился сюжет'
+python -m src.bot
+```
+
+Оба пути вызывают `src.classifier.predict(text)`. Ответ содержит `label`,
+`label_id`, `confidence`, `probabilities` (negative/neutral/positive) и
+`truncated`. При усечении бот сообщает, что учтено только начало отзыва.
+RuBERT использует CPU, tokenizer, max_length и правое усечение из сохранённого
+комплекта; обработка совпадает с `src.train_transformer.predict_texts`.
+Baseline не усекает текст. Общий интерфейс принимает непустые строки до
+2 000 символов; это ограничение интерфейса, а не обучающих выборок.
+
+`CLASSIFIER_MODEL_PATH` задаёт файл baseline или каталог RuBERT; относительный
+путь считается от текущего рабочего каталога. `CLASSIFIER_REPORT_PATH`
+применяется только к RuBERT и указывает на `run_metadata.json` соответствующего
+запуска. По умолчанию используются `models/transformer` и
+`reports/transformer/run_metadata.json` относительно корня проекта.
+Перед загрузкой RuBERT сверяются все файлы комплекта и контрольные суммы,
+версия данных, конфигурация обработки и порядок классов. Произвольные новые
+веса требуют собственного проверенного отчёта; подмена файлов вызывает ошибку.
+
+Модель загружается один раз, без сети и обучения. Backend фиксируется при
+первом вызове; после изменения переменных окружения процесс надо перезапустить.
+Для прямого выбора используйте `create_classifier("baseline" | "rubert", ...)`.
+Атрибут `data_version` после первой загрузки содержит сведения о данных из
+комплекта (у baseline - словарь `training`, у RuBERT - `metadata.data_version`).
+
+Проверка T07: `pytest tests/test_classifier_rubert.py tests/test_classifier.py tests/test_bot.py -q`.
+Синтетические BERT-комплекты в тестах проверяют интерфейс и не заменяют
+проверку принятой обученной модели. Статус проверки реальных артефактов:
+[reports/classifier/verification.md](reports/classifier/verification.md).
+
 ### Запуск Telegram-бота
 
 Бот запускается **из корня репозитория как Python-модуль**.
