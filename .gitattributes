@@ -1,0 +1,4 @@
+# Check out every file byte-for-byte on all OS. Reports, configs and src/train_transformer.py
+# are verified by SHA-256; Git for Windows (core.autocrlf=true) would otherwise rewrite them
+# with CRLF and the checks would fail. The index already stores LF only.
+* -text

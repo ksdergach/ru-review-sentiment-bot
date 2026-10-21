@@ -210,6 +210,21 @@ python src/train_baseline.py --config configs/baseline.json
 Точка входа — `python -m src.train_transformer --config configs/transformer.json`;
 она сверяет train-ID и версию данных с baseline и выбирает checkpoint по validation macro-F1.
 
+Готовую обученную модель RuBERT переобучать не нужно. Она скачивается вне Git одной
+командой, одинаковой для Windows, macOS и Linux:
+
+```bash
+python tools/fetch_transformer.py
+python tools/restore_nlp_splits.py
+python tools/verify_transformer.py
+```
+
+Первая команда скачивает архив с Google Диска и проверяет SHA-256. Затем она
+восстанавливает комплект в `models/transformer/`; повторный запуск ничего не
+перезаписывает. Две другие команды проверяют модель. Поддерживаемые платформы,
+ручная установка из архива и решения типичных проблем описаны в
+[README_T06.md](README_T06.md#получение-готовой-модели-без-обучения).
+
 Проверка ресурсов после получения локальных данных T03 и артефактов T04:
 
 ```bash
