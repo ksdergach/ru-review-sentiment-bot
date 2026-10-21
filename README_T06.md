@@ -212,11 +212,18 @@ JSON-отчёт проверки и XML с результатами тестов
 | Среда | А | Б: настоящий RuBERT |
 |---|---|---|
 | VDS2: Ubuntu VDS x86_64, Python 3.12.3, torch 2.10.0+cpu, 2 CPU | пройдено, полный набор тестов 535 passed | пройдено: скачивание 6 с, SHA-256 и 7/7 файлов, повтор без скачивания, `verify_transformer.py` 53/53, `--full-validation` 55/55 (macro-F1 0,6678240259861936, матрица совпала), top-1 [2, 0, 2] с вероятностями, побитово равными записанным |
-| Windows, macOS (arm64 и Intel), Linux ARM64 | не запускалось: CI ещё не выполнялся | не запускалось: нужен ручной запуск workflow |
+| GitHub Actions `ubuntu-latest`: Ubuntu x86_64, Python 3.12 для Б | пройдено, Python 3.11 и 3.13 | пройдено: скачивание, SHA-256, 7/7 файлов, повтор без скачивания, `--full-validation`, предсказание, полный набор тестов |
+| GitHub Actions `ubuntu-24.04-arm`: Ubuntu ARM64 | пройдено, Python 3.11 и 3.13 | пройдено, все шаги, включая полный набор тестов |
+| GitHub Actions `macos-latest`: macOS Apple Silicon | пройдено, Python 3.11 и 3.13 | пройдено, все шаги, включая полный набор тестов |
+| GitHub Actions `windows-latest`: Windows x64 | пройдено, Python 3.11 и 3.13 | скачивание, SHA-256, восстановление, повтор, `--full-validation` и предсказание пройдены. Полный набор тестов на `74867fb`: 1 падение — тест `reconstruct` на синтетическом комплекте, записанном на Windows с CRLF. Исправлено в `tools/transformer_bundle.py` и проверено эмуляцией Windows (CRLF и cp1252, 535 passed). На настоящем Windows после исправления задание Б ещё не запускалось |
+| GitHub Actions `macos-15-intel`: macOS Intel | пройдено, Python 3.11 и 3.13 | не выполняется: нет колёс torch 2.10.0 для macOS x86_64 |
 | macOS, Python 3.13 (независимое ревью 20.10.2026, HEAD `03ae6aa`) | 503 passed без комплекта | не проверялось |
 
-Пока задание Б не выполнено на конкретной ОС, работа настоящего RuBERT на ней
-подтверждена только наличием колёс зависимостей, а не запуском. На другом CPU
+Запуски: [А и Б на `74867fb`](https://github.com/ksdergach/ru-review-sentiment-bot/actions/runs/39625833989),
+[А и Б на `b4aad97`](https://github.com/ksdergach/ru-review-sentiment-bot/actions/runs/39592593520),
+[А на `23273ad`](https://github.com/ksdergach/ru-review-sentiment-bot/actions/runs/39588993557).
+На ОС без пройденного задания Б работа настоящего RuBERT подтверждена только наличием
+колёс зависимостей, а не запуском. На другом CPU
 вероятности могут отличаться от записанных в последних знаках. Проверка
 фиксированных текстов в `verify_transformer.py` допускает расхождение 1e-6.
 
