@@ -176,11 +176,9 @@ python tools/fetch_transformer.py --archive <путь>/t06_rubert_bundle.tar
 - пути с пробелами и кириллицей;
 - побайтовое совпадение хешируемых файлов после checkout.
 
-Для GitHub Actions подготовлен workflow `.github/workflows/model-portability.yml`.
-Он запускает эти тесты на каждом PR и push. Матрица: Ubuntu x86_64, Ubuntu ARM64,
-Windows x64, macOS Apple Silicon и macOS Intel, Python 3.11 и 3.13. Служба
-публикации VDS2 не смогла отправить файл workflow, поэтому владелец добавляет его
-в репозиторий отдельно (см. PR №34). До этого CI не работает.
+GitHub Actions (`.github/workflows/model-portability.yml`) запускает их на каждом
+PR и push. Матрица: Ubuntu x86_64, Ubuntu ARM64, Windows x64, macOS Apple Silicon и
+macOS Intel, Python 3.11 и 3.13.
 
 **Б. Настоящая модель.** Ручной запуск этого же workflow (Actions → «Model
 portability» → Run workflow) на Ubuntu x86_64, Ubuntu ARM64, Windows x64 и macOS
@@ -193,7 +191,7 @@ Apple Silicon выполняет: настоящее скачивание с Goo
 | Среда | А | Б: настоящий RuBERT |
 |---|---|---|
 | VDS2: Ubuntu VDS x86_64, Python 3.12.3, torch 2.10.0+cpu, 2 CPU | пройдено, полный набор тестов 535 passed | пройдено: скачивание 6 с, SHA-256 и 7/7 файлов, повтор без скачивания, `verify_transformer.py` 53/53, `--full-validation` 55/55 (macro-F1 0,6678240259861936, матрица совпала), top-1 [2, 0, 2] с вероятностями, побитово равными записанным |
-| Windows, macOS (arm64 и Intel), Linux ARM64 | не запускалось: workflow ещё не добавлен | не запускалось |
+| Windows, macOS (arm64 и Intel), Linux ARM64 | не запускалось: CI ещё не выполнялся | не запускалось: нужен ручной запуск workflow |
 | macOS, Python 3.13 (независимое ревью 20.10.2026, HEAD `03ae6aa`) | 503 passed без комплекта | не проверялось |
 
 Пока задание Б не выполнено на конкретной ОС, работа настоящего RuBERT на ней

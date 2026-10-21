@@ -1,0 +1,81 @@
+# A: portable download/restore tests on every PR and push (stdlib + pytest, small local archives).
+# B: manual run (Actions -> "Model portability" -> Run workflow) that downloads the real RuBERT
+#    archive from Google Drive, installs and verifies it, and runs the full offline test suite.
+name: Model portability
+
+on:
+  pull_request:
+  push:
+    branches: [master, vds/issue-8]
+  workflow_dispatch:
+    inputs:
+      real_model:
+        description: "Download the real RuBERT archive and verify it; run the full test suite"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    name: "A: loader / ${{ matrix.os }} / Python ${{ matrix.python }}"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # x86_64 Linux and Windows, ARM64 Linux, Apple Silicon (macos-latest) and Intel macOS.
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest, macos-15-intel]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Platform
+        run: python -c "import platform, sys; print(platform.platform(), platform.machine(), sys.version)"
+      - run: python -m pip install pytest==8.4.2
+      - run: python -m pytest tests/test_fetch_transformer.py -v -p no:cacheprovider
+
+  real-model:
+    name: "B: real RuBERT / ${{ matrix.os }}"
+    if: github.event_name == 'workflow_dispatch' && inputs.real_model
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS Intel is absent: PyTorch publishes no macOS x86_64 wheels for torch 2.10.0.
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+    env:
+      HF_HUB_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Platform
+        run: python -c "import platform, sys; print(platform.platform(), platform.machine(), sys.version)"
+      - name: Install dependencies (CPU PyTorch)
+        run: |
+          python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt
+      - name: Download, verify and install the model
+        run: python tools/fetch_transformer.py
+      - name: Second run must not download again
+        run: python tools/fetch_transformer.py
+      - name: Verify the model (load, fixed texts, full validation)
+        run: |
+          python tools/restore_nlp_splits.py
+          python tools/verify_transformer.py --full-validation --output verification-${{ matrix.os }}.json
+      - name: Predict fixed texts
+        run: python -m src.train_transformer --verify-bundle models/transformer
+      - name: Full offline test suite
+        run: python -m pytest -q -p no:cacheprovider
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-${{ matrix.os }}
+          path: verification-${{ matrix.os }}.json
+          if-no-files-found: ignore
