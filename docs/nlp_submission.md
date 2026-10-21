@@ -7,7 +7,7 @@
 [Milestone](https://github.com/ksdergach/ru-review-sentiment-bot/milestone/1) ·
 [Доска](https://github.com/users/ksdergach/projects/2) · [Полный план](team_plan.md).
 На доске этап можно выделить фильтром `milestone:"Сдача NLP: без трансформеров"`.
-Срок сдачи не сообщён, календарная дата завершения не назначена.
+Обновление 21.10.2026: ДЗ по теме 3 находится на проверке в ЛМС. Подготовка и публикация отчёта N04 завершены; зачёт преподавателя пока не подтверждён. [Текущие задания и материалы](course/netology/ASSIGNMENTS.md).
 
 ## Объём сдачи
 
@@ -96,7 +96,7 @@ Macro-F1 не подставляем вместо accuracy. Сохраняем �
 | [N01 · #24](https://github.com/ksdergach/ru-review-sentiment-bot/issues/24) | Описать качество данных и транскрипций для сдачи NLP | Done |
 | [N02 · #25](https://github.com/ksdergach/ru-review-sentiment-bot/issues/25) | Зафиксировать метрики baseline и разобрать ошибки для сдачи NLP | Done |
 | [N03 · #26](https://github.com/ksdergach/ru-review-sentiment-bot/issues/26) | Подключить baseline к текстовым сообщениям Telegram для сдачи NLP | Done: текстовая интеграция |
-| [N04 · #27](https://github.com/ksdergach/ru-review-sentiment-bot/issues/27) | Собрать открытый отчёт и зафиксировать версию сдачи NLP | In progress |
+| [N04 · #27](https://github.com/ksdergach/ru-review-sentiment-bot/issues/27) | Собрать открытый отчёт и зафиксировать версию сдачи NLP | Done: отчёт опубликован; ДЗ в ЛМС на проверке |
 
 N01 завершена: [отчёт о качестве данных](../reports/nlp/data_quality.md) содержит
 WER = 0% (0 ошибок / 24 слова) на 12-секундном отладочном фрагменте.
