@@ -1,6 +1,10 @@
 # A: portable download/restore tests on every PR and push (stdlib + pytest, small local archives).
-# B: manual run (Actions -> "Model portability" -> Run workflow) that downloads the real RuBERT
-#    archive from Google Drive, installs and verifies it, and runs the full offline test suite.
+# B: the real RuBERT archive from Google Drive is downloaded, verified, restored, loaded and used
+#    for predictions, then the full offline test suite runs. B is expensive and starts only
+#    explicitly: a push to vds/issue-8 whose last commit message contains [verify-real-model],
+#    or a manual run (Actions -> "Model portability" -> Run workflow, needs the file on the
+#    default branch). B never runs for pull_request events, so a push is not checked twice.
+#    The workflow only reads the repository and never pushes, so it cannot re-trigger itself.
 name: Model portability
 
 on:
@@ -40,42 +44,90 @@ jobs:
 
   real-model:
     name: "B: real RuBERT / ${{ matrix.os }}"
-    if: github.event_name == 'workflow_dispatch' && inputs.real_model
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.real_model) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/vds/issue-8' &&
+       contains(github.event.head_commit.message, '[verify-real-model]'))
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 45
+    # One expensive run per branch at a time; a newer request waits instead of cancelling.
+    concurrency:
+      group: real-model-${{ github.ref }}-${{ matrix.os }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
+      max-parallel: 1  # one Google Drive download at a time
       matrix:
         # macOS Intel is absent: PyTorch publishes no macOS x86_64 wheels for torch 2.10.0.
         os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
     env:
       HF_HUB_OFFLINE: "1"
+      PYTHONIOENCODING: utf-8  # readable Russian messages in CI logs (stdio only)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Platform
+      - name: "1. Platform"
         run: python -c "import platform, sys; print(platform.platform(), platform.machine(), sys.version)"
-      - name: Install dependencies (CPU PyTorch)
+      # Linux: the PyTorch CPU index avoids multi-GB CUDA wheels. Windows and macOS: PyPI,
+      # whose torch 2.10.0 wheels are CPU builds there (MPS on Apple Silicon).
+      - name: "1. Install dependencies (Linux, PyTorch CPU index)"
+        if: runner.os == 'Linux'
         run: |
           python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt
-      - name: Download, verify and install the model
+      - name: "1. Install dependencies (Windows/macOS, PyPI)"
+        if: runner.os != 'Linux'
+        run: python -m pip install -r requirements.txt
+      - name: "1. PyTorch check"
+        run: python -c "import torch, transformers, tokenizers; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), 'mps', torch.backends.mps.is_available(), 'transformers', transformers.__version__, 'tokenizers', tokenizers.__version__)"
+      - name: "2-3. Download, verify and restore the model"
         run: python tools/fetch_transformer.py
-      - name: Second run must not download again
+      - name: "2-3. Archive is a tar of the expected size and SHA-256; bundle matches metadata"
+        shell: python
+        run: |
+          import json, sys, tarfile
+          from pathlib import Path
+          sys.path.insert(0, "tools")
+          import transformer_bundle as tb
+          source = json.loads(Path("configs/transformer_bundle.json").read_text(encoding="utf-8"))
+          archive = Path(source["download_dir"]) / source["archive_name"]
+          assert not archive.read_bytes()[:512].lstrip().lower().startswith((b"<!doctype", b"<html")), "HTML"
+          assert tarfile.is_tarfile(archive), "not a tar archive"
+          assert archive.stat().st_size == source["size_bytes"], archive.stat().st_size
+          assert tb.sha256_file(archive) == source["sha256"], "archive SHA-256"
+          expected = tb.expected_files(Path("."), "reports/transformer")
+          tb.check_directory(Path("models/transformer"), expected)
+          stamps = {str(p): p.stat().st_mtime_ns for p in [archive, *Path("models/transformer").iterdir()]}
+          Path("stamps.json").write_text(json.dumps(stamps), encoding="utf-8")
+          print(f"archive {archive.stat().st_size} bytes, SHA-256 OK; {len(expected)} bundle files OK")
+      - name: "3. Second run must not download or rewrite anything"
         run: python tools/fetch_transformer.py
-      - name: Verify the model (load, fixed texts, full validation)
+      - name: "3. Files unchanged after the second run"
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          stamps = json.loads(Path("stamps.json").read_text(encoding="utf-8"))
+          changed = [p for p, t in stamps.items() if Path(p).stat().st_mtime_ns != t]
+          assert not changed, changed
+          assert not list(Path("artifacts/downloads").glob("*.partial"))
+          print(f"{len(stamps)} files unchanged, nothing downloaded")
+      - name: "4. Verify the model (class order, fixed texts, full validation)"
         run: |
           python tools/restore_nlp_splits.py
           python tools/verify_transformer.py --full-validation --output verification-${{ matrix.os }}.json
-      - name: Predict fixed texts
+      - name: "4. Predict fixed texts"
         run: python -m src.train_transformer --verify-bundle models/transformer
-      - name: Full offline test suite
-        run: python -m pytest -q -p no:cacheprovider
+      - name: "5. Full offline test suite"
+        run: python -m pytest -q -rfE -p no:cacheprovider --junitxml=pytest-${{ matrix.os }}.xml
+      # Only JSON/XML reports: no weights, archives or review texts are uploaded.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: verification-${{ matrix.os }}
-          path: verification-${{ matrix.os }}.json
+          path: |
+            verification-${{ matrix.os }}.json
+            pytest-${{ matrix.os }}.xml
           if-no-files-found: ignore

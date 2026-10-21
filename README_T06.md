@@ -77,12 +77,20 @@ SHA-256 `68970b2e3422a873d14da75a4910f6f813ade73c3ca99c103068f6f2d9e4c703`.
 
    Вместо `3.12` подойдут 3.11 и 3.13. Проверить версию: `python --version`.
 
-3. **Установить зависимости.** Команды одинаковы для всех ОС. Индекс PyTorch CPU
-   содержит сборки для Windows, Linux и macOS Apple Silicon. На Linux он не скачивает
-   CUDA-библиотеки, которые занимают несколько гигабайт.
+3. **Установить зависимости.**
+
+   Linux: сначала CPU-сборка PyTorch из индекса PyTorch. Обычный PyPI для Linux
+   ставит CUDA-сборку с библиотеками NVIDIA на несколько гигабайт.
 
    ```bash
    python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+   python -m pip install -r requirements.txt
+   ```
+
+   Windows и macOS Apple Silicon: только PyPI. Там `torch==2.10.0` и так собран
+   для CPU (на Apple Silicon дополнительно доступен MPS).
+
+   ```bash
    python -m pip install -r requirements.txt
    ```
 
@@ -180,11 +188,24 @@ GitHub Actions (`.github/workflows/model-portability.yml`) запускает и
 PR и push. Матрица: Ubuntu x86_64, Ubuntu ARM64, Windows x64, macOS Apple Silicon и
 macOS Intel, Python 3.11 и 3.13.
 
-**Б. Настоящая модель.** Ручной запуск этого же workflow (Actions → «Model
-portability» → Run workflow) на Ubuntu x86_64, Ubuntu ARM64, Windows x64 и macOS
-Apple Silicon выполняет: настоящее скачивание с Google Диска, повторный запуск без
-скачивания, `verify_transformer.py --full-validation`, предсказание и полный
-офлайн-набор тестов.
+**Б. Настоящая модель.** Задание `real-model` того же workflow выполняется на
+Ubuntu x86_64, Ubuntu ARM64, Windows x64 и macOS Apple Silicon. На каждой ОС оно:
+
+- скачивает архив с Google Диска и проверяет, что это tar нужного размера и SHA-256,
+  а не HTML;
+- восстанавливает комплект и сверяет 7 файлов;
+- повторяет запуск и проверяет, что ничего не скачано и не перезаписано;
+- выполняет `verify_transformer.py --full-validation` (порядок классов, фиксированные
+  тексты, полная validation) и предсказание;
+- запускает полный офлайн-набор тестов.
+
+Задание дорогое, поэтому запускается только явно: push в `vds/issue-8`, у которого
+последний коммит содержит в сообщении `[verify-real-model]`, или ручной запуск из
+Actions. Ручной запуск доступен, когда workflow есть в ветке по умолчанию. Для
+событий `pull_request` задание не выполняется, поэтому один push не проверяется
+дважды. ОС проверяются по очереди (`max-parallel: 1`), чтобы не скачивать архив
+параллельно. Каждое задание ограничено 45 минутами. В артефакты попадают только
+JSON-отчёт проверки и XML с результатами тестов, без весов.
 
 Фактические результаты на 21.10.2026:
 
