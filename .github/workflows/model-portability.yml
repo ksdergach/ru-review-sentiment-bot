@@ -122,6 +122,18 @@ jobs:
         run: python -m src.train_transformer --verify-bundle models/transformer
       - name: "5. Full offline test suite"
         run: python -m pytest -q -rfE -p no:cacheprovider --junitxml=pytest-${{ matrix.os }}.xml
+      - name: "5. Report failed tests as annotations"
+        if: failure()
+        shell: python
+        run: |
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          report = Path("pytest-${{ matrix.os }}.xml")
+          if report.exists():
+              for case in ET.parse(report).iter("testcase"):
+                  for bad in [*case.iter("failure"), *case.iter("error")]:
+                      message = (bad.get("message") or "").replace("\n", " ")[:300]
+                      print(f"::error title={case.get('classname')}.{case.get('name')}::{message}")
       # Only JSON/XML reports: no weights, archives or review texts are uploaded.
       - uses: actions/upload-artifact@v4
         if: always()

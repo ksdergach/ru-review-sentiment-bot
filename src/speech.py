@@ -6,7 +6,7 @@ import argparse
 import asyncio
 from dataclasses import asdict, dataclass
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import threading
 from time import perf_counter
@@ -45,8 +45,10 @@ class SpeechConfig:
             raise ValueError("VAD and conditioning settings must be booleans")
         if not self.vad_filter or self.temperature != 0.0:
             raise ValueError("The selected profile requires VAD and temperature=0")
-        path = Path(self.cache_dir)
-        if not self.cache_dir or path.is_absolute() or ".." in path.parts:
+        # Both path flavours: on Windows "/tmp/models" has no drive and is not is_absolute().
+        path = self.cache_dir
+        if (not path or PurePosixPath(path).is_absolute() or PureWindowsPath(path).drive
+                or PureWindowsPath(path).is_absolute() or ".." in re.split(r"[\\/]", path)):
             raise ValueError("cache_dir must be relative to the repository")
 
     @classmethod
