@@ -1,0 +1,24 @@
+[
+  {
+    "course": "nlp",
+    "title": "В06. Введение в языковые модели и их виды",
+    "path": "docs/course/netology/presentations/В06_Языковые_модели.pdf",
+    "source": "https://netology.ru/profile/program/bhemai-25-oeya-3/lessons/646047/lesson_items/3699557",
+    "downloaded_filename": "Вебинар___Урфу_ПИИ_NLP_Вебинар_6.pdf",
+    "sha256": "24eb526d15f85e7fa777589e34bb8998ad022cd981190be14a0020ff5287e591",
+    "bytes": 3143832,
+    "checked_on": "2026-10-21",
+    "pages": 62
+  },
+  {
+    "course": "nlp",
+    "title": "В07. Способы генерации LM и оценка их качества",
+    "path": "docs/course/netology/presentations/В07_Генерация_LM_и_оценка.pdf",
+    "source": "https://netology.ru/profile/program/bhemai-25-oeya-3/lessons/646048/lesson_items/3699558",
+    "downloaded_filename": "Вебинар___Урфу_ПИИ_NLP_Вебинар_7.pdf",
+    "sha256": "ff14748c9d12fab7e83ee232f7453246495e13d1ba40f28f79bb69cb5f0ecd7f",
+    "bytes": 1282817,
+    "checked_on": "2026-10-21",
+    "pages": 49
+  }
+]
