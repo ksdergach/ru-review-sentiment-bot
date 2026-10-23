@@ -1,0 +1,28 @@
+{
+  "baseline_metadata_sha256": "8cdd958d235473942609bf8aee1a650c7e5c1aa3f8e4921362236f2633141de4",
+  "baseline_train_ids_file_sha256": "ba4e73ceb3e52eb5e958afdde4515242b4145cb2736066e7e84db226e96228d5",
+  "baseline_validation_macro_f1": 0.7180146428367195,
+  "checksums": {
+    "data_prep_audit_path": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
+    "data_prep_split_ids_path": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
+    "train_path": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
+    "validation_path": "f95a9223e216c4fe3be1e4a9a23a0dfd65ea81e8b37c0a680c0a4b1fe411c214"
+  },
+  "final_test_used": false,
+  "split_independence": {
+    "movie_id_overlap": 0,
+    "normalized_text_overlap": 0,
+    "record_id_overlap": 0
+  },
+  "t03_split_check": {
+    "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+    "train_rows": 76971,
+    "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+    "validation_rows": 10396
+  },
+  "train_ids_equal_baseline": true,
+  "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+  "train_rows": 76971,
+  "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+  "validation_rows": 10396
+}

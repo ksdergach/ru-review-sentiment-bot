@@ -1,0 +1,30 @@
+{
+  "seed": 42,
+  "model_name": "cointegrated/rubert-tiny2",
+  "revision": "e8ed3b0c8bbf4fb6984c3de043bf7d2f4e5969ae",
+  "train_path": "data/processed/train.parquet",
+  "validation_path": "data/processed/validation.parquet",
+  "data_prep_audit_path": "reports/data_prep/audit.json",
+  "data_prep_split_ids_path": "reports/data_prep/split_ids.csv",
+  "baseline_metadata_path": "reports/baseline/run_metadata.json",
+  "baseline_train_ids_path": "reports/baseline/train_ids.csv",
+  "report_dir": "reports/transformer_repeat",
+  "model_dir": "models/transformer_repeat",
+  "label_mapping": {
+    "negative": 0,
+    "neutral": 1,
+    "positive": 2
+  },
+  "device": "cpu",
+  "num_threads": 2,
+  "epochs": 1,
+  "batch_size": 64,
+  "max_length": 64,
+  "truncation_side": "right",
+  "learning_rate": 2e-05,
+  "weight_decay": 0.01,
+  "class_weight_mode": "balanced_train",
+  "eval_every_steps": 602,
+  "log_every_steps": 100,
+  "pilot_steps": 3
+}
