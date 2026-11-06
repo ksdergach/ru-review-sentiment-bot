@@ -1,0 +1,140 @@
+{
+  "final_test_used": false,
+  "winner_step": 1203,
+  "validation_macro_f1": 0.6678240259861936,
+  "baseline_validation_macro_f1": 0.7180146428367195,
+  "delta_vs_baseline": -0.05019061685052584,
+  "fixed_texts": {
+    "text_sha256": [
+      "5a75385f9a81f9de988e71ec840389d6d898f76e7aba13b2571877a8e8b40bc4",
+      "32f85b841cdf369446e8c988889170d8aaee278ebb438238e687fd5e9af4d127",
+      "37e0d05b71cb0f74a7681c5b14e9b0f3981da3afd7d6067d5111dba11169564b"
+    ],
+    "label_ids": [
+      2,
+      0,
+      2
+    ],
+    "labels": [
+      "positive",
+      "negative",
+      "positive"
+    ],
+    "probability_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "probabilities": [
+      [
+        0.006064471788704395,
+        0.0190151147544384,
+        0.974920392036438
+      ],
+      [
+        0.9610050320625305,
+        0.02961183711886406,
+        0.009383078664541245
+      ],
+      [
+        0.2559608817100525,
+        0.36850816011428833,
+        0.37553098797798157
+      ]
+    ]
+  },
+  "full_validation": {
+    "rows": 10396,
+    "macro_f1": 0.6678240259861936,
+    "confusion_matrix": [
+      [
+        2296,
+        429,
+        100
+      ],
+      [
+        90,
+        280,
+        66
+      ],
+      [
+        287,
+        916,
+        5932
+      ]
+    ]
+  },
+  "pretrained_comparison": {
+    "source": "cointegrated/rubert-tiny2",
+    "max_abs_difference_by_block": {
+      "embeddings": 0.012137401849031448,
+      "encoder.layer.0": 0.007641802541911602,
+      "encoder.layer.1": 0.00780802546069026,
+      "encoder.layer.2": 0.008662350475788116,
+      "pooler": 0.00843882467597723
+    }
+  },
+  "status": "passed",
+  "checks": [
+    "config_class_order_and_truncation",
+    "baseline_metadata_checksum",
+    "baseline_train_ids_file_checksum",
+    "t03_checksum:data_prep_audit_path",
+    "t03_checksum:data_prep_split_ids_path",
+    "parquet_checksum:train",
+    "parquet_checksum:validation",
+    "baseline_train_ids_exist_with_same_labels",
+    "train_ordered_ids_equal_baseline",
+    "validation_ordered_ids_equal_baseline",
+    "row_counts",
+    "no_train_validation_id_overlap",
+    "no_test_ids_in_train_or_validation",
+    "ids_match_t03_manifest",
+    "recorded_no_final_test",
+    "baseline_macro_f1_recorded",
+    "config_checksum",
+    "config_copy_matches",
+    "training_script_checksum",
+    "full_training_budget_completed",
+    "encoder_and_head_updated_at_step_1",
+    "training_log_complete",
+    "validation_only_at_preplanned_steps",
+    "validation_table_matches_log",
+    "validation_row:602",
+    "metrics_from_confusion:602",
+    "validation_row:1203",
+    "metrics_from_confusion:1203",
+    "winner_is_max_validation_macro_f1_earliest_tie",
+    "honest_baseline_delta",
+    "roundtrip_recorded",
+    "fixed_texts_are_recorded_texts",
+    "bundle_file_set",
+    "bundle_checksum:config.json",
+    "bundle_checksum:label_mapping.json",
+    "bundle_checksum:metadata.json",
+    "bundle_checksum:model.safetensors",
+    "bundle_checksum:tokenizer.json",
+    "bundle_checksum:tokenizer_config.json",
+    "bundle_checksum:training_config.json",
+    "bundle_git_ignored:config.json",
+    "bundle_git_ignored:label_mapping.json",
+    "bundle_git_ignored:metadata.json",
+    "bundle_git_ignored:model.safetensors",
+    "bundle_git_ignored:tokenizer.json",
+    "bundle_git_ignored:tokenizer_config.json",
+    "bundle_git_ignored:training_config.json",
+    "bundle_metadata_matches_run",
+    "bundle_training_config_matches",
+    "bundle_label_mapping",
+    "hf_config_class_order",
+    "three_finite_probabilities",
+    "fixed_text_predictions_reproduced",
+    "full_validation_confusion_matrix_reproduced",
+    "full_validation_macro_f1_reproduced",
+    "pretrained_encoder_architecture_matches",
+    "winner_differs_from_pretrained_in_every_encoder_block"
+  ],
+  "checks_count": 57,
+  "not_run": {},
+  "note": "Re-implemented checks independent of src/*; not a quality assessment or test evaluation."
+}

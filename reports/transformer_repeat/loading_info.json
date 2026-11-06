@@ -1,0 +1,18 @@
+{
+  "available": true,
+  "mismatched_keys_count": 0,
+  "missing_keys": [
+    "classifier.bias",
+    "classifier.weight"
+  ],
+  "missing_keys_count": 2,
+  "only_new_head_missing": true,
+  "unexpected_keys_count": 8,
+  "unexpected_keys_sample": [
+    "bert.embeddings.position_ids",
+    "cls.predictions.bias",
+    "cls.predictions.transform.LayerNorm.bias",
+    "cls.predictions.transform.LayerNorm.weight",
+    "cls.predictions.transform.dense.bias"
+  ]
+}

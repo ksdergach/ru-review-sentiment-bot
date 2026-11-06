@@ -1,0 +1,82 @@
+{
+  "purpose": "Single repeat of the accepted T06 configuration after the original bundle was lost; checks bitwise reproducibility.",
+  "date": "2026-10-20",
+  "original_config": "configs/transformer.json",
+  "repeat_config": "configs/transformer_repeat.json",
+  "config_difference": "report_dir and model_dir only",
+  "script_sha256_equal": true,
+  "script_sha256": "c31da4045631f821fe5328837b0a0706f266095de98e2e4ea984c1f2c5eed218",
+  "versions_equal": true,
+  "data_version_equal": true,
+  "final_test_used": false,
+  "bundle_files": {
+    "config.json": {
+      "original": "60f99dfe240f5dc1efce5df2340ed0c8eea543d6bb75d61d9d827a8a6752d893",
+      "repeat": "60f99dfe240f5dc1efce5df2340ed0c8eea543d6bb75d61d9d827a8a6752d893",
+      "equal": true
+    },
+    "label_mapping.json": {
+      "original": "37d1487643d4a1642c1528e5f0c316243f4512a863f209bb021a5d9e2e162f97",
+      "repeat": "37d1487643d4a1642c1528e5f0c316243f4512a863f209bb021a5d9e2e162f97",
+      "equal": true
+    },
+    "metadata.json": {
+      "original": "c18f6f1951ce28ccab5eb705ec6be0531cb2ac6bffa8405095c5fb4fc3df23bd",
+      "repeat": "fa7da01d446bee1570e62b645541c3f8d3c45dcb8920ce9b336b2527af4de3da",
+      "equal": false
+    },
+    "model.safetensors": {
+      "original": "57d96aea79f03328370af6ca570f5403551a434751930699366d8537f13efa76",
+      "repeat": "57d96aea79f03328370af6ca570f5403551a434751930699366d8537f13efa76",
+      "equal": true
+    },
+    "tokenizer.json": {
+      "original": "df7038a0fd14044f6cb95b7581d72bae39749316080e31c78b07cefbc6bdc7fd",
+      "repeat": "df7038a0fd14044f6cb95b7581d72bae39749316080e31c78b07cefbc6bdc7fd",
+      "equal": true
+    },
+    "tokenizer_config.json": {
+      "original": "31d22df502dc5c6bdb106fbf71823d24afcce6715a56d11b189434b7585429e3",
+      "repeat": "31d22df502dc5c6bdb106fbf71823d24afcce6715a56d11b189434b7585429e3",
+      "equal": true
+    },
+    "training_config.json": {
+      "original": "fe0d2828e1eef487e2c70cafbb128917cc211915d5221233e5714646b27e1f42",
+      "repeat": "c985e4c6fbc334bad75811b25d4c2f4861ca29e31910853601aaa21789a8d6a6",
+      "equal": false
+    }
+  },
+  "bundle_files_differ_because": {
+    "training_config.json": "report_dir/model_dir differ",
+    "metadata.json": "timings, started_at and config_sha256 differ"
+  },
+  "model_safetensors_bitwise_equal": true,
+  "train_loss_by_logged_step_equal": true,
+  "validation_rows_equal": [
+    true,
+    true
+  ],
+  "winner_step": 1203,
+  "winner_macro_f1": 0.6678240259861936,
+  "delta_vs_baseline": -0.05019061685052584,
+  "bundle_roundtrip_equal": true,
+  "resources": {
+    "original": {
+      "train_seconds": 2036.3690660013817,
+      "elapsed_seconds": 2211.433240392944,
+      "rss_peak_mib": 1890.47265625
+    },
+    "repeat": {
+      "train_seconds": 1650.6688715454657,
+      "elapsed_seconds": 1799.1909512369893,
+      "rss_peak_mib": 1901.7890625
+    }
+  },
+  "original_bundle_reconstruction": "models/transformer/ = 5 byte-identical files from the repeat bundle + training_config.json (configs/transformer.json) and metadata.json (reports/transformer/run_metadata.json without bundle_files_sha256) serialized by src.train_baseline.write_json; all 7 SHA-256 equal run_metadata.json::bundle_files_sha256.",
+  "archive": {
+    "name": "t06_rubert_bundle.tar",
+    "sha256": "68970b2e3422a873d14da75a4910f6f813ade73c3ca99c103068f6f2d9e4c703",
+    "size_bytes": 119224320,
+    "location": "artifacts/transformer/ (outside Git, this VDS2 session workspace only)"
+  }
+}

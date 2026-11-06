@@ -1,0 +1,9 @@
+{
+  "archive_name": "t06_rubert_bundle.tar",
+  "sha256": "68970b2e3422a873d14da75a4910f6f813ade73c3ca99c103068f6f2d9e4c703",
+  "size_bytes": 119224320,
+  "google_drive_file_id": "1-1oZs7fqk0GYn23moRQOGZiIEKmfuAhO",
+  "google_drive_view_url": "https://drive.google.com/file/d/1-1oZs7fqk0GYn23moRQOGZiIEKmfuAhO/view",
+  "download_dir": "artifacts/downloads",
+  "note": "Accepted T06 bundle (reports/transformer/run_metadata.json::bundle_files_sha256), packed by tools/transformer_bundle.py pack. Public read-only link, no Google account needed."
+}
