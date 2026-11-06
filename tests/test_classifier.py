@@ -197,8 +197,9 @@ def test_missing_model_has_clear_error(tmp_path: Path) -> None:
         tmp_path / "missing.joblib"
     )
 
-    with pytest.raises(classifier.ModelUnavailableError):
+    with pytest.raises(classifier.ModelUnavailableError, match="FileNotFoundError") as error:
         model.predict("Обычный отзыв")
+    assert str(tmp_path / "missing.joblib") in str(error.value)
 
 
 def test_corrupted_model_has_clear_error(tmp_path: Path) -> None:

@@ -1,4 +1,4 @@
-"""Текстовый Telegram-интерфейс для baseline-классификатора.
+"""Текстовый Telegram-интерфейс общего классификатора.
 
 На этом этапе поддерживаются только текстовые киноотзывы.
 Голосовой ввод будет подключён в следующих задачах.
@@ -88,10 +88,12 @@ def format_prediction(result: dict[str, Any]) -> str:
     label = str(result["label"])
     confidence = float(result["confidence"])
 
+    truncation_note = "\nУчтено только начало отзыва: текст усечён моделью." if result.get("truncated") else ""
     return (
         f"Тональность: {label}\n"
         f"Уверенность модели: {confidence:.1%}\n\n"
         "Уверенность модели не является гарантией правильности ответа."
+        + truncation_note
     )
 
 
@@ -106,7 +108,7 @@ def classify_text_for_bot(text: str) -> str:
     except InvalidTextError:
         return EMPTY_TEXT_MESSAGE
     except ClassifierError:
-        logger.exception("Baseline classification failed")
+        logger.exception("Text classification failed")
         return MODEL_ERROR_MESSAGE
 
     return format_prediction(result)

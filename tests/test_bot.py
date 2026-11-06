@@ -101,7 +101,7 @@ def test_model_error_returns_message_and_is_logged(
         answer = bot.classify_text_for_bot("Обычный отзыв")
 
     assert answer == bot.MODEL_ERROR_MESSAGE
-    assert "Baseline classification failed" in caplog.text
+    assert "Text classification failed" in caplog.text
 
 
 def test_start_handler() -> None:
