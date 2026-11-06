@@ -184,12 +184,21 @@ python tools/fetch_transformer.py --archive <путь>/t06_rubert_bundle.tar
 - пути с пробелами и кириллицей;
 - побайтовое совпадение хешируемых файлов после checkout.
 
-GitHub Actions (`.github/workflows/model-portability.yml`) запускает их на каждом
-PR и push. Матрица: Ubuntu x86_64, Ubuntu ARM64, Windows x64, macOS Apple Silicon и
-macOS Intel, Python 3.11 и 3.13.
+GitHub Actions (`.github/workflows/model-portability.yml`) запускает их для
+`pull_request` и для `push` только в `master`, если изменены файлы из path-фильтров
+workflow: сам workflow, `.gitattributes`, `pyproject.toml`, `requirements.txt`,
+загрузчик (`tools/fetch_transformer.py`, `tools/transformer_bundle.py`) и его тест,
+`configs/transformer.json`, `configs/transformer_bundle.json`, а также файлы, чьи байты
+сверяет тест: `src/train_transformer.py`, `reports/transformer/run_metadata.json`,
+`reports/baseline/run_metadata.json`, `reports/baseline/train_ids.csv`,
+`reports/data_prep/audit.json`, `reports/data_prep/split_ids.csv`. Изменения только
+документации задание не запускают. Задание А выполняется и при ручном запуске workflow.
+Матрица: Ubuntu x86_64, Ubuntu ARM64, Windows x64, macOS Apple Silicon и macOS Intel,
+Python 3.11 и 3.13.
 
 **Б. Настоящая модель.** Задание `real-model` того же workflow выполняется на
-Ubuntu x86_64, Ubuntu ARM64, Windows x64 и macOS Apple Silicon. На каждой ОС оно:
+Ubuntu x86_64, Ubuntu ARM64, Windows x64 и macOS Apple Silicon; macOS Intel не входит
+в матрицу, так как для torch 2.10.0 нет колёс macOS x86_64. На каждой ОС оно:
 
 - скачивает архив с Google Диска и проверяет, что это tar нужного размера и SHA-256,
   а не HTML;
@@ -199,13 +208,17 @@ Ubuntu x86_64, Ubuntu ARM64, Windows x64 и macOS Apple Silicon. На каждо
   тексты, полная validation) и предсказание;
 - запускает полный офлайн-набор тестов.
 
-Задание дорогое, поэтому запускается только явно: push в `vds/issue-8`, у которого
-последний коммит содержит в сообщении `[verify-real-model]`, или ручной запуск из
-Actions. Ручной запуск доступен, когда workflow есть в ветке по умолчанию. Для
-событий `pull_request` задание не выполняется, поэтому один push не проверяется
-дважды. ОС проверяются по очереди (`max-parallel: 1`), чтобы не скачивать архив
-параллельно. Каждое задание ограничено 45 минутами. В артефакты попадают только
-JSON-отчёт проверки и XML с результатами тестов, без весов.
+Задание дорогое, поэтому запускается только вручную: `workflow_dispatch` с
+`real_model=true` (Actions → «Model portability» → Run workflow). Для `pull_request` и
+`push` оно не выполняется. GitHub разрешает ручной запуск только для workflow, который
+есть в ветке по умолчанию, поэтому текущая версия станет доступна для ручного запуска
+после появления workflow в `master`; затем в запуске можно выбрать любую ветку. Запуски
+до 06.11.2026 (таблица ниже) выполнялись прежним условием: push в `vds/issue-8` с
+`[verify-real-model]` в сообщении коммита. ОС проверяются по очереди (`max-parallel: 1`),
+чтобы не скачивать архив параллельно; одновременно выполняется не больше одной проверки
+на каждой ОС по всем веткам, новый запуск ждёт завершения предыдущего. Каждое задание
+ограничено 45 минутами. В артефакты попадают только JSON-отчёт проверки и XML с
+результатами тестов, без весов.
 
 Фактические результаты на 21.10.2026 (последний запуск — `936213b`):
 
