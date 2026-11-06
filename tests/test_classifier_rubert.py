@@ -78,8 +78,24 @@ def test_rejects_changed_bundle_before_loading(saved_transformer, monkeypatch, t
     def forbidden(*a, **k):
         pytest.fail("Corrupt bundle must not be loaded")
     monkeypatch.setattr(tt, "load_bundle", forbidden)
-    with pytest.raises(c.ModelUnavailableError):
+    reason = ("Unexpected transformer bundle files" if tamper in ("missing", "extra")
+              else f"checksum mismatch: {names[tamper]}")
+    with pytest.raises(c.ModelUnavailableError, match=reason):
         c.RuBERTClassifier(bundle, report_path=report).predict("фильм")
+
+
+def test_missing_bundle_error_names_path_and_install_command(tmp_path, monkeypatch, capsys):
+    missing = tmp_path / "absent"
+    with pytest.raises(c.ModelUnavailableError) as error:
+        c.RuBERTClassifier(missing).predict("фильм")
+    assert str(missing) in str(error.value)
+    assert "tools/fetch_transformer.py" in str(error.value)
+    monkeypatch.setattr(c, "_default_classifier", None)
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "rubert")
+    monkeypatch.setenv("CLASSIFIER_MODEL_PATH", str(missing))
+    assert predict_text.main(["фильм"]) == 1
+    assert "tools/fetch_transformer.py" in capsys.readouterr().err
+    assert bot.classify_text_for_bot("фильм") == bot.MODEL_ERROR_MESSAGE
 
 
 @pytest.mark.parametrize("backend", ["baseline", "rubert"])

@@ -77,7 +77,8 @@ class BaselineClassifier:
                 self._bundle = load_bundle(self.model_path)
                 self.data_version = dict(self._bundle.get("training", {}))
             except Exception as exc:
-                raise ModelUnavailableError("Could not load configured baseline model") from exc
+                raise ModelUnavailableError(
+                    f"Could not load configured baseline model {self.model_path}: {_reason(exc)}") from exc
             return self._bundle
 
     @staticmethod
@@ -105,6 +106,11 @@ class BaselineClassifier:
             raise ClassifierError("Baseline prediction failed") from exc
 
         return _format_prediction(raw, truncated=False)
+
+
+def _reason(exc: Exception) -> str:
+    """Cause of a load failure for the error message shown to the caller."""
+    return f"{type(exc).__name__}: {exc}"
 
 
 def _format_prediction(raw: dict[str, Any], *, truncated: bool) -> dict[str, Any]:
@@ -198,6 +204,10 @@ class RuBERTClassifier:
                 # Lazy import: using baseline must not initialize torch/transformers.
                 from src import train_transformer as transformer
                 from src.train_baseline import sha256_file, sha256_json
+                if not self.model_path.is_dir():
+                    raise FileNotFoundError(
+                        "bundle directory not found; install the accepted model with "
+                        "python tools/fetch_transformer.py")
                 report = json.loads(self.report_path.read_text(encoding="utf-8"))
                 expected = report["bundle_files_sha256"]
                 required = {"model.safetensors", "config.json", "tokenizer.json",
@@ -230,7 +240,8 @@ class RuBERTClassifier:
                 self.data_version = dict(version)
                 self._bundle = loaded
             except Exception as exc:
-                raise ModelUnavailableError("Could not load verified RuBERT bundle") from exc
+                raise ModelUnavailableError(
+                    f"Could not load verified RuBERT bundle {self.model_path}: {_reason(exc)}") from exc
             return self._bundle
 
     def predict(self, text: str) -> dict[str, Any]:
