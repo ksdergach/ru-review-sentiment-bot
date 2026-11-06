@@ -1,16 +1,53 @@
-# A: portable download/restore tests on every PR and push (stdlib + pytest, small local archives).
+# A: portable download/restore tests (stdlib + pytest, small local archives, no real model).
+#    Runs for PRs and pushes to master that touch the loader, its tests, the files whose
+#    checked-out bytes it verifies, dependencies or this workflow; also on manual runs.
+#    No required status checks exist for master, so skipped runs cannot block a merge. If
+#    this job is ever made required, drop the path filters first: a filtered-out PR would wait
+#    for the check forever.
 # B: the real RuBERT archive from Google Drive is downloaded, verified, restored, loaded and used
-#    for predictions, then the full offline test suite runs. B is expensive and starts only
-#    explicitly: a push to vds/issue-8 whose last commit message contains [verify-real-model],
-#    or a manual run (Actions -> "Model portability" -> Run workflow, needs the file on the
-#    default branch). B never runs for pull_request events, so a push is not checked twice.
+#    for predictions, then the full offline test suite runs. B is expensive and starts only on
+#    a manual run (Actions -> "Model portability" -> Run workflow; the workflow must be on the
+#    default branch, any branch can then be selected).
 #    The workflow only reads the repository and never pushes, so it cannot re-trigger itself.
+#    Third-party actions are pinned to full commit SHAs (tag in the trailing comment).
 name: Model portability
 
 on:
   pull_request:
+    paths:
+      - ".github/workflows/model-portability.yml"
+      - ".gitattributes"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "tools/fetch_transformer.py"
+      - "tools/transformer_bundle.py"
+      - "tests/test_fetch_transformer.py"
+      - "configs/transformer.json"
+      - "configs/transformer_bundle.json"
+      - "src/train_transformer.py"
+      - "reports/transformer/run_metadata.json"
+      - "reports/baseline/run_metadata.json"
+      - "reports/baseline/train_ids.csv"
+      - "reports/data_prep/audit.json"
+      - "reports/data_prep/split_ids.csv"
   push:
-    branches: [master, vds/issue-8]
+    branches: [master]
+    paths:
+      - ".github/workflows/model-portability.yml"
+      - ".gitattributes"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "tools/fetch_transformer.py"
+      - "tools/transformer_bundle.py"
+      - "tests/test_fetch_transformer.py"
+      - "configs/transformer.json"
+      - "configs/transformer_bundle.json"
+      - "src/train_transformer.py"
+      - "reports/transformer/run_metadata.json"
+      - "reports/baseline/run_metadata.json"
+      - "reports/baseline/train_ids.csv"
+      - "reports/data_prep/audit.json"
+      - "reports/data_prep/split_ids.csv"
   workflow_dispatch:
     inputs:
       real_model:
@@ -33,8 +70,8 @@ jobs:
         os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest, macos-15-intel]
         python: ["3.11", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: ${{ matrix.python }}
       - name: Platform
@@ -44,15 +81,13 @@ jobs:
 
   real-model:
     name: "B: real RuBERT / ${{ matrix.os }}"
-    if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.real_model) ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/vds/issue-8' &&
-       contains(github.event.head_commit.message, '[verify-real-model]'))
+    if: github.event_name == 'workflow_dispatch' && inputs.real_model
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    # One expensive run per branch at a time; a newer request waits instead of cancelling.
+    # One expensive run per OS at a time across all branches; a newer request waits instead
+    # of cancelling (GitHub keeps at most one waiting run per group).
     concurrency:
-      group: real-model-${{ github.ref }}-${{ matrix.os }}
+      group: real-model-${{ matrix.os }}
       cancel-in-progress: false
     strategy:
       fail-fast: false
@@ -64,8 +99,8 @@ jobs:
       HF_HUB_OFFLINE: "1"
       PYTHONIOENCODING: utf-8  # readable Russian messages in CI logs (stdio only)
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
       - name: "1. Platform"
@@ -135,7 +170,7 @@ jobs:
                       message = (bad.get("message") or "").replace("\n", " ")[:300]
                       print(f"::error title={case.get('classname')}.{case.get('name')}::{message}")
       # Only JSON/XML reports: no weights, archives or review texts are uploaded.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:
           name: verification-${{ matrix.os }}
