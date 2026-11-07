@@ -23,13 +23,7 @@ def fake_prediction(
     }
 
 
-def make_fake_model(tmp_path: Path) -> Path:
-    path = tmp_path / "baseline.joblib"
-    path.write_bytes(b"fake model")
-    return path
-
-
-def make_real_bundle(tmp_path: Path) -> Path:
+def make_real_bundle(tmp_path: Path, training_update=None) -> Path:
     """Создать маленький настоящий TF-IDF + LR bundle для интеграционных тестов."""
     texts = [
         "ужасный фильм",
@@ -81,37 +75,63 @@ def make_real_bundle(tmp_path: Path) -> Path:
             **lr_config,
             "C": 1.0,
         },
-        training={
-            "seed": 42,
-            "smoke": True,
-        },
+        training=valid_training(vectorizer),
     )
+    if training_update is not None:
+        training_update(bundle["training"])
 
     path = tmp_path / "real_baseline.joblib"
     tb.save_bundle(path, bundle)
+    write_report(path, bundle["training"])
     return path
+
+
+def valid_training(vectorizer) -> dict[str, Any]:
+    """Версия данных той же схемы, что пишет train_baseline.run_training."""
+    return {
+        "seed": 42,
+        "train_rows": 6,
+        "validation_rows": 2,
+        "train_ids_sha256": "1" * 64,
+        "validation_ids_sha256": "2" * 64,
+        "train_parquet_sha256": "3" * 64,
+        "validation_parquet_sha256": "4" * 64,
+        "tfidf_state_sha256": tb._vectorizer_state_sha256(vectorizer),
+        "class_weight_mode": "none",
+        "winner_C": 1.0,
+        "selection_metric": "validation_macro_f1",
+        "final_test_used": False,
+        "split_independence": {"movie_id_overlap": 0, "normalized_text_overlap": 0, "record_id_overlap": 0},
+    }
+
+
+def report_of(model_path: Path) -> Path:
+    return model_path.with_name("run_metadata.json")
+
+
+def write_report(model_path: Path, training: dict[str, Any], **changes: Any) -> Path:
+    """Отчёт запуска для искусственного комплекта: тот же формат, что у T04."""
+    report = {**training, "bundle_sha256": tb.sha256_file(model_path),
+              "config_path": "configs/nlp_baseline.json", **changes}
+    tb.write_json(report_of(model_path), report)
+    return report_of(model_path)
+
+
+def baseline(model_path: Path) -> classifier.BaselineClassifier:
+    return classifier.BaselineClassifier(model_path, report_path=report_of(model_path))
+
+
+def predict_with(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, raw: dict[str, Any]) -> classifier.BaselineClassifier:
+    """Настоящий проверенный комплект с подменённым результатом predict_texts."""
+    monkeypatch.setattr(classifier, "predict_texts", lambda bundle, texts: raw)
+    return baseline(make_real_bundle(tmp_path))
 
 
 def test_predict_returns_label_confidence_and_probabilities(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    model_path = make_fake_model(tmp_path)
-
-    monkeypatch.setattr(
-        classifier,
-        "load_bundle",
-        lambda path: {
-            "label_mapping": classifier.EXPECTED_LABEL_MAPPING.copy()
-        },
-    )
-    monkeypatch.setattr(
-        classifier,
-        "predict_texts",
-        lambda bundle, texts: fake_prediction(),
-    )
-
-    model = classifier.BaselineClassifier(model_path)
+    model = predict_with(monkeypatch, tmp_path, fake_prediction())
     result = model.predict("Отличный фильм")
 
     assert result["label"] == "positive"
@@ -128,24 +148,16 @@ def test_model_is_loaded_only_once(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    model_path = make_fake_model(tmp_path)
+    original = classifier.load_bundle
     calls = 0
 
-    def fake_load(path: Path) -> dict[str, Any]:
+    def counting_load(path: Path) -> dict[str, Any]:
         nonlocal calls
         calls += 1
-        return {
-            "label_mapping": classifier.EXPECTED_LABEL_MAPPING.copy()
-        }
+        return original(path)
 
-    monkeypatch.setattr(classifier, "load_bundle", fake_load)
-    monkeypatch.setattr(
-        classifier,
-        "predict_texts",
-        lambda bundle, texts: fake_prediction(),
-    )
-
-    model = classifier.BaselineClassifier(model_path)
+    monkeypatch.setattr(classifier, "load_bundle", counting_load)
+    model = predict_with(monkeypatch, tmp_path, fake_prediction())
 
     model.predict("Первый отзыв")
     model.predict("Второй отзыв")
@@ -183,8 +195,7 @@ def test_whitespace_over_2000_characters_is_still_empty() -> None:
 
 
 def test_exactly_2000_characters_are_allowed(tmp_path: Path) -> None:
-    model_path = make_real_bundle(tmp_path)
-    model = classifier.BaselineClassifier(model_path)
+    model = baseline(make_real_bundle(tmp_path))
 
     result = model.predict("а" * 2000)
 
@@ -205,11 +216,10 @@ def test_missing_model_has_clear_error(tmp_path: Path) -> None:
 def test_corrupted_model_has_clear_error(tmp_path: Path) -> None:
     model_path = tmp_path / "broken.joblib"
     model_path.write_bytes(b"this is not a joblib bundle")
-
-    model = classifier.BaselineClassifier(model_path)
+    write_report(model_path, {})
 
     with pytest.raises(classifier.ModelUnavailableError):
-        model.predict("Обычный отзыв")
+        baseline(model_path).predict("Обычный отзыв")
 
 
 def test_wrong_label_mapping_is_rejected(tmp_path: Path) -> None:
@@ -217,34 +227,18 @@ def test_wrong_label_mapping_is_rejected(tmp_path: Path) -> None:
     bundle = tb.load_bundle(model_path)
     bundle["label_mapping"] = {"negative": 2, "neutral": 1, "positive": 0}
     tb.save_bundle(model_path, bundle)
-    with pytest.raises(classifier.ModelUnavailableError):
-        classifier.BaselineClassifier(model_path).predict("Обычный отзыв")
+    write_report(model_path, bundle["training"])
+    with pytest.raises(classifier.ModelUnavailableError, match="label_mapping"):
+        baseline(model_path).predict("Обычный отзыв")
 
 
 def test_wrong_probability_order_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    model_path = make_fake_model(tmp_path)
-
-    monkeypatch.setattr(
-        classifier,
-        "load_bundle",
-        lambda path: {
-            "label_mapping": classifier.EXPECTED_LABEL_MAPPING.copy()
-        },
-    )
-
     bad_result = fake_prediction()
     bad_result["probability_class_ids"] = [2, 1, 0]
-
-    monkeypatch.setattr(
-        classifier,
-        "predict_texts",
-        lambda bundle, texts: bad_result,
-    )
-
-    model = classifier.BaselineClassifier(model_path)
+    model = predict_with(monkeypatch, tmp_path, bad_result)
 
     with pytest.raises(classifier.ClassifierError):
         model.predict("Обычный отзыв")
@@ -254,30 +248,13 @@ def test_wrong_probability_label_order_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    model_path = make_fake_model(tmp_path)
-
-    monkeypatch.setattr(
-        classifier,
-        "load_bundle",
-        lambda path: {
-            "label_mapping": classifier.EXPECTED_LABEL_MAPPING.copy()
-        },
-    )
-
     bad_result = fake_prediction()
     bad_result["probability_labels"] = [
         "positive",
         "neutral",
         "negative",
     ]
-
-    monkeypatch.setattr(
-        classifier,
-        "predict_texts",
-        lambda bundle, texts: bad_result,
-    )
-
-    model = classifier.BaselineClassifier(model_path)
+    model = predict_with(monkeypatch, tmp_path, bad_result)
 
     with pytest.raises(classifier.ClassifierError):
         model.predict("Обычный отзыв")
@@ -287,28 +264,11 @@ def test_inconsistent_predicted_label_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    model_path = make_fake_model(tmp_path)
-
-    monkeypatch.setattr(
-        classifier,
-        "load_bundle",
-        lambda path: {
-            "label_mapping": classifier.EXPECTED_LABEL_MAPPING.copy()
-        },
-    )
-
     bad_result = fake_prediction(
         label_id=2,
         label="negative",
     )
-
-    monkeypatch.setattr(
-        classifier,
-        "predict_texts",
-        lambda bundle, texts: bad_result,
-    )
-
-    model = classifier.BaselineClassifier(model_path)
+    model = predict_with(monkeypatch, tmp_path, bad_result)
 
     with pytest.raises(classifier.ClassifierError):
         model.predict("Обычный отзыв")
@@ -316,8 +276,7 @@ def test_inconsistent_predicted_label_is_rejected(
 
 def test_real_bundle_contract(tmp_path: Path) -> None:
     """Проверить реальный контракт train_baseline -> BaselineClassifier."""
-    model_path = make_real_bundle(tmp_path)
-    model = classifier.BaselineClassifier(model_path)
+    model = baseline(make_real_bundle(tmp_path))
 
     result = model.predict("отличный фильм")
     probabilities = result["probabilities"]
@@ -338,16 +297,29 @@ def test_real_bundle_contract(tmp_path: Path) -> None:
     assert result["label_id"] == (
         classifier.EXPECTED_LABEL_MAPPING[result["label"]]
     )
+    assert model.data_version["train_ids_sha256"] == "1" * 64
+
+
+def test_batch_matches_single_predictions(tmp_path: Path) -> None:
+    model = baseline(make_real_bundle(tmp_path))
+    texts = ["отличный фильм", "ужасный фильм", "средний фильм"]
+    assert model.predict_batch(texts) == [model.predict(text) for text in texts]
+    with pytest.raises(classifier.TextTooLongError):
+        model.predict_batch(["фильм", "а" * 2001])
+    assert len(model.predict_batch(["фильм " * 500], max_text_length=None)) == 1
+
 
 def test_default_model_path_follows_configuration(tmp_path, monkeypatch):
     import json
     model_path = make_real_bundle(tmp_path)
     config = tmp_path / "config.json"
-    config.write_text(json.dumps({"model_dir": str(tmp_path), "bundle_name": model_path.name}))
+    config.write_text(json.dumps({"model_dir": str(tmp_path), "bundle_name": model_path.name,
+                                  "report_dir": str(tmp_path)}))
     monkeypatch.setattr(classifier, "DEFAULT_CONFIG_PATH", config)
     model = classifier.BaselineClassifier()
     assert model.predict("отличный фильм")["label"] == "positive"
     assert model.model_path == model_path
+    assert model.report_path == report_of(model_path)
 
 
 def test_invalid_configuration_is_model_error(tmp_path, monkeypatch):
@@ -368,7 +340,7 @@ def test_concurrent_first_predictions_load_once(tmp_path, monkeypatch):
         calls.append(path)
         return original(path)
     monkeypatch.setattr(classifier, "load_bundle", load)
-    model = classifier.BaselineClassifier(model_path)
+    model = baseline(model_path)
     gate = Barrier(4)
     def predict(_):
         gate.wait(timeout=5)
@@ -377,3 +349,68 @@ def test_concurrent_first_predictions_load_once(tmp_path, monkeypatch):
         results = list(pool.map(predict, range(4)))
     assert len(calls) == 1
     assert all(result == results[0] for result in results)
+
+
+def test_checksum_is_verified_before_deserialization(tmp_path, monkeypatch):
+    model_path = make_real_bundle(tmp_path)
+    write_report(model_path, tb.load_bundle(model_path)["training"], bundle_sha256="0" * 64)
+    def forbidden(path):
+        pytest.fail("A file that differs from the run report must not be deserialized")
+    monkeypatch.setattr(classifier, "load_bundle", forbidden)
+    with pytest.raises(classifier.ModelUnavailableError, match="checksum differs from run report"):
+        baseline(model_path).predict("Фильм")
+
+
+def test_default_report_rejects_other_bundle(tmp_path):
+    """Без собственного отчёта используется отчёт принятого запуска T04."""
+    with pytest.raises(classifier.ModelUnavailableError, match="checksum differs from run report"):
+        classifier.BaselineClassifier(make_real_bundle(tmp_path)).predict("Фильм")
+
+
+def test_report_without_bundle_checksum_is_rejected(tmp_path):
+    model_path = make_real_bundle(tmp_path)
+    write_report(model_path, tb.load_bundle(model_path)["training"], bundle_sha256=None)
+    with pytest.raises(classifier.ModelUnavailableError, match="bundle_sha256"):
+        baseline(model_path).predict("Фильм")
+
+
+def _drop(key):
+    return lambda training: training.pop(key)
+
+
+def _set(key, value):
+    return lambda training: training.update({key: value})
+
+
+@pytest.mark.parametrize("update, reason", [
+    (lambda training: training.clear(), "train_ids_sha256"),
+    (_set("train_ids_sha256", "abc"), "train_ids_sha256"),
+    (_set("validation_ids_sha256", "G" * 64), "validation_ids_sha256"),
+    (_set("train_parquet_sha256", None), "train_parquet_sha256"),
+    (_set("train_rows", 0), "train_rows"),
+    (_set("validation_rows", True), "validation_rows"),
+    (_drop("validation_parquet_sha256"), "validation_parquet_sha256"),
+    (_drop("tfidf_state_sha256"), "tfidf_state_sha256"),
+    (_set("final_test_used", True), "final test"),
+    (_drop("final_test_used"), "final test"),
+    (_set("split_independence", {"record_id_overlap": 3}), "overlap"),
+    (_drop("split_independence"), "overlap"),
+    (_set("selection_metric", "test_macro_f1"), "selection"),
+    (_set("winner_C", 2.0), "differs from model configuration"),
+    (_set("class_weight_mode", "balanced_train"), "differs from model configuration"),
+    (_set("tfidf_state_sha256", "5" * 64), "TF-IDF state"),
+])
+def test_invalid_or_incompatible_data_version_is_rejected(tmp_path, update, reason):
+    """Отчёт согласован с изменённым комплектом: отказ даёт именно проверка версии данных."""
+    model_path = make_real_bundle(tmp_path, training_update=update)
+    with pytest.raises(classifier.ModelUnavailableError, match=reason):
+        baseline(model_path).predict("Фильм")
+
+
+@pytest.mark.parametrize("field, value", [("train_ids_sha256", "9" * 64), ("final_test_used", True),
+                                          ("validation_rows", 99)])
+def test_data_version_must_match_run_report(tmp_path, field, value):
+    model_path = make_real_bundle(tmp_path)
+    write_report(model_path, tb.load_bundle(model_path)["training"], **{field: value})
+    with pytest.raises(classifier.ModelUnavailableError, match="final test" if field == "final_test_used" else field):
+        baseline(model_path).predict("Фильм")

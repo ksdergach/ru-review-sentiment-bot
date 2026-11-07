@@ -9,7 +9,7 @@ import pytest
 from src import classifier as c, bot, train_baseline as base, train_transformer as tt
 from tools import predict_text
 from test_train_transformer import tiny_model, config  # noqa: F401
-from test_classifier import fake_prediction, make_real_bundle
+from test_classifier import fake_prediction, make_real_bundle, report_of
 
 
 @pytest.fixture
@@ -104,7 +104,8 @@ def test_bot_direct_and_cli_share_result(backend, saved_transformer, tmp_path, m
         bundle, report = saved_transformer
         model = c.create_classifier(backend, bundle, report_path=report)
     else:
-        model = c.create_classifier(backend, make_real_bundle(tmp_path))
+        path = make_real_bundle(tmp_path)
+        model = c.create_classifier(backend, path, report_path=report_of(path))
     monkeypatch.setattr(c, "_default_classifier", model)
     text = "фильм " * 20
     direct = c.predict(text)
@@ -113,6 +114,25 @@ def test_bot_direct_and_cli_share_result(backend, saved_transformer, tmp_path, m
     assert predict_text.main([text]) == 0
     assert json.loads(capsys.readouterr().out) == direct
     assert ("усечён" in bot.classify_text_for_bot(text)) is direct["truncated"]
+    [batch] = c.predict_batch([text])
+    assert batch["label_id"] == direct["label_id"] and batch["truncated"] is direct["truncated"]
+    assert list(batch["probabilities"].values()) == pytest.approx(list(direct["probabilities"].values()), abs=1e-6)
+
+
+def test_rubert_batch_matches_single_and_marks_truncation_per_text(saved_transformer):
+    bundle, report = saved_transformer
+    adapter = c.RuBERTClassifier(bundle, report_path=report)
+    texts = [" ".join(["фильм"] * count) for count in (1, 6, 7, 30)]
+    batch = adapter.predict_batch(texts)
+    assert [r["truncated"] for r in batch] == [False, False, True, True]
+    for text, result in zip(texts, batch):
+        single = adapter.predict(text)
+        assert result["label_id"] == single["label_id"]
+        assert list(result["probabilities"].values()) == pytest.approx(list(single["probabilities"].values()), abs=1e-6)
+    with pytest.raises(c.TextTooLongError):
+        adapter.predict_batch(["фильм", "а" * 2001])
+    with pytest.raises(c.InvalidTextError):
+        adapter.predict_batch("фильм")
 
 
 @pytest.mark.parametrize("probabilities", [[float("nan"), .2, .8], [float("inf"), 0, 0],

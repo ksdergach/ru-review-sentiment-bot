@@ -26,27 +26,74 @@ TEXTS = base._smoke_texts()
 RECORDED = json.loads((ROOT / "reports/transformer/bundle_roundtrip.json").read_text(encoding="utf-8"))["fixed_texts"]
 
 
-@pytest.fixture(autouse=True)
-def no_network(monkeypatch):
-    def refuse(*args, **kwargs):
-        raise AssertionError("inference must not use the network")
-    monkeypatch.setattr(socket.socket, "connect", refuse)
-    monkeypatch.setattr(socket, "create_connection", refuse)
+@pytest.fixture(scope="module", autouse=True)
+def guards():
+    """Network and training are refused for the whole module, before the first load.
 
+    Attempts are recorded as well as refused: the classifier wraps load errors, so a
+    swallowed attempt must still fail the test.
+    """
+    import torch
+    attempts = []
+    loads = []
 
-@pytest.fixture(autouse=True)
-def no_training(monkeypatch):
-    def refuse(*args, **kwargs):
-        raise AssertionError("inference must not start training")
-    for name in ("run_training", "load_pretrained", "make_loader"):
-        monkeypatch.setattr(tt, name, refuse)
+    def refuse(name):
+        def call(*args, **kwargs):
+            attempts.append(name)
+            raise AssertionError(f"inference must not use {name}")
+        return call
+
+    original_load = tt.load_bundle
+
+    def counting_load(*args, **kwargs):
+        loads.append(args[0])
+        return original_load(*args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as patch:
+        for name in ("connect", "connect_ex"):
+            patch.setattr(socket.socket, name, refuse(f"socket.{name}"))
+        patch.setattr(socket, "create_connection", refuse("socket.create_connection"))
+        patch.setattr(socket, "getaddrinfo", refuse("socket.getaddrinfo"))
+        for name in ("run_training", "load_pretrained", "make_loader"):
+            patch.setattr(tt, name, refuse(f"train_transformer.{name}"))
+        patch.setattr(torch.Tensor, "backward", refuse("Tensor.backward"))
+        patch.setattr(torch.optim.Optimizer, "step", refuse("Optimizer.step"))
+        patch.setattr(tt, "load_bundle", counting_load)
+        yield {"attempts": attempts, "loads": loads}
+    assert attempts == []
 
 
 @pytest.fixture(scope="module")
-def accepted():
+def accepted(guards):
+    assert guards["loads"] == []
     model = c.RuBERTClassifier()
-    model.predict(TEXTS[0])
+    first = model.predict(TEXTS[0])
+    assert guards["loads"] == [BUNDLE] and guards["attempts"] == []
+    assert first["label_id"] == RECORDED["label_ids"][0]
     return model
+
+
+def test_first_load_ran_under_guards(accepted, guards):
+    assert guards["loads"].count(BUNDLE) >= 1 and guards["attempts"] == []
+    assert accepted.data_version["final_test_used"] is False
+
+
+def test_concurrent_first_load_of_accepted_bundle(guards):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    before = len(guards["loads"])
+    model = c.RuBERTClassifier()
+    gate = Barrier(4)
+
+    def run(_):
+        gate.wait(timeout=30)
+        return model.predict(TEXTS[1])
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(run, range(4)))
+    assert len(guards["loads"]) - before == 1
+    assert all(r == results[0] for r in results) and results[0]["label_id"] == RECORDED["label_ids"][1]
+    assert guards["attempts"] == []
 
 
 def test_accepted_bundle_matches_recorded_and_training_predict(accepted):
@@ -72,11 +119,18 @@ def test_accepted_bundle_matches_recorded_and_training_predict(accepted):
 
 def test_bot_cli_and_default_predict_agree(accepted, monkeypatch, capsys):
     monkeypatch.setattr(c, "_default_classifier", accepted)
-    for text in TEXTS:
+    batch = c.predict_batch(TEXTS)
+    for text, evaluated in zip(TEXTS, batch):
         direct = c.predict(text)
         assert bot.classify_text_for_bot(text) == bot.format_prediction(direct)
         assert predict_text.main([text]) == 0
         assert json.loads(capsys.readouterr().out) == direct
+        # Evaluation path: same fields; batch padding may change probabilities by float noise.
+        assert {k: evaluated[k] for k in ("label", "label_id", "truncated")} == \
+            {k: direct[k] for k in ("label", "label_id", "truncated")}
+        assert list(evaluated["probabilities"]) == c.EXPECTED_CLASS_NAMES
+        assert list(evaluated["probabilities"].values()) == pytest.approx(list(direct["probabilities"].values()), abs=1e-6)
+        assert evaluated["confidence"] == pytest.approx(direct["confidence"], abs=1e-6)
 
 
 def test_truncation_boundary_on_real_tokenizer(accepted):
@@ -96,12 +150,12 @@ def test_truncation_boundary_on_real_tokenizer(accepted):
         assert ("усечён" in bot.format_prediction(result)) is truncated
 
 
-def test_accepted_model_is_reused(accepted, monkeypatch):
-    def reload(*args, **kwargs):
-        raise AssertionError("loaded model must be reused")
-    monkeypatch.setattr(tt, "load_bundle", reload)
+def test_accepted_model_is_reused(accepted, guards):
+    before = len(guards["loads"])
     for text in TEXTS * 2:
         accepted.predict(text)
+    accepted.predict_batch(TEXTS)
+    assert len(guards["loads"]) == before
 
 
 def test_changed_copy_of_accepted_bundle_is_rejected(tmp_path):
