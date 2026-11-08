@@ -419,7 +419,9 @@ pytest tests/test_classifier_accepted_rubert.py tests/test_classifier_accepted_b
 комплекте RuBERT и пропускается, если `models/transformer` не установлен.
 `tests/test_classifier_accepted_baseline.py` делает то же для принятого baseline
 T04/N02 и пропускается, если файла нет или его SHA-256 отличается от
-`reports/nlp/training/run_metadata.json`.
+`reports/nlp/training/run_metadata.json`. При подготовленной validation
+(`data/processed/validation.parquet`) он также сверяет предсказания
+`predict_batch` на всех строках с хешем предсказаний N02.
 Синтетические BERT-комплекты в остальных тестах проверяют интерфейс и не
 заменяют проверку принятой модели. Результаты проверки реальных артефактов:
 [reports/classifier/verification.md](reports/classifier/verification.md).
