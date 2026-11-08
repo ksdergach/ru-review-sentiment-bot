@@ -361,6 +361,86 @@ $actual -eq $acceptedMetadata.bundle_sha256
 с контрольной суммой именно из принятого состояния репозитория.
 
 
+### Выбор модели и общий интерфейс (T07)
+
+По умолчанию используется baseline. Для RuBERT установите принятый комплект T06
+командой `python tools/fetch_transformer.py` (подробности в `README_T06.md`) и
+выберите backend перед запуском процесса:
+
+```bash
+export CLASSIFIER_BACKEND=rubert
+python tools/predict_text.py 'Отличный фильм, понравился сюжет'
+python -m src.bot
+```
+
+Оба пути вызывают `src.classifier.predict(text)`. Ответ содержит `label`,
+`label_id`, `confidence`, `probabilities` (negative/neutral/positive) и
+`truncated`. При усечении бот сообщает, что учтено только начало отзыва.
+RuBERT использует CPU, tokenizer, max_length и правое усечение из сохранённого
+комплекта; обработка совпадает с `src.train_transformer.predict_texts`.
+Baseline не усекает текст. Общий интерфейс принимает непустые строки до
+2 000 символов; это ограничение интерфейса, а не обучающих выборок.
+
+`CLASSIFIER_MODEL_PATH` задаёт файл baseline или каталог RuBERT; относительный
+путь считается от текущего рабочего каталога. `CLASSIFIER_REPORT_PATH` указывает
+на `run_metadata.json` запуска, создавшего этот комплект. По умолчанию
+используются `models/nlp_baseline/tfidf_logreg_baseline.joblib` с
+`reports/nlp/training/run_metadata.json` (пути из `configs/nlp_baseline.json`) и
+`models/transformer` с `reports/transformer/run_metadata.json`.
+Перед загрузкой RuBERT сверяются все файлы комплекта и контрольные суммы,
+версия данных, конфигурация обработки и порядок классов. Для baseline SHA-256
+файла сверяется с отчётом до `joblib.load`, затем проверяется версия данных
+(`training`): SHA-256 ID и Parquet train/validation, число строк,
+`final_test_used: false`, отсутствие пересечений train/validation, выбор по
+validation macro-F1, согласованность с параметрами модели и состоянием TF-IDF и
+совпадение всех полей с отчётом. Проверка SHA-256 до загрузки ограничивает
+десериализацию файлом, записанным в отчёте из Git, но не делает произвольный
+pickle безопасным. Произвольные новые веса требуют собственного проверенного
+отчёта; подмена файлов вызывает ошибку. Локально переобученный baseline
+принимается только вместе с отчётом своего запуска.
+Отсутствующий или несовместимый комплект приводит к `ModelUnavailableError`
+с путём и причиной (например, `checksum mismatch: label_mapping.json`);
+`tools/predict_text.py` печатает её и завершается с кодом 1, бот отвечает
+сообщением о недоступности классификации и записывает причину в журнал.
+
+Модель загружается один раз, без сети и обучения. Backend фиксируется при
+первом вызове; после изменения переменных окружения процесс надо перезапустить.
+Для прямого выбора используйте `create_classifier("baseline" | "rubert", ...)`.
+Для оценки на размеченных текстах предназначен `src.classifier.predict_batch(texts)`:
+та же загрузка, обработка и проверка результата, что у `predict`; параметр
+`max_text_length=None` снимает только ограничение длины интерактивного ввода.
+`tools/evaluate_classifier.py` вычисляет через него метрики на validation
+(финальный test не читается) и сравнивает матрицу ошибок с отчётом запуска:
+
+```bash
+CLASSIFIER_BACKEND=rubert python tools/evaluate_classifier.py
+```
+
+`tools/verify_transformer.py` и `tools/report_nlp_baseline.py` намеренно не
+используют `src.classifier`: это независимые проверки результатов T06 и N02,
+которые не должны зависеть от проверяемого кода интерфейса.
+Атрибут `data_version` после первой загрузки содержит сведения о данных из
+комплекта (у baseline - проверенный словарь `training`, у RuBERT - `metadata.data_version`).
+
+Проверка T07:
+
+```bash
+python tools/fetch_transformer.py
+pytest tests/test_classifier_accepted_rubert.py tests/test_classifier_accepted_baseline.py \
+  tests/test_classifier_rubert.py tests/test_classifier.py tests/test_evaluate_classifier.py tests/test_bot.py -q
+```
+
+`tests/test_classifier_accepted_rubert.py` проверяет общий интерфейс на принятом
+комплекте RuBERT и пропускается, если `models/transformer` не установлен.
+`tests/test_classifier_accepted_baseline.py` делает то же для принятого baseline
+T04/N02 и пропускается, если файла нет или его SHA-256 отличается от
+`reports/nlp/training/run_metadata.json`. При подготовленной validation
+(`data/processed/validation.parquet`) он также сверяет предсказания
+`predict_batch` на всех строках с хешем предсказаний N02.
+Синтетические BERT-комплекты в остальных тестах проверяют интерфейс и не
+заменяют проверку принятой модели. Результаты проверки реальных артефактов:
+[reports/classifier/verification.md](reports/classifier/verification.md).
+
 ### Запуск Telegram-бота
 
 Бот запускается **из корня репозитория как Python-модуль**.

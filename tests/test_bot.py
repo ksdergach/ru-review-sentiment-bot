@@ -9,7 +9,7 @@ import pytest
 
 import src.bot as bot
 import src.classifier as classifier
-from test_classifier import make_real_bundle
+from test_classifier import baseline, make_real_bundle
 
 
 class FakeMessage:
@@ -101,7 +101,7 @@ def test_model_error_returns_message_and_is_logged(
         answer = bot.classify_text_for_bot("Обычный отзыв")
 
     assert answer == bot.MODEL_ERROR_MESSAGE
-    assert "Baseline classification failed" in caplog.text
+    assert "Text classification failed" in caplog.text
 
 
 def test_start_handler() -> None:
@@ -220,7 +220,7 @@ def test_real_bundle_direct_and_bot_paths_match(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     model_path = make_real_bundle(tmp_path)
-    model = classifier.BaselineClassifier(model_path)
+    model = baseline(model_path)
 
     monkeypatch.setattr(
         classifier,
@@ -243,7 +243,7 @@ def test_exactly_2000_characters_reach_classifier(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     model_path = make_real_bundle(tmp_path)
-    model = classifier.BaselineClassifier(model_path)
+    model = baseline(model_path)
 
     monkeypatch.setattr(
         classifier,
