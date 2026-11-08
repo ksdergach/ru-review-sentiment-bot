@@ -145,7 +145,11 @@ def reconstruct(source: Path, bundle: Path, root: Path, report_dir: str, expecte
         staging.mkdir()
         for name in expected:
             if name in generated:
-                (staging / name).write_bytes(generated[name])
+                # write_json uses text mode: LF on Linux/macOS, CRLF on Windows. Rebuild the
+                # bytes of the recorded run, whichever platform produced it.
+                data = generated[name]
+                crlf = data.replace(b"\n", b"\r\n")
+                (staging / name).write_bytes(crlf if hashlib.sha256(crlf).hexdigest() == expected[name] else data)
             else:
                 path = source / name
                 if path.is_symlink() or not path.is_file():

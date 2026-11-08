@@ -5,9 +5,245 @@
 при точном равенстве сохраняется более ранний шаг. Финальный test не открывается.
 Порядок классов: **negative=0, neutral=1, positive=2**.
 
-## Воспроизведение
+Есть две разные процедуры. **Использование готовой модели** (следующий раздел)
+не требует обучения: обученный комплект скачивается одной командой. **Воспроизведение
+обучения** (раздел «Воспроизведение обучения») нужно только для проверки самого
+эксперимента и занимает около 30–40 минут на CPU.
 
-Команды выполняются из корня репозитория. Зависимости устанавливаются только
+## Получение готовой модели (без обучения)
+
+Обученный комплект хранится вне Git, в архиве `t06_rubert_bundle.tar` (113,7 МиБ) на
+Google Диске с публичным доступом на чтение. Аккаунт Google, токены и браузер не нужны.
+Параметры источника записаны в `configs/transformer_bundle.json`: ID файла, размер и
+SHA-256 `68970b2e3422a873d14da75a4910f6f813ade73c3ca99c103068f6f2d9e4c703`.
+
+### Системные требования
+
+- CPython **3.11, 3.12 или 3.13**. Python 3.14 не подходит: для закреплённых
+  `scipy==1.15.3` и `pandas==2.3.2` нет колёс под 3.14. Python 3.10 тоже не подходит:
+  `numpy==2.3.3` требует 3.11+. Основная версия проекта — 3.13.7 (`.python-version`).
+- Git в PATH.
+- Около 2,5 ГБ свободного места: окружение `.venv` с CPU-сборкой PyTorch и
+  остальными зависимостями проекта занимает 1,9 ГБ, архив и комплект — по 114 МиБ.
+- Около 1 ГБ свободной RAM. Пик при проверке и предсказании на VDS — 0,5 ГБ.
+- Видеокарта не нужна: всё выполняется на CPU.
+- `sudo`, `curl`, `wget`, системный `tar` и `gdown` не нужны. Скачивание, проверка и
+  распаковка выполняются стандартной библиотекой Python.
+
+| Платформа | Получение модели | Работа RuBERT (torch 2.10.0) |
+|---|---|---|
+| Windows 10/11 x64 | да | да |
+| macOS Apple Silicon (arm64) | да | да |
+| Linux x86_64 и ARM64 с glibc ≥ 2.28 (Ubuntu 20.04+, Debian 10+, Fedora 29+, RHEL/Rocky 8+), контейнеры на их основе, например `python:3.12-slim` | да | да |
+| macOS Intel (x86_64) | да | **нет**: PyTorch не публикует колёса macOS x86_64 для torch 2.10.0 (поддержка прекращена после 2.2) |
+| Windows on ARM | да | **не поддерживается**: нет колёс `pyarrow`, `pandas` и `scipy` для win_arm64 |
+| Alpine и другие musl-дистрибутивы | да | **не поддерживается**: нет колёс torch для musllinux |
+
+«Получение модели» означает, что `tools/fetch_transformer.py` использует только
+стандартную библиотеку и работает на любой ОС с Python 3.11+. Колонка RuBERT
+составлена по колёсам на PyPI и в индексе PyTorch CPU. Что фактически проверено,
+указано в разделе «Проверенные платформы» ниже. На неподдерживаемых платформах
+модель можно скачать и проверить по SHA-256, но не запустить: используйте другую
+машину, контейнер Linux или удалённый сервер.
+
+### Шаги для нового пользователя
+
+1. **Получить репозиторий.** Пока PR №34 не слит, модель описана в ветке `vds/issue-8`.
+
+   ```bash
+   git clone https://github.com/ksdergach/ru-review-sentiment-bot.git
+   cd ru-review-sentiment-bot
+   git checkout vds/issue-8
+   ```
+
+2. **Создать окружение и активировать его.**
+
+   Windows (PowerShell):
+
+   ```powershell
+   py -3.12 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   ```
+
+   Если активация запрещена политикой PowerShell, вместо `python` в следующих командах
+   пишите `.\.venv\Scripts\python.exe`. Политику менять не нужно.
+
+   macOS и Linux:
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+   Вместо `3.12` подойдут 3.11 и 3.13. Проверить версию: `python --version`.
+
+3. **Установить зависимости.**
+
+   Linux: сначала CPU-сборка PyTorch из индекса PyTorch. Обычный PyPI для Linux
+   ставит CUDA-сборку с библиотеками NVIDIA на несколько гигабайт.
+
+   ```bash
+   python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+   python -m pip install -r requirements.txt
+   ```
+
+   Windows и macOS Apple Silicon: только PyPI. Там `torch==2.10.0` и так собран
+   для CPU (на Apple Silicon дополнительно доступен MPS).
+
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+
+4. **Скачать и установить модель.**
+
+   ```bash
+   python tools/fetch_transformer.py
+   ```
+
+   Команда скачивает архив в `artifacts/downloads/` и сверяет его размер и SHA-256.
+   Затем `tools/transformer_bundle.py restore` распаковывает архив в
+   `models/transformer/` и сверяет все 7 файлов с
+   `reports/transformer/run_metadata.json`. Модель считается установленной только
+   после обеих проверок. При повторном запуске проверенный комплект не скачивается
+   и не перезаписывается.
+
+5. **Проверить модель.**
+
+   ```bash
+   python tools/restore_nlp_splits.py
+   python tools/verify_transformer.py
+   ```
+
+   Первая команда один раз восстанавливает train/validation из `NLP_dataset/`.
+   Test она не открывает. Вторая независимо от `src/*` сверяет данные, журналы
+   и все файлы комплекта. Она загружает модель с `local_files_only=True` и
+   воспроизводит записанные предсказания на трёх фиксированных текстах.
+   Ожидаемый итог: `"status": "passed"`, код 0. Ключ `--full-validation` дополнительно
+   прогоняет все 10 396 validation-текстов (около минуты на 2 CPU VDS).
+
+6. **Запустить модель.**
+
+   ```bash
+   python -m src.train_transformer --verify-bundle models/transformer
+   ```
+
+   Команда загружает комплект без сети и выводит классы и вероятности
+   [negative, neutral, positive] для трёх фиксированных текстов. Ожидаемые top-1:
+   positive, negative, positive. RuBERT пока не подключён к Telegram-боту. Бот N03
+   использует baseline; подключение RuBERT — отдельная задача.
+
+На удалённом сервере команды те же, выполняются по SSH. Браузер и графический
+интерфейс не нужны.
+
+### Если Google Диск недоступен: ручная установка
+
+Скачайте архив в браузере по ссылке
+<https://drive.google.com/file/d/1-1oZs7fqk0GYn23moRQOGZiIEKmfuAhO/view> (кнопка
+«Скачать», затем «Всё равно скачать»). Также можно скопировать его с другой
+машины команды. Затем выполните:
+
+```bash
+python tools/fetch_transformer.py --archive <путь>/t06_rubert_bundle.tar
+```
+
+Сеть при этом не используется. SHA-256 и состав архива проверяются так же. Ваш
+файл не перемещается и не удаляется. Если архив выложат в другое место, например
+в GitHub Release, подойдёт `--url <прямая ссылка>`. Код менять не нужно: контрольная
+сумма та же.
+
+### Типичные проблемы
+
+| Сообщение или симптом | Что делать |
+|---|---|
+| «вместо архива получена HTML-страница» | Google Диск временно ограничил скачивание файла (лимит на число загрузок) или закрыл доступ. Повторите через несколько часов либо установите вручную через `--archive`. |
+| «сетевая ошибка», «загрузка оборвалась», HTTP 429/5xx | Команда сама делает 3 попытки. Если все неудачны, запустите её снова: загрузка продолжится с сохранённой части (`*.partial`). Прокси берётся из `HTTPS_PROXY`. |
+| «SHA-256 скачанного архива … не совпадает» | Скачанный файл удалён, установка не выполнялась. Повторите команду. Если ошибка повторяется, файл на Диске заменён: сообщите владельцу проекта. |
+| «недостаточно места» | Освободите место или укажите `--download-dir <каталог на другом диске>`. |
+| «models/transformer уже существует, но не совпадает…» | Каталог не изменён. Переименуйте или удалите его и повторите команду. |
+| `CERTIFICATE_VERIFY_FAILED` на macOS | Запустите «Install Certificates.command» из папки Python в «Программах» или выполните `python -m pip install certifi`. |
+| pip: `No matching distribution found for torch==2.10.0` | Python 3.14 или 3.10, macOS Intel, Windows on ARM либо musl-Linux. См. таблицу выше. |
+| Windows: `verify_transformer.py` падает на `training_script_checksum` или `t03_checksum` | Клон сделан до появления `.gitattributes`, и Git перевёл строки в CRLF. Сделайте новый клон. |
+
+Скачанный архив можно удалить после установки (`artifacts/downloads/`). Тогда
+повторная установка после удаления `models/transformer/` скачает его снова.
+
+### Проверенные платформы
+
+Проверки делятся на две категории.
+
+**А. Переносимость загрузчика.** `tests/test_fetch_transformer.py` использует
+только стандартную библиотеку и pytest, без torch и без Интернета. Маленький
+настоящий архив раздаёт локальный HTTP-сервер, имитирующий Google Диск. Тесты
+покрывают:
+
+- страницу подтверждения Google и HTML вместо архива;
+- обрыв соединения с докачкой через `Range`, сервер без докачки, HTTP 503 и 404;
+- неверную SHA-256, неверный размер и нехватку места;
+- повторный запуск без скачивания и сохранение чужого каталога `models/transformer/`;
+- небезопасные члены архива: `..`, абсолютный путь, `\`, symlink и hardlink;
+- пути с пробелами и кириллицей;
+- побайтовое совпадение хешируемых файлов после checkout.
+
+GitHub Actions (`.github/workflows/model-portability.yml`) запускает их для
+`pull_request` и для `push` только в `master`, если изменены файлы из path-фильтров
+workflow: сам workflow, `.gitattributes`, `pyproject.toml`, `requirements.txt`,
+загрузчик (`tools/fetch_transformer.py`, `tools/transformer_bundle.py`) и его тест,
+`configs/transformer.json`, `configs/transformer_bundle.json`, а также файлы, чьи байты
+сверяет тест: `src/train_transformer.py`, `reports/transformer/run_metadata.json`,
+`reports/baseline/run_metadata.json`, `reports/baseline/train_ids.csv`,
+`reports/data_prep/audit.json`, `reports/data_prep/split_ids.csv`. Изменения только
+документации задание не запускают. Задание А выполняется и при ручном запуске workflow.
+Матрица: Ubuntu x86_64, Ubuntu ARM64, Windows x64, macOS Apple Silicon и macOS Intel,
+Python 3.11 и 3.13.
+
+**Б. Настоящая модель.** Задание `real-model` того же workflow выполняется на
+Ubuntu x86_64, Ubuntu ARM64, Windows x64 и macOS Apple Silicon; macOS Intel не входит
+в матрицу, так как для torch 2.10.0 нет колёс macOS x86_64. На каждой ОС оно:
+
+- скачивает архив с Google Диска и проверяет, что это tar нужного размера и SHA-256,
+  а не HTML;
+- восстанавливает комплект и сверяет 7 файлов;
+- повторяет запуск и проверяет, что ничего не скачано и не перезаписано;
+- выполняет `verify_transformer.py --full-validation` (порядок классов, фиксированные
+  тексты, полная validation) и предсказание;
+- запускает полный офлайн-набор тестов.
+
+Задание дорогое, поэтому запускается только вручную: `workflow_dispatch` с
+`real_model=true` (Actions → «Model portability» → Run workflow). Для `pull_request` и
+`push` оно не выполняется. GitHub разрешает ручной запуск только для workflow, который
+есть в ветке по умолчанию, поэтому текущая версия станет доступна для ручного запуска
+после появления workflow в `master`; затем в запуске можно выбрать любую ветку. Запуски
+до 06.11.2026 (таблица ниже) выполнялись прежним условием: push в `vds/issue-8` с
+`[verify-real-model]` в сообщении коммита. ОС проверяются по очереди (`max-parallel: 1`),
+чтобы не скачивать архив параллельно; одновременно выполняется не больше одной проверки
+на каждой ОС по всем веткам, новый запуск ждёт завершения предыдущего. Каждое задание
+ограничено 45 минутами. В артефакты попадают только JSON-отчёт проверки и XML с
+результатами тестов, без весов.
+
+Фактические результаты на 21.10.2026 (последний запуск — `936213b`):
+
+| Среда | А | Б: настоящий RuBERT |
+|---|---|---|
+| VDS2: Ubuntu VDS x86_64, Python 3.12.3, torch 2.10.0+cpu, 2 CPU | пройдено, полный набор тестов 535 passed | пройдено: скачивание 6 с, SHA-256 и 7/7 файлов, повтор без скачивания, `verify_transformer.py` 53/53, `--full-validation` 55/55 (macro-F1 0,6678240259861936, матрица совпала), top-1 [2, 0, 2] с вероятностями, побитово равными записанным |
+| GitHub Actions `ubuntu-latest`: Ubuntu x86_64, Python 3.12 для Б | пройдено, Python 3.11 и 3.13 | пройдено: скачивание, SHA-256, 7/7 файлов, повтор без скачивания, `--full-validation`, предсказание, полный набор тестов |
+| GitHub Actions `ubuntu-24.04-arm`: Ubuntu ARM64 | пройдено, Python 3.11 и 3.13 | пройдено, все шаги, включая полный набор тестов |
+| GitHub Actions `macos-latest`: macOS Apple Silicon | пройдено, Python 3.11 и 3.13 | пройдено, все шаги, включая полный набор тестов |
+| GitHub Actions `windows-latest`: Windows x64 | пройдено, Python 3.11 и 3.13 | пройдено, все шаги, включая полный набор тестов (с `936213b`). На `74867fb` падал 1 тест: `reconstruct` на синтетическом комплекте, записанном на Windows с CRLF. Исправлено в `tools/transformer_bundle.py` (`9dd45f3`) |
+| GitHub Actions `macos-15-intel`: macOS Intel | пройдено, Python 3.11 и 3.13 | не выполняется: нет колёс torch 2.10.0 для macOS x86_64 |
+| macOS, Python 3.13 (независимое ревью 20.10.2026, HEAD `03ae6aa`) | 503 passed без комплекта | не проверялось |
+
+Запуски: [А и Б на `936213b`](https://github.com/ksdergach/ru-review-sentiment-bot/actions/runs/39636588035),
+[А и Б на `74867fb`](https://github.com/ksdergach/ru-review-sentiment-bot/actions/runs/39625833989),
+[А и Б на `b4aad97`](https://github.com/ksdergach/ru-review-sentiment-bot/actions/runs/39592593520),
+[А на `23273ad`](https://github.com/ksdergach/ru-review-sentiment-bot/actions/runs/39588993557).
+На ОС без пройденного задания Б работа настоящего RuBERT подтверждена только наличием
+колёс зависимостей, а не запуском. На другом CPU
+вероятности могут отличаться от записанных в последних знаках. Проверка
+фиксированных текстов в `verify_transformer.py` допускает расхождение 1e-6.
+
+## Воспроизведение обучения
+
+Для использования модели этот раздел не нужен. Команды выполняются из корня репозитория. Зависимости устанавливаются только
 в локальное окружение. Фактические версии окружения записаны в логах и метаданных.
 Для этого запуска использован Python 3.12.3 на Linux CPU; исходные отчёты baseline
 получены в другом окружении. Данные, их порядок и контрольные суммы одинаковы.
@@ -50,25 +286,14 @@ HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py --config artifacts
 Для всего набора тестов проекта дополнительно нужны пакеты из `requirements.txt`
 (`aiogram`, `faster-whisper`, `ctranslate2`, `av`).
 
-### Проверка на отдельной машине
+### Независимая проверка
 
-Нужны Linux, Python 3.12 (исходный запуск и повторная проверка — 3.12.3; на 3.13.7
-из `.python-version` тесты T06 не прогонялись), около 3 ГБ свободной RAM и 3 ГБ диска. `sudo` не требуется:
-всё ставится в локальное `.venv` внутри клона.
-
-```bash
-git clone https://github.com/ksdergach/ru-review-sentiment-bot.git && cd ru-review-sentiment-bot
-git checkout vds/issue-8
-python3 -m venv .venv
-.venv/bin/python -m pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
-.venv/bin/python -m pip install -r requirements.txt   # torch уже установлен, версия совпадает
-.venv/bin/python tools/restore_nlp_splits.py           # train/validation из NLP_dataset/, test не открывается
-HF_HUB_OFFLINE=1 .venv/bin/python -m pytest -q
-.venv/bin/python tools/verify_transformer.py --no-bundle   # доказательства и данные без весов
-# после восстановления комплекта (см. «Хранение и перенос комплекта»):
-.venv/bin/python tools/transformer_bundle.py restore --archive <путь>/t06_rubert_bundle.tar
-HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py --full-validation
-```
+Порядок на отдельной машине описан в разделе «Получение готовой модели». Полный
+офлайн-набор тестов запускается командой `python -m pytest -q`, после неё —
+`python tools/verify_transformer.py --no-bundle` для проверки без весов.
+На Windows переменная `HF_HUB_OFFLINE=1` из команд этого раздела задаётся отдельно:
+`$env:HF_HUB_OFFLINE = "1"` в PowerShell. Для `verify_transformer.py` без
+`--pretrained-check` она не нужна: комплект загружается с `local_files_only=True`.
 
 `tools/verify_transformer.py` не импортирует `src/*`. Контрольные суммы, упорядоченные
 ID/label, метрики из матриц ошибок и правило выбора реализованы в нём заново.
@@ -207,18 +432,28 @@ CSV с `pytest.approx`, поскольку парсинг decimal менял п�
 
 ```bash
 # на машине, где есть комплект: детерминированный tar + <архив>.sha256
-.venv/bin/python tools/transformer_bundle.py check
-.venv/bin/python tools/transformer_bundle.py pack --out <хранилище>/t06_rubert_bundle.tar
-# на машине проверяющего:
-.venv/bin/python tools/transformer_bundle.py restore --archive <хранилище>/t06_rubert_bundle.tar
-HF_HUB_OFFLINE=1 .venv/bin/python tools/verify_transformer.py --full-validation
+python tools/transformer_bundle.py check
+python tools/transformer_bundle.py pack --out <хранилище>/t06_rubert_bundle.tar
+# на машине проверяющего — обычно одной командой (см. «Получение готовой модели»):
+python tools/fetch_transformer.py                 # или --archive <хранилище>/t06_rubert_bundle.tar
+python tools/verify_transformer.py --full-validation
 ```
 
 `pack` не архивирует комплект, если набор файлов или хотя бы одна сумма отличаются
-от метаданных запуска. `restore` проверяет SHA-256 архива и каждого файла, допускает
-только ожидаемые обычные файлы (без ссылок и `..`) и не перезаписывает непустой
-каталог. Хранилище — GitHub Release asset этого репозитория или общий диск
-команды. Публикация архива выполняется только с разрешения владельца репозитория.
+от метаданных запуска. `restore` проверяет SHA-256 архива и каждого файла. Он
+допускает только ожидаемые обычные файлы (без ссылок и `..`) и не перезаписывает
+непустой каталог. `fetch_transformer.py` скачивает архив и вызывает этот же `restore`:
+отдельного механизма распаковки нет.
+
+**Постоянное хранилище, 21.10.2026.** Владелец загрузил архив на Google Диск с
+доступом «Все, у кого есть ссылка — Читатель». Скачивание без авторизации проверено
+из VDS2: SHA-256 совпала, восстановление дало 7/7 файлов, проверки описаны в разделе
+«Проверенные платформы». Отдельная закрытая резервная копия для штатного получения
+модели не используется. Google Диск может временно ограничить скачивание
+популярного файла. На этот случай есть ручная установка через `--archive`. Если
+ограничения станут регулярными, простая альтернатива — приложить тот же архив к
+GitHub Release репозитория и передавать `--url`. Решение о смене хранилища
+принимает владелец.
 
 **Состояние на 20.10.2026 (после повторной проверки).** Исходный каталог обучения на
 VDS был удалён, архив во внешнее хранилище не выгружался. Поэтому выполнен **один**
@@ -289,7 +524,7 @@ Python 3.12.3, те же версии библиотек). Скрипт не м�
 
 Ниже сохранены команды исторического запуска. В новом клоне каталог
 `reports/transformer_repeat` уже заполнен; для нового обучения используйте
-блок «Воспроизведение» в начале документа с отдельными каталогами.
+раздел «Воспроизведение обучения» с отдельными каталогами.
 
 ```bash
 .venv/bin/python tools/restore_nlp_splits.py

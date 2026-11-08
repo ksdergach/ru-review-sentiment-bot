@@ -91,13 +91,13 @@ def test_review_packet_escapes_text_and_preserves_human_notes(tmp_path):
     notes = output / "notes.md"
     notes.write_text("Human decisions, do not replace", encoding="utf-8")
     write_review_packet(sample, output)
-    assert notes.read_text() == "Human decisions, do not replace"
-    page = (output / "review.html").read_text()
+    assert notes.read_text(encoding="utf-8") == "Human decisions, do not replace"
+    page = (output / "review.html").read_text(encoding="utf-8")
     assert "<script>" not in page
     assert "&lt;script&gt;" in page
     with pytest.raises(ValueError, match="different IDs"):
         write_review_packet(sample[:-1], output)
-    assert notes.read_text() == "Human decisions, do not replace"
+    assert notes.read_text(encoding="utf-8") == "Human decisions, do not replace"
 
 
 def test_insufficient_class_is_an_error(tmp_path):

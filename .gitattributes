@@ -1,0 +1,33 @@
+# Line endings: text files are stored and checked out with LF on every OS, whatever
+# core.autocrlf says. Reports, configs, ID lists and src/train_transformer.py are verified by
+# SHA-256 (see run_metadata.json); Git for Windows (core.autocrlf=true) would otherwise check
+# them out with CRLF and the checks would fail. The index already stores LF only, so these
+# rules do not renormalize any committed file.
+
+# Fallback for files without a rule below: Git's binary detection, LF for text.
+* text=auto eol=lf
+
+# Text formats present in the repository.
+*.py text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.csv text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.example text eol=lf
+.python-version text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Binary: datasets, reports, model bundles and audio are never converted or diffed as text.
+*.parquet binary
+*.pdf binary
+*.safetensors binary
+*.tar binary
+*.ogg binary
+*.wav binary
+*.mp3 binary
+*.m4a binary

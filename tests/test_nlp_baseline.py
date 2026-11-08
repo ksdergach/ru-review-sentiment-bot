@@ -83,9 +83,9 @@ def test_evaluate_is_read_only_no_fit_and_reads_only_full_validation(fitted_proj
     assert len(chosen) == min(result["errors"], 40)
     assert all(r["nonzero_features"] == 0 for r in chosen)
     report.write_outputs(root, result, chosen, annotations)
-    public = (root / "reports/nlp/baseline_errors.csv").read_text()
+    public = (root / "reports/nlp/baseline_errors.csv").read_text(encoding="utf-8")
     assert "<script>" not in public and "review_text" not in public
-    page = (root / "artifacts/nlp/baseline_errors.html").read_text()
+    page = (root / "artifacts/nlp/baseline_errors.html").read_text(encoding="utf-8")
     assert "<script>" not in page and "&lt;script&gt;" in page
     first = (root / "reports/nlp/baseline_metrics.json").read_bytes()
     report.write_outputs(root, *report.evaluate(root))
