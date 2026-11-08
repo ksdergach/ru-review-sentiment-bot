@@ -45,17 +45,20 @@ def _recorded(model) -> tuple[float, list[list[int]], str]:
 def evaluate(model, validation_path: Path) -> dict:
     if base._looks_like_test(validation_path.stem):
         raise ValueError("The final test split is not evaluated")
+    # Load and verify the model without processing any dataset text. Its report
+    # pins the allowed validation file, including when a different split is renamed.
+    model._get_bundle()
+    recorded_f1, recorded_matrix, recorded_sha = _recorded(model)
+    if base.sha256_file(validation_path) != recorded_sha:
+        raise ValueError("Validation data differs from the model data version")
     frame = base.load_prepared_split(validation_path, split_name="validation", text_column="review_text",
                                      label_column="label_id", id_column="record_id")
-    # One call keeps the batch layout of the training-time evaluation; it also loads and
-    # verifies the model, so its data version is known afterwards.
-    results = model.predict_batch(frame["review_text"].tolist(), max_text_length=None)
-    recorded_f1, recorded_matrix, recorded_sha = _recorded(model)
     version = model.data_version
-    if (base.sha256_file(validation_path) != recorded_sha
-            or base.ids_sha256(frame, id_column="record_id", label_column="label_id") != version["validation_ids_sha256"]
+    if (base.ids_sha256(frame, id_column="record_id", label_column="label_id") != version["validation_ids_sha256"]
             or len(frame) != version["validation_rows"]):
         raise ValueError("Validation data differs from the model data version")
+    # Preserve the training-time batch layout, but only after all data checks.
+    results = model.predict_batch(frame["review_text"].tolist(), max_text_length=None)
     truth = frame["label_id"].to_numpy(dtype=int)
     predicted = np.asarray([r["label_id"] for r in results], dtype=int)
     metrics = base.validation_metrics(truth, predicted)

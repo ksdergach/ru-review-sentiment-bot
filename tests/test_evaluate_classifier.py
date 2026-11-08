@@ -92,3 +92,30 @@ def test_unavailable_model_exit_code(monkeypatch, tmp_path, capsys):
     (tmp_path / "configs/nlp_baseline.json").write_text('{"validation_path": "validation.parquet"}')
     assert ev.main([]) == 2
     assert "absent.joblib" in capsys.readouterr().err
+
+
+def test_wrong_checksum_rejected_before_reading_texts_or_predicting(setup, tmp_path, monkeypatch):
+    model_path, _ = setup
+    other = tmp_path / "validation_copy.parquet"
+    write_split(other, labels=[0, 1, 1, 0, 2, 2])
+    model = baseline(model_path)
+    def forbidden(*args, **kwargs):
+        pytest.fail("Unverified dataset must not be decoded or passed to the model")
+    monkeypatch.setattr(tb, "load_prepared_split", forbidden)
+    monkeypatch.setattr(model, "predict_batch", forbidden)
+    with pytest.raises(ValueError, match="data version"):
+        ev.evaluate(model, other)
+
+
+@pytest.mark.parametrize("field,value", [("validation_ids_sha256", "0" * 64),
+                                         ("validation_rows", 999)])
+def test_version_mismatch_rejected_before_prediction(setup, monkeypatch, field, value):
+    model_path, split = setup
+    model = baseline(model_path)
+    model._get_bundle()
+    model.data_version[field] = value
+    def forbidden(*args, **kwargs):
+        pytest.fail("Incompatible dataset must not be passed to the model")
+    monkeypatch.setattr(model, "predict_batch", forbidden)
+    with pytest.raises(ValueError, match="data version"):
+        ev.evaluate(model, split)
