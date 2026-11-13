@@ -81,6 +81,75 @@ def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
 
 
+def _same(expected: Any, actual: Any) -> bool:
+    """Равенство с учётом типа: True не равно 1, 2.0 не равно 2 (для sklearn это разные значения)."""
+    if type(expected) is not type(actual):
+        return False
+    if isinstance(expected, dict):
+        return expected.keys() == actual.keys() and all(_same(v, actual[k]) for k, v in expected.items())
+    if isinstance(expected, (list, tuple)):
+        return len(expected) == len(actual) and all(_same(a, b) for a, b in zip(expected, actual))
+    return expected == actual
+
+
+def _differing(expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
+    return sorted(k for k in expected.keys() | actual.keys()
+                  if k not in expected or k not in actual or not _same(expected[k], actual[k]))
+
+
+def _check_baseline_components(bundle: dict[str, Any]) -> None:
+    """Параметры, которые читает инференс, должны совпадать с объявленными в комплекте.
+
+    Ожидаемые объекты строятся теми же функциями, что и при обучении, поэтому
+    сравниваются все параметры TfidfVectorizer и LogisticRegression, включая
+    значения по умолчанию (``ngram_range``: список в JSON, tuple в sklearn).
+    """
+    from sklearn.feature_extraction.text import TfidfTransformer
+    from src.train_baseline import _validate_tfidf, build_classifier, build_vectorizer
+
+    declared = bundle["text_processing"].get("tfidf")
+    if not isinstance(declared, dict):
+        raise ValueError("Baseline bundle has no declared text_processing.tfidf")
+    _validate_tfidf(declared)
+    vectorizer = bundle["vectorizer"]
+    expected = build_vectorizer(declared).get_params()
+    actual = vectorizer.get_params()
+    # vocabulary_ and idf_ are checked by tfidf_state_sha256; transform reads vocabulary_.
+    expected.pop("vocabulary")
+    actual.pop("vocabulary")
+    differing = _differing(expected, actual)
+    if differing:
+        raise ValueError(f"Baseline TF-IDF parameters differ from text_processing.tfidf: {', '.join(differing)}")
+    # transform applies sublinear_tf, IDF and norm from the transformer created by fit.
+    weighting = getattr(vectorizer, "_tfidf", None)
+    if not isinstance(weighting, TfidfTransformer):
+        raise ValueError("Baseline TF-IDF vectorizer has no fitted weighting transformer")
+    differing = _differing({k: expected[k] for k in ("norm", "use_idf", "smooth_idf", "sublinear_tf")},
+                           weighting.get_params())
+    if differing or hasattr(weighting, "idf_") is not expected["use_idf"]:
+        raise ValueError(f"Baseline TF-IDF weighting differs from text_processing.tfidf: "
+                         f"{', '.join(differing) or 'idf_'}")
+
+    lr = bundle["logistic_regression"]
+    weights = lr.get("class_weights")
+    try:
+        class_weight = None if weights is None else {int(k): float(v) for k, v in weights.items()}
+        expected = build_classifier(c_value=lr["C"], lr_config=lr, class_weight=class_weight,
+                                    seed=0).get_params()
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Invalid baseline logistic_regression parameters") from exc
+    if "penalty" in lr:
+        expected["penalty"] = lr["penalty"]
+    actual = bundle["classifier"].get_params()
+    # random_state affects only fitting with sag/saga; inference does not read it.
+    expected.pop("random_state")
+    actual.pop("random_state")
+    differing = _differing(expected, actual)
+    if differing:
+        raise ValueError(f"Baseline LogisticRegression parameters differ from logistic_regression: "
+                         f"{', '.join(differing)}")
+
+
 def _check_baseline_provenance(bundle: dict[str, Any], report: dict[str, Any]) -> dict[str, Any]:
     """Проверить версию данных комплекта и её совпадение с отчётом запуска."""
     from src.train_baseline import _vectorizer_state_sha256
@@ -168,6 +237,7 @@ class BaselineClassifier:
                     raise ValueError("Baseline bundle checksum differs from run report")
                 # load_bundle validates the shared class mapping and fitted components.
                 bundle = load_bundle(self.model_path)
+                _check_baseline_components(bundle)
                 self.data_version = _check_baseline_provenance(bundle, report)
                 self._bundle = bundle
             except Exception as exc:

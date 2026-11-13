@@ -24,6 +24,12 @@ from tools import predict_text  # noqa: E402
 
 TEXTS = base._smoke_texts()
 RECORDED = json.loads((ROOT / "reports/transformer/bundle_roundtrip.json").read_text(encoding="utf-8"))["fixed_texts"]
+# The same texts in another batch are padded to another length: float32 kernels then sum
+# in another order. Measured on all 10 396 validation texts, one text vs the evaluation batch:
+# up to 8.9e-7 (1 CPU thread) and 1.1e-6 (4 threads), labels and truncation equal.
+PADDING_ATOL = 2e-6
+# bundle_roundtrip.json was written on the training machine (another CPU and BLAS).
+RECORDED_ATOL = 1e-6
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -65,16 +71,19 @@ def guards():
 
 @pytest.fixture(scope="module")
 def accepted(guards):
-    assert guards["loads"] == []
+    # Loads are counted only while the guards are installed; other tests may load first.
+    before = len(guards["loads"])
     model = c.RuBERTClassifier()
+    assert model._bundle is None
     first = model.predict(TEXTS[0])
-    assert guards["loads"] == [BUNDLE] and guards["attempts"] == []
+    guards["accepted_first_load"] = guards["loads"][before:]
+    assert guards["accepted_first_load"] == [BUNDLE] and guards["attempts"] == []
     assert first["label_id"] == RECORDED["label_ids"][0]
     return model
 
 
 def test_first_load_ran_under_guards(accepted, guards):
-    assert guards["loads"].count(BUNDLE) >= 1 and guards["attempts"] == []
+    assert guards["accepted_first_load"] == [BUNDLE] and guards["attempts"] == []
     assert accepted.data_version["final_test_used"] is False
 
 
@@ -99,6 +108,8 @@ def test_concurrent_first_load_of_accepted_bundle(guards):
 def test_accepted_bundle_matches_recorded_and_training_predict(accepted):
     model, tokenizer, config = accepted._get_bundle()
     raw = tt.predict_texts(model, tokenizer, TEXTS, config)
+    # Same input, same computation: the interface adds no numerical difference.
+    assert [list(r["probabilities"].values()) for r in accepted.predict_batch(TEXTS)] == raw["probabilities"]
     assert raw["probability_labels"] == c.EXPECTED_CLASS_NAMES == ["negative", "neutral", "positive"]
     assert dict(model.config.label2id) == {"negative": 0, "neutral": 1, "positive": 2}
     for i, text in enumerate(TEXTS):
@@ -111,8 +122,9 @@ def test_accepted_bundle_matches_recorded_and_training_predict(accepted):
         assert result["label_id"] == raw["label_ids"][i] == RECORDED["label_ids"][i]
         assert result["label"] == RECORDED["labels"][i]
         assert result["confidence"] == result["probabilities"][result["label"]] == max(values)
-        assert values == pytest.approx(raw["probabilities"][i], abs=1e-7)
-        assert values == pytest.approx(RECORDED["probabilities"][i], abs=1e-6)
+        assert values == tt.predict_texts(model, tokenizer, [text], config)["probabilities"][0]
+        assert values == pytest.approx(raw["probabilities"][i], abs=PADDING_ATOL)
+        assert values == pytest.approx(RECORDED["probabilities"][i], abs=RECORDED_ATOL)
         assert result["truncated"] is False
     assert accepted.data_version["final_test_used"] is False
 
@@ -129,8 +141,9 @@ def test_bot_cli_and_default_predict_agree(accepted, monkeypatch, capsys):
         assert {k: evaluated[k] for k in ("label", "label_id", "truncated")} == \
             {k: direct[k] for k in ("label", "label_id", "truncated")}
         assert list(evaluated["probabilities"]) == c.EXPECTED_CLASS_NAMES
-        assert list(evaluated["probabilities"].values()) == pytest.approx(list(direct["probabilities"].values()), abs=1e-6)
-        assert evaluated["confidence"] == pytest.approx(direct["confidence"], abs=1e-6)
+        assert list(evaluated["probabilities"].values()) == pytest.approx(list(direct["probabilities"].values()),
+                                                                          abs=PADDING_ATOL)
+        assert evaluated["confidence"] == pytest.approx(direct["confidence"], abs=PADDING_ATOL)
 
 
 def test_truncation_boundary_on_real_tokenizer(accepted):
@@ -146,7 +159,7 @@ def test_truncation_boundary_on_real_tokenizer(accepted):
         result = accepted.predict(text)
         raw = tt.predict_texts(model, tokenizer, [text], config)
         assert result["truncated"] is truncated
-        assert list(result["probabilities"].values()) == pytest.approx(raw["probabilities"][0], abs=1e-7)
+        assert list(result["probabilities"].values()) == raw["probabilities"][0]
         assert ("усечён" in bot.format_prediction(result)) is truncated
 
 

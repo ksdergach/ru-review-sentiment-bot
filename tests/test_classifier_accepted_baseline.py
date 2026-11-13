@@ -70,7 +70,9 @@ def guards():
             for name in ("fit", "fit_transform"):
                 if name in vars(cls):
                     patch.setattr(cls, name, refuse(f"{cls.__name__}.{name}"))
-        for name in ("run_training", "fit_vectorizer_on_train", "build_classifier", "save_bundle"):
+        # The loader builds unfitted estimators (build_vectorizer, build_classifier) to compare
+        # parameters; any fitting is refused above.
+        for name in ("run_training", "fit_vectorizer_on_train", "save_bundle"):
             patch.setattr(base, name, refuse(f"train_baseline.{name}"))
         patch.setattr(c, "load_bundle", counting_load)
         yield {"attempts": attempts, "loads": loads}
@@ -79,15 +81,18 @@ def guards():
 
 @pytest.fixture(scope="module")
 def accepted(guards):
-    assert guards["loads"] == []
+    # Loads are counted only while the guards are installed; other tests may load first.
+    before = len(guards["loads"])
     model = c.BaselineClassifier()
+    assert model._bundle is None
     model.predict(TEXTS[0])
-    assert guards["loads"] == [BUNDLE] and guards["attempts"] == []
+    guards["accepted_first_load"] = guards["loads"][before:]
+    assert guards["accepted_first_load"] == [BUNDLE] and guards["attempts"] == []
     return model
 
 
 def test_first_load_ran_under_guards(accepted, guards):
-    assert guards["loads"].count(BUNDLE) == 1 and guards["attempts"] == []
+    assert guards["accepted_first_load"] == [BUNDLE] and guards["attempts"] == []
     # The loaded state is the N02 model itself, not just a file with the same name.
     assert n02.model_state_sha256(accepted._get_bundle()) == METRICS["model"]["state_sha256"]
 
@@ -184,12 +189,41 @@ def test_class_order_is_checked_on_saved_artifact(tmp_path, change, reason):
         _signed_copy(tmp_path, change).predict(TEXTS[0])
 
 
+def test_tfidf_parameters_differing_from_declaration_are_rejected(accepted, tmp_path):
+    """Review scenario: text_processing.tfidf says lowercase=True, the vectorizer does not lowercase."""
+    text = "ОТЛИЧНЫЙ ФИЛЬМ"
+    changed = joblib.load(BUNDLE)
+    assert changed["text_processing"]["tfidf"]["lowercase"] is True
+    changed["vectorizer"].lowercase = False
+    # Without the check the copy would answer differently from the accepted model.
+    assert base.predict_texts(changed, [text])["labels"] == ["neutral"]
+    assert accepted.predict(text)["label"] == "positive"
+    with pytest.raises(c.ModelUnavailableError, match="TF-IDF parameters differ.*lowercase"):
+        _signed_copy(tmp_path, lambda b: setattr(b["vectorizer"], "lowercase", False)).predict(text)
+
+
 def test_concurrent_first_load_of_accepted_bundle(guards):
     from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
 
-    before = guards["loads"].count(BUNDLE)
+    before = len(guards["loads"])
     model = c.BaselineClassifier()
+    gate = Barrier(4)
+
+    def run(i):
+        gate.wait(timeout=30)
+        return model.predict(TEXTS[i % len(TEXTS)])
+
     with ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(model.predict, TEXTS * 4))
-    assert guards["loads"].count(BUNDLE) == before + 1
-    assert [r["label_id"] for r in results] == RECORDED["predicted_label_ids"] * 4
+        results = list(pool.map(run, range(4)))
+    assert guards["loads"][before:] == [BUNDLE]
+    assert [r["label_id"] for r in results] == [RECORDED["predicted_label_ids"][i % len(TEXTS)] for i in range(4)]
+    assert guards["attempts"] == []
+
+
+def test_accepted_model_is_reused(accepted, guards):
+    before = len(guards["loads"])
+    for text in TEXTS * 2:
+        accepted.predict(text)
+    accepted.predict_batch(TEXTS)
+    assert len(guards["loads"]) == before
