@@ -9,7 +9,8 @@ negative/neutral/positive и truncated; baseline возвращает truncated 
 2000 символов тексты отклоняются до загрузки модели.
 
 Проверка выполнена 07–08.11.2026 на результате слияния `master` (`2c47aa5`, T06)
-с изменениями T07;
+с изменениями T07; исправления по ревью проверены на `master` `b2423db`
+(после слияния PR №35);
 Linux x86_64, CPU, Python 3.13.7, torch 2.10.0+cpu, transformers 5.5.0,
 scikit-learn 1.7.2. Финальная test-выборка не использовалась.
 
@@ -26,14 +27,24 @@ scikit-learn 1.7.2. Финальная test-выборка не использо
   `Tensor.backward`, `Optimizer.step`) установлены модульной фикстурой до
   создания классификатора; первая загрузка, конкурентная первая загрузка
   (4 потока, одна загрузка), инференс и повторное использование проходят под
-  ними, попыток обращения нет.
+  ними, попыток обращения нет. Загрузки считаются как приращение внутри
+  каждого теста, поэтому результат не зависит от порядка запуска (проверены
+  исходный, обратный и порядок «конкурентная загрузка → первая загрузка»).
   - три текста `train_baseline._smoke_texts()`: positive / negative /
     positive, label_id 2 / 0 / 2, confidence 0,974920 / 0,961005 / 0,375531;
-    совпадение с `train_transformer.predict_texts` (|Δp| ≤ 1e-7) и с
-    `reports/transformer/bundle_roundtrip.json` (|Δp| ≤ 1e-6);
+    на том же входе вероятности интерфейса точно равны
+    `train_transformer.predict_texts`; с `reports/transformer/bundle_roundtrip.json`
+    (запись на машине обучения) — |Δp| ≤ 1e-6;
+  - один текст и тот же текст в пакете с другими дополняются до разной длины,
+    и операции float32 суммируют в другом порядке. Измерено на всех 10 396
+    текстах validation (один текст против пакета оценки): |Δp| до 8,9e-7 при
+    1 потоке CPU и до 1,1e-6 при 4 потоках, метки и `truncated` совпадают.
+    Поэтому допуск сравнения одиночного и пакетного вызова — 2e-6 (на трёх
+    фиксированных текстах при 1 потоке наблюдается 1,5e-7). Тест проходит при
+    1, 2 и 4 потоках;
   - бот, `tools/predict_text.py` и `predict_batch` дают те же label,
     label_id, truncated; вероятности `predict_batch` совпадают с `predict`
-    в пределах 1e-6 (паддинг пакета);
+    в пределах 2e-6;
   - порядок классов `label_mapping.json`, `config.json`, вероятностей —
     negative=0/neutral=1/positive=2; копия с переставленным mapping отклонена;
   - усечение (max_length 64 с учётом специальных токенов): 64 токена —
@@ -51,12 +62,13 @@ scikit-learn 1.7.2. Финальная test-выборка не использо
 `reports/nlp/training/run_metadata.json` до десериализации; SHA-256
 `data/processed/train.parquet` и `validation.parquet` совпали с тем же отчётом.
 
-- `tests/test_classifier_accepted_baseline.py` — 8 passed. Запреты сетевых
+- `tests/test_classifier_accepted_baseline.py` — 10 passed. Запреты сетевых
   соединений и обучения (`fit`/`fit_transform` у `CountVectorizer`,
   `TfidfVectorizer`, `LogisticRegression`; `run_training`,
-  `fit_vectorizer_on_train`, `build_classifier`, `save_bundle`) установлены
-  модульной фикстурой до первой загрузки, попыток обращения нет; комплект
-  загружен один раз, в том числе при конкурентной первой загрузке (4 потока).
+  `fit_vectorizer_on_train`, `save_bundle`) установлены модульной фикстурой до
+  первой загрузки, попыток обращения нет; комплект загружен один раз, в том
+  числе при конкурентной первой загрузке (4 потока), и не загружается повторно
+  при переиспользовании. Результат не зависит от порядка запуска тестов.
   - загруженное состояние совпадает с N02: `model_state_sha256`
     `273359cc…` = `reports/nlp/baseline_metrics.json`; версия данных
     (SHA-256 ID и Parquet, состояние TF-IDF, winner_C 2.0,
@@ -73,7 +85,11 @@ scikit-learn 1.7.2. Финальная test-выборка не использо
   - порядок классов `label_mapping`, `classes_`, вероятностей —
     negative=0/neutral=1/positive=2; копии принятого комплекта с
     переставленным `label_mapping` и с обратным порядком `classes_` (со своим
-    отчётом, чтобы проверка не останавливалась на SHA-256) отклонены.
+    отчётом, чтобы проверка не останавливалась на SHA-256) отклонены;
+  - копия с `text_processing.tfidf.lowercase=True` и `lowercase=False` у
+    vectorizer (со своим отчётом) отклонена: `Baseline TF-IDF parameters
+    differ from text_processing.tfidf: lowercase`; без проверки она отвечала
+    бы neutral вместо positive на «ОТЛИЧНЫЙ ФИЛЬМ».
 - `CLASSIFIER_BACKEND=baseline python tools/evaluate_classifier.py`: passed,
   10 396 строк validation, macro-F1 0,7180146428367195, accuracy
   0,8893805309734514, матрица ошибок
@@ -98,6 +114,23 @@ TF-IDF + LR комплектах с собственным отчётом зап
 SHA-256 до десериализации, отказ при `training={}`, некорректных SHA-256/ID,
 числе строк, `final_test_used`, пересечении выборок, выборе не по validation,
 расхождении с параметрами модели, состоянием TF-IDF или отчётом.
+
+Параметры, которые читает инференс, сверяются с объявленными в комплекте:
+все параметры `TfidfVectorizer` (в том числе `analyzer`, `lowercase`,
+`ngram_range` — список в JSON и tuple в scikit-learn, `min_df`, `max_df`,
+`max_features`, `sublinear_tf`, `norm`, `use_idf`, `smooth_idf`,
+`token_pattern`, а также `binary`, `strip_accents` и другие значения по
+умолчанию) с `text_processing.tfidf`; параметры внутреннего
+`TfidfTransformer`, которым scikit-learn 1.7.2 применяет `sublinear_tf`, IDF и
+`norm` при `transform`; параметры `LogisticRegression` (`C`, `solver`,
+`multi_class`, `class_weight`, …) с `logistic_regression`. Ожидаемые объекты
+строятся функциями обучения `build_vectorizer` и `build_classifier`, сравнение
+учитывает тип значения. Отказ проверен на 23 несовместимых вариантах:
+22 в `test_inference_parameters_must_match_declared_configuration` и 1 в
+`test_declared_tfidf_change_is_rejected_even_if_vectorizer_matches`; у каждого
+изменённого комплекта собственный отчёт с совпадающим SHA-256. Проверка
+находится в `src/classifier.py`: `src/train_baseline.py` не изменялся, так
+как его SHA-256 входит в принятый отчёт N02.
 
 ## Ошибки комплекта
 
@@ -128,5 +161,35 @@ SHA-256 validation до декодирования Parquet. После чтен�
 - через исправленный evaluate_classifier на всех 10 396 validation-примерах
   воспроизведены матрицы ошибок и macro-F1: baseline T04 — 0,7180146428367195,
   RuBERT T06 — 0,6678240259861936.
+
+Обучение и финальная test-оценка не выполнялись.
+
+## Исправления по независимому ревью
+
+Проверено 08.11.2026 и повторно 13.11.2026 на `master` `b2423db` с
+исправлениями; Linux x86_64, CPU, принятые комплекты baseline N02 (SHA-256
+`389a768b…`) и RuBERT T06.
+
+| Замечание | На `b2423db` без исправлений | С исправлениями |
+|---|---|---|
+| Параметры TF-IDF/LR не сверялись с объявленными | 23 варианта из `tests/test_classifier.py` приняты; те же 22 изменения на копиях N02 со своим отчётом: 19 меняют параметры N02 и приняты (`lowercase=False`: positive → neutral) | 23 варианта отклонены с ожидаемой причиной; на копиях N02 19 отклонены с именем параметра |
+| Допуск 1e-7 одиночного и пакетного вызова RuBERT | при 1 потоке CPU: 6 passed, 1 failed | 7 passed при 1 (3 запуска), 2 и 4 потоках |
+| Зависимость тестов от порядка запуска | «конкурентная загрузка → первая загрузка»: 1 passed, 1 error для каждого backend | 2 passed; обратный порядок — baseline 10, RuBERT 7 passed |
+
+На копиях N02 три изменения из 22 (`ngram_range=(1, 2)`, `min_df=2`, `C=2.0`)
+совпадают с параметрами N02 и комплект не меняют, поэтому принимаются обоими
+загрузчиками; в синтетическом комплекте теста (`ngram_range=[1, 1]`,
+`min_df=1`, `C=1.0`) они отклоняются. Проверка 22 изменений на копиях N02
+выполнена разово; в наборе тестов на N02 — сценарий `lowercase`
+(`test_tfidf_parameters_differing_from_declaration_are_rejected`).
+
+- `HF_HUB_OFFLINE=1 python -m pytest -q`: 634 passed, 0 failed, 0 skipped;
+  так же при 1 потоке CPU и в обратном порядке тестов. Без моделей —
+  617 passed, 2 skipped (модули принятых комплектов).
+- `tools/evaluate_classifier.py` (с исправленным порядком проверок): baseline —
+  macro-F1 0,7180146428367195, RuBERT — 0,6678240259861936, матрицы ошибок
+  совпали; `tools/verify_transformer.py` — passed, 53 проверки;
+  `tools/report_nlp_baseline.py` (`evaluate`, без записи) — все поля
+  `baseline_metrics.json`, кроме платформы.
 
 Обучение и финальная test-оценка не выполнялись.

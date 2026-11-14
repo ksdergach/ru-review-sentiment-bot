@@ -232,6 +232,64 @@ def test_wrong_label_mapping_is_rejected(tmp_path: Path) -> None:
         baseline(model_path).predict("Обычный отзыв")
 
 
+def _set(component: str, name: str, value: Any):
+    def change(bundle: dict[str, Any]) -> None:
+        target = {"vectorizer": bundle["vectorizer"], "weighting": bundle["vectorizer"]._tfidf,
+                  "classifier": bundle["classifier"]}.get(component)
+        if target is None:
+            bundle[component][name] = value
+        else:
+            setattr(target, name, value)
+    return change
+
+
+@pytest.mark.parametrize("change, reason", [
+    (_set("vectorizer", "lowercase", False), "TF-IDF parameters differ.*lowercase"),
+    (_set("vectorizer", "lowercase", 1), "TF-IDF parameters differ.*lowercase"),
+    (_set("vectorizer", "ngram_range", (1, 2)), "TF-IDF parameters differ.*ngram_range"),
+    (_set("vectorizer", "ngram_range", [1, 1]), "TF-IDF parameters differ.*ngram_range"),
+    (_set("vectorizer", "token_pattern", r"(?u)\b\w+\b"), "TF-IDF parameters differ.*token_pattern"),
+    (_set("vectorizer", "min_df", 2), "TF-IDF parameters differ.*min_df"),
+    (_set("vectorizer", "max_df", 0.5), "TF-IDF parameters differ.*max_df"),
+    (_set("vectorizer", "max_features", 10), "TF-IDF parameters differ.*max_features"),
+    (_set("vectorizer", "sublinear_tf", False), "TF-IDF parameters differ.*sublinear_tf"),
+    (_set("vectorizer", "norm", "l1"), "TF-IDF parameters differ.*norm"),
+    (_set("vectorizer", "use_idf", False), "TF-IDF parameters differ.*use_idf"),
+    (_set("vectorizer", "smooth_idf", False), "TF-IDF parameters differ.*smooth_idf"),
+    (_set("vectorizer", "binary", True), "TF-IDF parameters differ.*binary"),
+    (_set("vectorizer", "strip_accents", "unicode"), "TF-IDF parameters differ.*strip_accents"),
+    (_set("weighting", "sublinear_tf", False), "TF-IDF weighting differs.*sublinear_tf"),
+    (_set("weighting", "norm", "l1"), "TF-IDF weighting differs.*norm"),
+    (_set("weighting", "use_idf", False), "TF-IDF weighting differs.*use_idf"),
+    (_set("text_processing", "tfidf", None), "no declared text_processing.tfidf"),
+    (_set("classifier", "multi_class", "ovr"), "LogisticRegression parameters differ.*multi_class"),
+    (_set("classifier", "solver", "liblinear"), "LogisticRegression parameters differ.*solver"),
+    (_set("classifier", "C", 2.0), "LogisticRegression parameters differ.*C"),
+    (_set("classifier", "class_weight", {0: 1.0, 1: 1.0, 2: 1.0}),
+     "LogisticRegression parameters differ.*class_weight"),
+])
+def test_inference_parameters_must_match_declared_configuration(tmp_path: Path, change, reason) -> None:
+    model_path = make_real_bundle(tmp_path)
+    bundle = tb.load_bundle(model_path)
+    change(bundle)
+    tb.save_bundle(model_path, bundle)
+    report = write_report(model_path, bundle["training"])
+    # The changed bundle has its own matching checksum: rejection comes from the parameter check.
+    assert tb.read_json(report)["bundle_sha256"] == tb.sha256_file(model_path)
+    with pytest.raises(classifier.ModelUnavailableError, match=reason):
+        baseline(model_path).predict("Отличный фильм")
+
+
+def test_declared_tfidf_change_is_rejected_even_if_vectorizer_matches(tmp_path: Path) -> None:
+    model_path = make_real_bundle(tmp_path)
+    bundle = tb.load_bundle(model_path)
+    bundle["text_processing"]["tfidf"]["lowercase"] = False
+    tb.save_bundle(model_path, bundle)
+    write_report(model_path, bundle["training"])
+    with pytest.raises(classifier.ModelUnavailableError, match="lowercase"):
+        baseline(model_path).predict("Отличный фильм")
+
+
 def test_wrong_probability_order_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
