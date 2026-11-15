@@ -1,0 +1,337 @@
+{
+  "schema": "t11-voice-composition/1",
+  "task": "T11",
+  "frozen_at": "2026-11-15",
+  "rebuilt_at": "2026-11-15",
+  "human_confirmation": "reports/voice_test/human_confirmation.json",
+  "source": {
+    "xlsx_sha256": "b6d2ce446c2b3db9702a949831b7985270117be82189dd7a44eeb4f1a62811e3",
+    "xlsx_modified": "2026-11-15T15:36:22Z",
+    "sheets": {
+      "02_Записи": [
+        "ID записи",
+        "Участник",
+        "Текст для записи",
+        "Имя файла (предложение)",
+        "Слов",
+        "Шум, да/нет",
+        "Дословная транскрипция ПОСЛЕ аудио",
+        "Сверена человеком, да/нет"
+      ],
+      "03_Сведение_меток": [
+        "ID",
+        "Участник",
+        "Метка А",
+        "Метка Б",
+        "Согласованная метка",
+        "Есть спор, да/нет",
+        "Причина неоднозначности",
+        "Подтверждено человеком, да/нет"
+      ]
+    },
+    "audio_layout": "raw_audio/voice_NNN.ogg"
+  },
+  "content_sha256": "4004319e4f5b728b7edb006a4ca717bfd5a16bfa864709d34ca8f0fe1943c8c6",
+  "labeling_rules": "docs/team_plan.md, разделы 3 и 8: negative=0, neutral=1, positive=2; две независимые оценки эталонного текста, затем согласование без ответов моделей",
+  "aggregates": {
+    "records": 36,
+    "speakers": 4,
+    "records_per_speaker": {
+      "S01": 9,
+      "S02": 9,
+      "S03": 9,
+      "S04": 9
+    },
+    "annotators": [
+      "R01",
+      "R02"
+    ],
+    "final_labels": {
+      "negative": 12,
+      "neutral": 12,
+      "positive": 12
+    },
+    "labels_R01": {
+      "negative": 12,
+      "neutral": 12,
+      "positive": 12
+    },
+    "labels_R02": {
+      "negative": 12,
+      "neutral": 12,
+      "positive": 12
+    },
+    "a_equals_b": 36,
+    "disputes": 0,
+    "ambiguous": 0,
+    "noise": 5,
+    "noise_by_class": {
+      "negative": 1,
+      "neutral": 2,
+      "positive": 2
+    },
+    "reference_words": {
+      "min": 19,
+      "max": 25
+    },
+    "reference_equals_script": 36,
+    "duration_seconds": {
+      "min": 8.084,
+      "median": 12.127,
+      "max": 15.534,
+      "total": 431.817
+    },
+    "audio_bytes": {
+      "min": 40053,
+      "max": 75887,
+      "total": 1897913
+    },
+    "formats": {
+      "ogg/opus, 1 ch, 48000 Hz": 36
+    },
+    "encoders": {
+      "Lavf61.7.103": 9,
+      "libopus": 27
+    },
+    "files_with_clipping": 3,
+    "voice_limits": {
+      "max_seconds": 30.0,
+      "max_bytes": 5242880
+    },
+    "debug_hashes_compared": {
+      "audio_sha256": 3,
+      "transcript_sha256": 2,
+      "matches": 0
+    }
+  },
+  "records": [
+    {
+      "record_id": "voice_001",
+      "audio_sha256": "3cd0c501355e513626ce8ae785bffac9f3f84a2eb754f9cb19d00f895fb7809a",
+      "audio_bytes": 51280,
+      "duration_seconds": 13.073
+    },
+    {
+      "record_id": "voice_002",
+      "audio_sha256": "9259de8af7560b8dea07d465e9918c6e772c99b0dad396a9bfc42d53b8c55c0d",
+      "audio_bytes": 53337,
+      "duration_seconds": 13.594
+    },
+    {
+      "record_id": "voice_003",
+      "audio_sha256": "0581b126f0fb91fd9b2aeb9049d503007227527576fa3a999caa533eb1f9f07c",
+      "audio_bytes": 61193,
+      "duration_seconds": 9.897
+    },
+    {
+      "record_id": "voice_004",
+      "audio_sha256": "d48f26f48cba292325c7b4e750f125f742b04d3d40cebba02818b7e0b1ddefaa",
+      "audio_bytes": 48724,
+      "duration_seconds": 12.54
+    },
+    {
+      "record_id": "voice_005",
+      "audio_sha256": "12e443cfcfeac9ea8a6660142bb5f5afb054a7b5ee03074b03e7574e7d9d4a90",
+      "audio_bytes": 53733,
+      "duration_seconds": 13.893
+    },
+    {
+      "record_id": "voice_006",
+      "audio_sha256": "e9dce59d0d8b3b68f53adefa7e81210f697089b0284c1989fa3c8b8d8f6a441b",
+      "audio_bytes": 55837,
+      "duration_seconds": 14.034
+    },
+    {
+      "record_id": "voice_007",
+      "audio_sha256": "4fcc744ad0b2225fbb0bc90672c3067302ccd2c53f276d27b2867d89c1ff32f7",
+      "audio_bytes": 63858,
+      "duration_seconds": 10.409
+    },
+    {
+      "record_id": "voice_008",
+      "audio_sha256": "6ea1402f205bb1e41223af79bdde3ae520d5b25bc9c6e8f6459493cae4eeef90",
+      "audio_bytes": 42394,
+      "duration_seconds": 10.84
+    },
+    {
+      "record_id": "voice_009",
+      "audio_sha256": "202404d8f21d28da340d70f336c7b9d8fde253cac018e1f8f5cde8e4482c9b58",
+      "audio_bytes": 48035,
+      "duration_seconds": 12.213
+    },
+    {
+      "record_id": "voice_010",
+      "audio_sha256": "c6b9107400ccfd3332efe33690d2ed948eeea46e8e666616d82100aa36b355b1",
+      "audio_bytes": 55931,
+      "duration_seconds": 14.454
+    },
+    {
+      "record_id": "voice_011",
+      "audio_sha256": "ca884558bbf65032b4df464735d3ca14268f2866392416b81a177a0559249af3",
+      "audio_bytes": 67438,
+      "duration_seconds": 11.028
+    },
+    {
+      "record_id": "voice_012",
+      "audio_sha256": "795e058651e6b05d6d3dd2b5f06aff810fcbbd6931e4dd2ab1ed51bd58373a63",
+      "audio_bytes": 47761,
+      "duration_seconds": 12.06
+    },
+    {
+      "record_id": "voice_013",
+      "audio_sha256": "b0d3efab8f4e7426f6682d9982c0a2f21aaeca9da1a051d861c564d69d4c3672",
+      "audio_bytes": 48094,
+      "duration_seconds": 12.334
+    },
+    {
+      "record_id": "voice_014",
+      "audio_sha256": "03b16c63d1a9c4e757a49d3000148f56d2eafdc185de3bfbd2667fad2a4a3b79",
+      "audio_bytes": 53225,
+      "duration_seconds": 13.694
+    },
+    {
+      "record_id": "voice_015",
+      "audio_sha256": "9f94640f165671a09a39612cabb950615ef879a5db62d998aeb18470688509a1",
+      "audio_bytes": 60533,
+      "duration_seconds": 9.919
+    },
+    {
+      "record_id": "voice_016",
+      "audio_sha256": "a391305337b7dc96fbc3924e6dedeb564b8511f5cbec740c77fd2860e8df07fe",
+      "audio_bytes": 43296,
+      "duration_seconds": 10.9
+    },
+    {
+      "record_id": "voice_017",
+      "audio_sha256": "69dc3ba660c7c8ad7ca275496187e5323516aca8fd0794f9bf51819e1b645347",
+      "audio_bytes": 50811,
+      "duration_seconds": 13.053
+    },
+    {
+      "record_id": "voice_018",
+      "audio_sha256": "a6aa80321f1d75b066be34f5b9c9fbb7921c7944602645491db1f97393908deb",
+      "audio_bytes": 54917,
+      "duration_seconds": 13.973
+    },
+    {
+      "record_id": "voice_019",
+      "audio_sha256": "425988c6d7310a1b154f821f17715ccbcbf4722e6beab0b74982d63ec1d8c8a3",
+      "audio_bytes": 66343,
+      "duration_seconds": 10.921
+    },
+    {
+      "record_id": "voice_020",
+      "audio_sha256": "0ee8b9d4696646f9462af7071894c119615813b15e3e2b447b8b160d94212d1a",
+      "audio_bytes": 40053,
+      "duration_seconds": 10.04
+    },
+    {
+      "record_id": "voice_021",
+      "audio_sha256": "762ecf18f444c9a2549af0681a18b8ccb61aed276bad640e5bd85ea046c9228b",
+      "audio_bytes": 47724,
+      "duration_seconds": 12.194
+    },
+    {
+      "record_id": "voice_022",
+      "audio_sha256": "f4039c0bc7c0179307e8d433731269af448dbde91a992667bf99b8b721ff25b9",
+      "audio_bytes": 60834,
+      "duration_seconds": 15.534
+    },
+    {
+      "record_id": "voice_023",
+      "audio_sha256": "7bbd7d5b9307d4cf264d29d36ca6a1bcbfe4fe09054b733223626dabb2d82c14",
+      "audio_bytes": 64643,
+      "duration_seconds": 10.58
+    },
+    {
+      "record_id": "voice_024",
+      "audio_sha256": "9d8afe65de2a59aa5a98634341f291f52c53fe7cd79e1771c51c0debbbfa55b8",
+      "audio_bytes": 44239,
+      "duration_seconds": 11.12
+    },
+    {
+      "record_id": "voice_025",
+      "audio_sha256": "e83388d9f41e4398a72c3d5090ce9a4a477c0900d936075dd591d3cf54467bcd",
+      "audio_bytes": 45041,
+      "duration_seconds": 11.514
+    },
+    {
+      "record_id": "voice_026",
+      "audio_sha256": "cfe880b41e1c33023d8cb7a692573f290cde24e30375f21c3d43434c5ffaa51f",
+      "audio_bytes": 57032,
+      "duration_seconds": 14.653
+    },
+    {
+      "record_id": "voice_027",
+      "audio_sha256": "0c8f40fd59c46e077e4022dfa70cd20a5941460030930107ab6008e1ba7b95b4",
+      "audio_bytes": 49225,
+      "duration_seconds": 8.084
+    },
+    {
+      "record_id": "voice_028",
+      "audio_sha256": "0334f6054cbd0166fea88f33828a5a7f21c04046d2228fe07008f09e80189cf7",
+      "audio_bytes": 42188,
+      "duration_seconds": 10.66
+    },
+    {
+      "record_id": "voice_029",
+      "audio_sha256": "1a1146be1e1a16090f9d1d71de516ea90e1cd08874b0e97c45c87953494b5932",
+      "audio_bytes": 41286,
+      "duration_seconds": 10.514
+    },
+    {
+      "record_id": "voice_030",
+      "audio_sha256": "30d5c9ea1fc83696d339d4810606d1f0444c51f4eab3b13842c60c7d44151c3a",
+      "audio_bytes": 56384,
+      "duration_seconds": 14.293
+    },
+    {
+      "record_id": "voice_031",
+      "audio_sha256": "7c4d5f532c56cf5f021ba8aedfdc653f7bf661742de90d77e38c189a8b053391",
+      "audio_bytes": 60377,
+      "duration_seconds": 9.983
+    },
+    {
+      "record_id": "voice_032",
+      "audio_sha256": "ff2a5ef040a5ae982dff9fb917321594419303c7ccc9d25e148ed6d74f816304",
+      "audio_bytes": 41928,
+      "duration_seconds": 10.6
+    },
+    {
+      "record_id": "voice_033",
+      "audio_sha256": "96b4817f658489f0b4e29c02565deb1b640ea08a92699df2e28eb811dff30f12",
+      "audio_bytes": 49226,
+      "duration_seconds": 12.454
+    },
+    {
+      "record_id": "voice_034",
+      "audio_sha256": "484df30c9e528a5acc6c8e953b3e1af2ab4075b3218a0499dded1ec4ad136d59",
+      "audio_bytes": 52463,
+      "duration_seconds": 13.434
+    },
+    {
+      "record_id": "voice_035",
+      "audio_sha256": "0bbc9f78522e4c18b90c8840dce9c93a50ba332116fcc68211d0ac300a7be8e2",
+      "audio_bytes": 75887,
+      "duration_seconds": 12.671
+    },
+    {
+      "record_id": "voice_036",
+      "audio_sha256": "ac19ecfdc06d3f423d715a7ed3917ed63ea5ffed865ce0a4e301e39fe06da7fd",
+      "audio_bytes": 42643,
+      "duration_seconds": 10.66
+    }
+  ],
+  "warnings": [
+    "voice_007: 14 сэмплов на уровне клиппинга",
+    "voice_027: 17 сэмплов на уровне клиппинга",
+    "voice_035: 6 сэмплов на уровне клиппинга",
+    "36 из 36 эталонов совпадают со сценарием с точностью до регистра и пунктуации; дословность подтверждает только человек"
+  ],
+  "unchanged_conditions": [
+    "В каталоге аудио ровно 36 файлов voice_001.ogg–voice_036.ogg с SHA-256 из records.",
+    "content_sha256 приватного манифеста совпадает: эталоны, метки R01/R02, согласованные метки, шум, неоднозначность и обезличенные дикторы не менялись.",
+    "Повторный запуск валидатора без --write завершается с кодом 0.",
+    "Состав и метки не меняются после получения любых модельных предсказаний; трудные записи не исключаются."
+  ]
+}
