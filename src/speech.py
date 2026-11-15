@@ -94,6 +94,12 @@ class SpeechRecognizer:
             download_root=str(ROOT / c.cache_dir), local_files_only=not self.allow_download,
         )
 
+    def load(self) -> None:
+        """Load the model now, e.g. at application startup; errors propagate to the caller."""
+        with self._lock:
+            if self._model is None:
+                self._model = self._load_model()
+
     @staticmethod
     def _decode(path: Path):
         from faster_whisper.audio import decode_audio

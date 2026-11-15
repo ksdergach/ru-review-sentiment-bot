@@ -129,6 +129,25 @@ def test_model_load_failure_is_distinct_and_recoverable(monkeypatch, audio_path)
     assert recognizer.transcribe(audio_path).status == "empty"
 
 
+def test_eager_load_is_reused_and_failure_propagates(monkeypatch, audio_path):
+    recognizer, loads = setup_fake(monkeypatch, lambda *a, **kw: (iter([SimpleNamespace(text="Привет")]), None))
+    recognizer.load()
+    recognizer.load()
+    result = recognizer.transcribe(audio_path)
+    assert result.status == "ok" and result.model_load_seconds == 0
+    assert len(loads) == 1
+
+    failing = SpeechRecognizer()
+
+    def fail():
+        raise RuntimeError("missing local weights")
+
+    monkeypatch.setattr(failing, "_load_model", fail)
+    with pytest.raises(RuntimeError, match="missing local weights"):
+        failing.load()
+    assert failing._model is None
+
+
 def test_cancellation_waits_for_worker_before_caller_deletes_file(monkeypatch, audio_path):
     started, release, finished = threading.Event(), threading.Event(), threading.Event()
 
