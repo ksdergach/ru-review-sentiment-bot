@@ -1,10 +1,12 @@
 """T11: validate the private final voice test and freeze its composition.
 
 Reads the coordinator's Excel table and the OGG/Opus files, never runs ASR or a
-classifier. ``--write`` stores the private manifest (with transcripts and
-labels, outside Git) and the public report (IDs, checksums, aggregates only).
-Without ``--write`` the same inputs are rebuilt and compared with both files:
-the set is unchanged only if everything except the freeze date matches.
+classifier. ``--write`` creates the freeze once: the private manifest (with
+transcripts and labels, outside Git) and the public report (IDs, checksums,
+aggregates only). It never replaces an existing freeze. Without ``--write`` the
+inputs are rebuilt and compared with the stored manifest content and the report:
+the set is unchanged only if everything except audio paths and dates matches.
+Diagnostics name records and fields, never cell values.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from datetime import date
 import hashlib
 import json
 import math
+import os
 from pathlib import Path, PurePosixPath
 import re
 import statistics
@@ -41,6 +44,8 @@ EXPECTED_PER_CLASS = 12
 MIN_SPEAKERS = 3
 YES, NO = "да", "нет"
 EMPTY_REASON = {"", "-", "—"}
+ID_PATTERN = re.compile(r"voice_\d{3}")
+WORDS_PATTERN = re.compile(r"\d{1,3}")
 
 RECORD_SHEET = "02_Записи"
 LABEL_SHEET = "03_Сведение_меток"
@@ -73,6 +78,14 @@ UNCHANGED_CONDITIONS = [
     "трудные записи не исключаются.",
 ]
 
+# Private manifest layout; content_sha256 covers every record field except audio_path.
+MANIFEST_KEYS = ("schema", "label_ids", "annotators", "source_xlsx_sha256", "content_sha256", "records")
+RECORD_KEYS = ("record_id", "speaker_id", "audio_path", "audio_sha256", "audio_bytes", "duration_seconds",
+               "reference_transcript", "transcript_sha256", "annotator_a", "label_a", "annotator_b", "label_b",
+               "final_label", "dispute", "ambiguous", "ambiguity_reason", "noise")
+LOCATION_KEYS = ("audio_path",)  # may differ between checkouts
+DATE_FIELDS = ("frozen_at", "rebuilt_at")  # report metadata, not frozen content
+
 MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 PKG_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -103,11 +116,25 @@ def words(text: str) -> list[str]:
     return re.findall(r"\w+", text.lower().replace("ё", "е"))
 
 
+def content_of(records: list[dict]) -> list[dict]:
+    return [{key: value for key, value in record.items() if key not in LOCATION_KEYS} for record in records]
+
+
+def load_json(path: Path, name: str):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValidationError(f"{name} не читается как JSON ({error.__class__.__name__})") from None
+
+
 # --- xlsx (standard library only) -------------------------------------------------
 
-def _column(ref: str) -> int:
+def _column(ref: str | None) -> int:
+    match = re.fullmatch(r"([A-Z]{1,3})[1-9]\d*", ref or "")
+    if not match:
+        raise ValueError("bad cell reference")
     number = 0
-    for char in re.match(r"[A-Z]+", ref).group():
+    for char in match.group(1):
         number = number * 26 + ord(char) - 64
     return number - 1
 
@@ -115,10 +142,17 @@ def _column(ref: str) -> int:
 def read_xlsx(path: Path) -> tuple[dict[str, list[list[str]]], dict]:
     """Return sheet name -> rows of cell strings, and safe workbook metadata."""
     try:
-        book = zipfile.ZipFile(path)
-    except (OSError, zipfile.BadZipFile) as error:
-        raise ValidationError(f"Таблица не читается как .xlsx: {error.__class__.__name__}") from None
-    with book:
+        return _read_xlsx(path)
+    except ValidationError:
+        raise
+    # Missing parts, broken XML, bad references or indexes: report the kind only.
+    except (OSError, zipfile.BadZipFile, KeyError, IndexError, ValueError, TypeError, AttributeError,
+            ET.ParseError) as error:
+        raise ValidationError(f"Таблица повреждена или не является .xlsx ({error.__class__.__name__})") from None
+
+
+def _read_xlsx(path: Path) -> tuple[dict[str, list[list[str]]], dict]:
+    with zipfile.ZipFile(path) as book:
         names = set(book.namelist())
         shared = []
         if "xl/sharedStrings.xml" in names:
@@ -167,12 +201,15 @@ def read_table(sheets: dict, sheet: str, columns: dict[str, str]) -> list[dict[s
     else:
         raise ValidationError(f"На листе «{sheet}» нет строки заголовков: {', '.join(wanted)}")
     records = []
-    for row in rows[index + 1:]:
+    for number, row in enumerate(rows[index + 1:], start=1):
         values = {key: clean(row[pos]) if pos < len(row) else "" for key, pos in positions.items()}
         if not values["record_id"]:
             if any(values.values()):
-                raise ValidationError(f"На листе «{sheet}» есть строка без ID")
+                raise ValidationError(f"На листе «{sheet}» строка данных {number} без ID")
             continue
+        # Safe label for diagnostics: a well-formed ID or the row position, never cell text.
+        values["where"] = (f"{values['record_id']}:" if ID_PATTERN.fullmatch(values["record_id"])
+                           else f"лист «{sheet}», строка данных {number}:")
         records.append(values)
     return records
 
@@ -241,10 +278,14 @@ def _collect_hashes(value, key: str) -> set[str]:
 
 
 def debug_hashes(path: Path) -> tuple[set[str], set[str]]:
+    # Without T08 data the overlap check would silently compare against nothing.
     if not path.is_file():
-        return set(), set()
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return _collect_hashes(data, "audio_sha256"), _collect_hashes(data, "text_sha256")
+        raise ValidationError("Нет сведений об отладочных материалах T08 (reports/speech/verification.json)")
+    data = load_json(path, "Сведения T08")
+    audio = _collect_hashes(data, "audio_sha256")
+    if not audio:
+        raise ValidationError("В сведениях T08 нет SHA-256 отладочного аудио")
+    return audio, _collect_hashes(data, "text_sha256")
 
 
 def load_limits(path: Path) -> dict:
@@ -279,6 +320,9 @@ def build(xlsx: Path, audio_dir: Path, *, debug_report: Path | None = None,
 
     ids = [row["record_id"] for row in plan]
     expected_ids = [f"voice_{n:03d}" for n in range(1, EXPECTED_RECORDS + 1)]
+    for row in plan + merge:
+        if not ID_PATTERN.fullmatch(row["record_id"]):
+            errors.append(f"{row['where']} ID не в формате voice_NNN")
     if sorted(ids) != expected_ids:
         errors.append(f"ID записей: ожидалось voice_001–voice_{EXPECTED_RECORDS:03d} без повторов, "
                       f"получено {len(ids)} строк, {len(set(ids))} уникальных")
@@ -286,22 +330,21 @@ def build(xlsx: Path, audio_dir: Path, *, debug_report: Path | None = None,
         errors.append("ID и порядок строк на листах записей и сведения меток различаются")
     merge_by_id = {row["record_id"]: row for row in merge}
 
-    expected_files = {f"{record_id}.ogg" for record_id in ids}
+    expected_files = {f"{record_id}.ogg" for record_id in expected_ids}
     present = {path.name for path in audio_dir.iterdir()}
     if missing := sorted(expected_files - present):
         errors.append(f"Нет аудиофайлов: {', '.join(missing)}")
     if extra := sorted(present - expected_files):
-        errors.append(f"Лишние файлы в каталоге аудио: {', '.join(extra)}")
+        errors.append(f"Лишние элементы в каталоге аудио: {len(extra)}")
 
     debug_audio, debug_text = debug_hashes(debug_report)
     pseudonyms: dict[str, str] = {}
     records, audio_info, seen_audio, seen_text = [], {}, {}, {}
     for row in plan:
-        record_id = row["record_id"]
+        record_id, where = row["record_id"], row["where"]
         labels = merge_by_id.get(record_id)
-        if labels is None:
+        if labels is None or not ID_PATTERN.fullmatch(record_id):
             continue
-        where = f"{record_id}:"
         if row["file"] != f"{record_id}.ogg":
             errors.append(f"{where} имя файла в таблице не совпадает с ID")
         if not row["speaker"]:
@@ -315,6 +358,11 @@ def build(xlsx: Path, audio_dir: Path, *, debug_report: Path | None = None,
             errors.append(f"{where} транскрипция не отмечена как сверенная человеком")
         if row["noise"] not in (YES, NO):
             errors.append(f"{where} шум должен быть «да» или «нет»")
+        # The planning column counts whitespace-separated tokens, a dash included.
+        if row["words"] and not WORDS_PATTERN.fullmatch(row["words"]):
+            errors.append(f"{where} «Слов» должно быть целым неотрицательным числом")
+        elif row["words"] and int(row["words"]) != len(row["script"].split()):
+            warnings.append(f"{where} число в столбце «Слов» не совпадает с числом слов сценария")
         for key in ("label_a", "label_b", "final"):
             if labels[key] not in LABELS:
                 errors.append(f"{where} {LABEL_COLUMNS[key]} должна быть одной из {', '.join(LABELS)}")
@@ -334,11 +382,17 @@ def build(xlsx: Path, audio_dir: Path, *, debug_report: Path | None = None,
             errors.append(f"{where} транскрипция совпадает с отладочной T08")
 
         path = audio_dir / f"{record_id}.ogg"
-        if not path.is_file():
+        if not path.exists() and not path.is_symlink():
+            continue  # already reported as missing
+        if path.is_symlink() or not path.is_file():
+            errors.append(f"{where} ожидаемый путь аудио не является обычным файлом")
             continue
         size = path.stat().st_size
         if size == 0:
             errors.append(f"{where} пустой аудиофайл")
+            continue
+        if size > limits["max_bytes"]:  # checked before decoding
+            errors.append(f"{where} превышен лимит размера голоса ({limits['max_bytes']} B)")
             continue
         digest = sha256_file(path)
         if digest in seen_audio:
@@ -353,8 +407,8 @@ def build(xlsx: Path, audio_dir: Path, *, debug_report: Path | None = None,
             continue
         if (info["container"], info["codec"]) != ("ogg", "opus"):
             errors.append(f"{where} формат {info['container']}/{info['codec']}, ожидался ogg/opus")
-        if info["duration_seconds"] > limits["max_seconds"] or size > limits["max_bytes"]:
-            errors.append(f"{where} превышен лимит голоса ({limits['max_seconds']:g} s / {limits['max_bytes']} B)")
+        if info["duration_seconds"] > limits["max_seconds"]:
+            errors.append(f"{where} превышен лимит длительности голоса ({limits['max_seconds']:g} s)")
         if info["clipped_samples"]:
             warnings.append(f"{where} {info['clipped_samples']} сэмплов на уровне клиппинга")
         audio_info[record_id] = info
@@ -377,15 +431,20 @@ def build(xlsx: Path, audio_dir: Path, *, debug_report: Path | None = None,
             "ambiguity_reason": "" if labels["ambiguity"] in EMPTY_REASON else labels["ambiguity"],
             "noise": row["noise"] == YES,
         })
-        # The planning column counts whitespace-separated tokens, a dash included.
-        if row["words"] and row["words"] != str(len(row["script"].split())):
-            warnings.append(f"{where} в столбце «Слов» {row['words']}, в сценарии {len(row['script'].split())}")
 
     final = Counter(row["final"] for row in merge)
     if any(final.get(label, 0) != EXPECTED_PER_CLASS for label in LABELS) or len(merge) != EXPECTED_RECORDS:
-        errors.append(f"Согласованные метки: ожидалось по {EXPECTED_PER_CLASS} на класс, получено {dict(final)}")
+        counts = ", ".join(f"{label}={final.get(label, 0)}" for label in LABELS)
+        other = sum(count for label, count in final.items() if label not in LABELS)
+        errors.append(f"Согласованные метки: ожидалось по {EXPECTED_PER_CLASS} на класс, "
+                      f"получено {counts}, прочих значений {other}")
     if len(pseudonyms) < MIN_SPEAKERS:
         errors.append(f"Дикторов {len(pseudonyms)}, нужно не меньше {MIN_SPEAKERS}")
+    # The freeze itself must hold exactly the expected, fully checked records.
+    checked = Counter(record["final_label"] for record in records)
+    if len(records) != EXPECTED_RECORDS or any(checked[label] != EXPECTED_PER_CLASS for label in LABELS):
+        errors.append(f"Проверено записей {len(records)} из {EXPECTED_RECORDS}; "
+                      "фиксация требует полного набора 12/12/12")
     if errors:
         raise ValidationError("\n".join(errors))
 
@@ -393,7 +452,7 @@ def build(xlsx: Path, audio_dir: Path, *, debug_report: Path | None = None,
     if same_as_script:
         warnings.append(f"{same_as_script} из {len(plan)} эталонов совпадают со сценарием с точностью "
                         "до регистра и пунктуации; дословность подтверждает только человек")
-    content = [{key: value for key, value in record.items() if key != "audio_path"} for record in records]
+    content = content_of(records)
     manifest = {
         "schema": "t11-voice-manifest/1",
         "label_ids": {label: index for index, label in enumerate(LABELS)},
@@ -468,30 +527,116 @@ def public_report(manifest: dict, audio_info: dict, book_meta: dict, limits: dic
 
 # --- CLI -----------------------------------------------------------------------------
 
-def write_json(path: Path, value) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+def _record_name(rebuilt: list[dict], index: int) -> str:
+    return rebuilt[index]["record_id"] if index < len(rebuilt) else f"запись {index + 1}"
 
 
-DATE_FIELDS = ("frozen_at", "rebuilt_at")  # not part of the frozen content
-
-
-def compare(manifest: dict, report: dict, manifest_path: Path, report_path: Path) -> list[str]:
+def check_manifest(stored, rebuilt: dict) -> list[str]:
+    """Compare a stored private manifest with the rebuilt one; name fields, never values."""
+    if not isinstance(stored, dict):
+        return ["Манифест: ожидался JSON-объект"]
     problems = []
-    if not report_path.is_file():
-        return [f"Нет зафиксированного отчёта {report_path.name}; сначала --write"]
-    frozen = json.loads(report_path.read_text(encoding="utf-8"))
-    report = {**report, **{key: frozen.get(key) for key in DATE_FIELDS}}
-    if frozen != report:
-        changed = sorted(key for key in set(frozen) | set(report) if frozen.get(key) != report.get(key))
-        problems.append(f"Состав отличается от зафиксированного: {', '.join(changed)}")
-    if manifest_path.is_file():
-        stored = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if stored.get("content_sha256") != manifest["content_sha256"]:
-            problems.append("content_sha256 приватного манифеста отличается")
-    else:
-        problems.append("Приватный манифест не найден")
+    if missing := [key for key in MANIFEST_KEYS if key not in stored]:
+        problems.append(f"Манифест: нет полей {', '.join(missing)}")
+    if extra := [key for key in stored if key not in MANIFEST_KEYS]:
+        problems.append(f"Манифест: лишних полей {len(extra)}")
+    records = stored.get("records")
+    if not isinstance(records, list):
+        return [*problems, "Манифест: records не является списком"]
+    for index, record in enumerate(records):
+        if not isinstance(record, dict) or set(record) != set(RECORD_KEYS):
+            problems.append(f"Манифест, {_record_name(rebuilt['records'], index)}: неверный набор полей записи")
+    if problems:
+        return problems
+    content = content_of(records)
+    if canonical_sha256(content) != stored["content_sha256"]:
+        problems.append("Манифест: content_sha256 не соответствует его записям")
+    expected = content_of(rebuilt["records"])
+    if len(content) != len(expected):
+        problems.append(f"Манифест: записей {len(content)}, в проверенном наборе {len(expected)}")
+    for index, (saved, actual) in enumerate(zip(content, expected)):
+        if fields := [key for key in RECORD_KEYS if key not in LOCATION_KEYS and saved[key] != actual[key]]:
+            problems.append(f"Манифест, {_record_name(rebuilt['records'], index)}: отличаются {', '.join(fields)}")
+    for key in MANIFEST_KEYS:
+        if key != "records" and stored[key] != rebuilt[key]:
+            problems.append(f"Манифест: отличается {key}")
     return problems
+
+
+def _is_date(value) -> bool:
+    try:
+        return isinstance(value, str) and date.fromisoformat(value).isoformat() == value
+    except ValueError:
+        return False
+
+
+def check_report(frozen, rebuilt: dict) -> list[str]:
+    """Compare the frozen public report with the rebuilt one, ignoring only its dates."""
+    if not isinstance(frozen, dict):
+        return ["Отчёт: ожидался JSON-объект"]
+    problems = []
+    if not _is_date(frozen.get("frozen_at")):
+        problems.append("Отчёт: frozen_at не является датой YYYY-MM-DD")
+    if frozen.get("rebuilt_at") is not None and not _is_date(frozen["rebuilt_at"]):
+        problems.append("Отчёт: rebuilt_at не является датой YYYY-MM-DD")
+    if extra := [key for key in frozen if key not in rebuilt]:
+        problems.append(f"Отчёт: лишних полей {len(extra)}")
+    if changed := [key for key in rebuilt if key not in DATE_FIELDS and frozen.get(key) != rebuilt[key]]:
+        problems.append(f"Состав отличается от зафиксированного: {', '.join(changed)}")
+    return problems
+
+
+def verify(manifest: dict, report: dict, manifest_path: Path, report_path: Path) -> list[str]:
+    """All differences between the rebuilt set and the stored freeze."""
+    problems = []
+    stored_manifest = frozen_report = None
+    for path, name in ((manifest_path, "Приватный манифест"), (report_path, "Зафиксированный отчёт")):
+        if not path.is_file():
+            problems.append(f"{name} не найден")
+            continue
+        try:
+            value = load_json(path, name)
+        except ValidationError as error:
+            problems.append(str(error))
+            continue
+        if path == manifest_path:
+            stored_manifest = value
+        else:
+            frozen_report = value
+    if stored_manifest is not None:
+        problems += check_manifest(stored_manifest, manifest)
+    if frozen_report is not None:
+        problems += check_report(frozen_report, report)
+    if isinstance(stored_manifest, dict) and isinstance(frozen_report, dict) \
+            and stored_manifest.get("content_sha256") != frozen_report.get("content_sha256"):
+        problems.append("content_sha256 манифеста и отчёта не совпадают")
+    return problems
+
+
+def _dump(value) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+
+
+def write_new_freeze(files: list[tuple[Path, dict]]) -> None:
+    """Create all files or none; never replaces an existing file."""
+    temporary, created = [], []
+    try:
+        for path, value in files:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(f".{path.name}.tmp")
+            with tmp.open("x", encoding="utf-8") as stream:
+                stream.write(_dump(value))
+            temporary.append((tmp, path))
+        for tmp, path in temporary:
+            os.link(tmp, path)  # fails if the target already exists
+            created.append(path)
+    except BaseException:
+        for path in created:
+            path.unlink(missing_ok=True)
+        raise
+    finally:
+        for tmp, _ in temporary:
+            tmp.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -500,9 +645,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--audio-dir", type=Path, default=DEFAULT_AUDIO)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
-    parser.add_argument("--write", action="store_true", help="записать манифест и зафиксировать отчёт")
+    parser.add_argument("--write", action="store_true",
+                        help="создать фиксацию, если её ещё нет; существующая не заменяется")
     parser.add_argument("--frozen-at", type=date.fromisoformat,
-                        help="дата первоначальной фиксации; по умолчанию сохраняется из отчёта или сегодня")
+                        help="дата первоначальной фиксации для нового набора; по умолчанию сегодня")
     args = parser.parse_args(argv)
     try:
         manifest, report, warnings = build(args.xlsx, args.audio_dir)
@@ -511,21 +657,29 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     for warning in warnings:
         print(f"WARN {warning}", file=sys.stderr)
-    if args.write:
-        previous = json.loads(args.report.read_text(encoding="utf-8")) if args.report.is_file() else {}
-        today = date.today().isoformat()
-        report["frozen_at"] = args.frozen_at.isoformat() if args.frozen_at else previous.get("frozen_at") or today
-        report["rebuilt_at"] = today
-        write_json(args.manifest, manifest)
-        write_json(args.report, report)
-        print(json.dumps({"status": "WRITTEN", "records": len(manifest["records"]),
-                          "content_sha256": manifest["content_sha256"]}))
+    summary = {"records": len(manifest["records"]), "content_sha256": manifest["content_sha256"]}
+
+    if args.write and not args.manifest.exists() and not args.report.exists():
+        report["frozen_at"] = (args.frozen_at or date.today()).isoformat()
+        try:
+            write_new_freeze([(args.manifest, manifest), (args.report, report)])
+        except OSError as error:
+            print(f"FAIL Фиксация не записана ({error.__class__.__name__}); файлы не созданы", file=sys.stderr)
+            return 1
+        print(json.dumps({"status": "WRITTEN", **summary}))
         return 0
-    problems = compare(manifest, report, args.manifest, args.report)
+
+    problems = verify(manifest, report, args.manifest, args.report)
+    if args.write and args.frozen_at and not problems:
+        frozen = load_json(args.report, "Зафиксированный отчёт")
+        if frozen.get("frozen_at") != args.frozen_at.isoformat():
+            problems.append("Дата первоначальной фиксации не меняется")
     for problem in problems:
         print(f"FAIL {problem}", file=sys.stderr)
-    print(json.dumps({"status": "CHANGED" if problems else "UNCHANGED",
-                      "records": len(manifest["records"]), "content_sha256": manifest["content_sha256"]}))
+    if args.write and problems:
+        print("FAIL Фиксация уже существует; --write её не заменяет, файлы не изменены", file=sys.stderr)
+    status = "CHANGED" if problems else ("ALREADY_FROZEN" if args.write else "UNCHANGED")
+    print(json.dumps({"status": status, **summary}))
     return 1 if problems else 0
 
 
