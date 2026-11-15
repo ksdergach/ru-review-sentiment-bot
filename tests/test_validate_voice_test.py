@@ -482,6 +482,129 @@ def test_failed_write_leaves_no_partial_freeze(dataset, capsys, monkeypatch):
 
     monkeypatch.setattr(vt.os, "link", link)
     code, _, err = run(dataset, capsys, "--write")
-    assert code == 1 and "файлы не созданы" in err
+    assert code == 1 and "файлы фиксации не созданы" in err
     assert not dataset["manifest"].exists() and not dataset["report"].exists()
     assert not list(dataset["root"].rglob(".*.tmp"))
+
+
+# --- second review: JSON null and other non-objects -------------------------------------
+
+NON_OBJECTS = [None, [], "строка", 1, True, {}]
+
+
+@pytest.mark.parametrize("target", ["manifest", "report", "both"])
+@pytest.mark.parametrize("value", NON_OBJECTS, ids=repr)
+def test_stored_documents_must_be_valid_objects(dataset, capsys, target, value):
+    before = freeze(dataset, capsys)
+    for name in (["manifest", "report"] if target == "both" else [target]):
+        dataset[name].write_text(json.dumps(value), encoding="utf-8")
+    code, out, err = run(dataset, capsys)
+    assert code == 1 and '"CHANGED"' in out and "FAIL" in err
+
+    tampered = (dataset["manifest"].read_bytes(), dataset["report"].read_bytes())
+    code, out, err = run(dataset, capsys, "--write")
+    assert code == 1 and '"ALREADY_FROZEN"' not in out and "не заменяет" in err
+    assert (dataset["manifest"].read_bytes(), dataset["report"].read_bytes()) == tampered
+    assert tampered != before
+
+
+def test_null_documents_do_not_hide_a_later_source_change(dataset, capsys):
+    freeze(dataset, capsys)
+    for name in ("manifest", "report"):
+        dataset[name].write_text("null", encoding="utf-8")
+    dataset["plan"][3]["transcript"] = f"Изменённый эталон {MARKER}"
+    rewrite(dataset)
+    code, out, err = run(dataset, capsys)
+    assert code == 1 and '"CHANGED"' in out
+    assert MARKER not in out + err
+
+
+# --- second review: temporary files -------------------------------------------------------
+
+def failing_exclusive_open(monkeypatch, *, fail_on):
+    """Make writes of new temporary files fail after partial output or on close."""
+    real_open = vt.Path.open
+
+    class Stream:
+        def __init__(self, inner):
+            self.inner = inner
+
+        def write(self, text):
+            if fail_on == "write":
+                self.inner.write(text[: len(text) // 2])
+                self.inner.flush()
+                raise OSError("disk full")
+            return self.inner.write(text)
+
+        def close(self):
+            self.inner.close()
+            if fail_on == "close":
+                raise OSError("close failed")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self.close()
+
+    def fake_open(self, mode="r", *args, **kwargs):
+        stream = real_open(self, mode, *args, **kwargs)
+        return Stream(stream) if mode == "x" else stream
+
+    monkeypatch.setattr(vt.Path, "open", fake_open)
+
+
+@pytest.mark.parametrize("fail_on", ["write", "close"])
+def test_failed_temporary_write_leaves_nothing_and_can_be_retried(dataset, capsys, monkeypatch, fail_on):
+    with monkeypatch.context() as patch:
+        failing_exclusive_open(patch, fail_on=fail_on)
+        code, _, err = run(dataset, capsys, "--write", "--frozen-at", "2020-01-02")
+    assert code == 1 and "файлы фиксации не созданы" in err
+    assert not dataset["manifest"].exists() and not dataset["report"].exists()
+    assert not list(dataset["root"].rglob(".*.tmp"))
+
+    freeze(dataset, capsys, frozen_at="2020-01-02")  # the cause is gone: a normal retry succeeds
+    assert run(dataset, capsys)[0] == 0
+
+
+def test_failing_writes_never_touch_an_existing_freeze(dataset, capsys, monkeypatch):
+    before = freeze(dataset, capsys)
+    failing_exclusive_open(monkeypatch, fail_on="write")
+    code, out, _ = run(dataset, capsys, "--write")
+    assert code == 0 and '"ALREADY_FROZEN"' in out
+    assert (dataset["manifest"].read_bytes(), dataset["report"].read_bytes()) == before
+
+
+def test_foreign_temporary_file_is_kept_on_conflict(dataset, capsys):
+    foreign = dataset["report"].with_name(f".{dataset['report'].name}.tmp")
+    foreign.parent.mkdir(parents=True)
+    foreign.write_text("чужой файл", encoding="utf-8")
+    code, _, err = run(dataset, capsys, "--write")
+    assert code == 1 and "Мешает уже существующий временный файл" in err
+    assert foreign.read_text(encoding="utf-8") == "чужой файл"
+    assert not dataset["manifest"].exists() and not dataset["report"].exists()
+    assert list(dataset["root"].rglob(".*.tmp")) == [foreign]
+
+
+# --- second review: broken compression inside the workbook -------------------------------
+
+def test_corrupted_compressed_part_fails_safely(dataset, capsys):
+    import zlib
+
+    with zipfile.ZipFile(dataset["xlsx"], "w", zipfile.ZIP_DEFLATED) as book:
+        for name, data in xlsx_parts(dataset["plan"], dataset["merge"]).items():
+            book.writestr(name, data)
+    raw = bytearray(dataset["xlsx"].read_bytes())
+    with zipfile.ZipFile(dataset["xlsx"]) as book:
+        info = book.getinfo("xl/worksheets/sheet1.xml")
+    name_length = int.from_bytes(raw[info.header_offset + 26:info.header_offset + 28], "little")
+    extra_length = int.from_bytes(raw[info.header_offset + 28:info.header_offset + 30], "little")
+    start = info.header_offset + 30 + name_length + extra_length
+    raw[start] = 0xFF  # deflate block header with the reserved block type
+    dataset["xlsx"].write_bytes(bytes(raw))
+    with zipfile.ZipFile(dataset["xlsx"]) as book, pytest.raises(zlib.error):
+        book.read("xl/worksheets/sheet1.xml")  # precondition: the real read path hits zlib.error
+
+    code, out, err = run(dataset, capsys)
+    assert code == 1 and "Таблица повреждена" in err and "Traceback" not in err
+    assert str(dataset["root"]) not in out + err

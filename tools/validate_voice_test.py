@@ -25,6 +25,7 @@ import sys
 import unicodedata
 import xml.etree.ElementTree as ET
 import zipfile
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_XLSX = ROOT / "artifacts/t11/T11_dataset.xlsx"
@@ -85,6 +86,7 @@ RECORD_KEYS = ("record_id", "speaker_id", "audio_path", "audio_sha256", "audio_b
                "final_label", "dispute", "ambiguous", "ambiguity_reason", "noise")
 LOCATION_KEYS = ("audio_path",)  # may differ between checkouts
 DATE_FIELDS = ("frozen_at", "rebuilt_at")  # report metadata, not frozen content
+NOT_LOADED = object()
 
 MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -145,9 +147,9 @@ def read_xlsx(path: Path) -> tuple[dict[str, list[list[str]]], dict]:
         return _read_xlsx(path)
     except ValidationError:
         raise
-    # Missing parts, broken XML, bad references or indexes: report the kind only.
-    except (OSError, zipfile.BadZipFile, KeyError, IndexError, ValueError, TypeError, AttributeError,
-            ET.ParseError) as error:
+    # Missing parts, broken compression or XML, bad references or indexes: report the kind only.
+    except (OSError, zipfile.BadZipFile, zlib.error, EOFError, KeyError, IndexError, ValueError, TypeError,
+            AttributeError, ET.ParseError) as error:
         raise ValidationError(f"Таблица повреждена или не является .xlsx ({error.__class__.__name__})") from None
 
 
@@ -589,23 +591,22 @@ def check_report(frozen, rebuilt: dict) -> list[str]:
 def verify(manifest: dict, report: dict, manifest_path: Path, report_path: Path) -> list[str]:
     """All differences between the rebuilt set and the stored freeze."""
     problems = []
-    stored_manifest = frozen_report = None
-    for path, name in ((manifest_path, "Приватный манифест"), (report_path, "Зафиксированный отчёт")):
+    # NOT_LOADED is distinct from any JSON value: a stored ``null`` is loaded and must fail the checks.
+    loaded = {}
+    for key, path, name in (("manifest", manifest_path, "Приватный манифест"),
+                            ("report", report_path, "Зафиксированный отчёт")):
+        loaded[key] = NOT_LOADED
         if not path.is_file():
             problems.append(f"{name} не найден")
             continue
         try:
-            value = load_json(path, name)
+            loaded[key] = load_json(path, name)
         except ValidationError as error:
             problems.append(str(error))
-            continue
-        if path == manifest_path:
-            stored_manifest = value
-        else:
-            frozen_report = value
-    if stored_manifest is not None:
+    stored_manifest, frozen_report = loaded["manifest"], loaded["report"]
+    if stored_manifest is not NOT_LOADED:
         problems += check_manifest(stored_manifest, manifest)
-    if frozen_report is not None:
+    if frozen_report is not NOT_LOADED:
         problems += check_report(frozen_report, report)
     if isinstance(stored_manifest, dict) and isinstance(frozen_report, dict) \
             and stored_manifest.get("content_sha256") != frozen_report.get("content_sha256"):
@@ -618,15 +619,22 @@ def _dump(value) -> str:
 
 
 def write_new_freeze(files: list[tuple[Path, dict]]) -> None:
-    """Create all files or none; never replaces an existing file."""
+    """Create all files or none; never replaces an existing file.
+
+    Each target appears via ``os.link`` only after its content is fully written.
+    The pair is not one atomic step: a crash between the two links can leave
+    only the first file. Later runs then report an incomplete freeze and refuse
+    to write.
+    """
     temporary, created = [], []
     try:
         for path, value in files:
             path.parent.mkdir(parents=True, exist_ok=True)
             tmp = path.with_name(f".{path.name}.tmp")
-            with tmp.open("x", encoding="utf-8") as stream:
+            stream = tmp.open("x", encoding="utf-8")  # a pre-existing file is not ours and stays
+            temporary.append((tmp, path))  # owned from creation, even if writing or closing fails
+            with stream:
                 stream.write(_dump(value))
-            temporary.append((tmp, path))
         for tmp, path in temporary:
             os.link(tmp, path)  # fails if the target already exists
             created.append(path)
@@ -664,7 +672,11 @@ def main(argv: list[str] | None = None) -> int:
         try:
             write_new_freeze([(args.manifest, manifest), (args.report, report)])
         except OSError as error:
-            print(f"FAIL Фиксация не записана ({error.__class__.__name__}); файлы не созданы", file=sys.stderr)
+            print(f"FAIL Фиксация не записана ({error.__class__.__name__}); файлы фиксации не созданы, "
+                  "собственные временные файлы удалены", file=sys.stderr)
+            if isinstance(error, FileExistsError):
+                print("FAIL Мешает уже существующий временный файл рядом с фиксацией; он не тронут",
+                      file=sys.stderr)
             return 1
         print(json.dumps({"status": "WRITTEN", **summary}))
         return 0
