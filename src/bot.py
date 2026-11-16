@@ -12,9 +12,10 @@ from contextlib import contextmanager
 import logging
 import os
 from pathlib import Path
+import re
 import shutil
 import tempfile
-from typing import Any, Callable, Iterator, TypeVar
+from typing import Any, Iterator
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
@@ -30,15 +31,13 @@ from src.classifier import (
     get_default_classifier,
     predict,
 )
-from src.speech import ROOT, SpeechConfig, SpeechRecognizer
+from src.speech import ROOT, SpeechConfig, SpeechRecognizer, run_in_thread
 
 
 router = Router()
 logger = logging.getLogger(__name__)
 _classification_lock = asyncio.Lock()
 BUSY_MESSAGE = "Сейчас обрабатывается другой отзыв. Повторите запрос чуть позже."
-
-_T = TypeVar("_T")
 
 # Начальные ограничения из docs/team_plan.md, раздел 7.
 MAX_VOICE_SECONDS = 30
@@ -194,17 +193,6 @@ def classify_transcript_for_bot(transcript: str) -> str:
     return f"Распознанный текст:\n{transcript}\n\n{format_prediction(result)}"
 
 
-async def _run_in_worker(func: Callable[[str], _T], argument: str) -> _T:
-    """Выполнить тяжёлую операцию вне event loop."""
-    task = asyncio.create_task(asyncio.to_thread(func, argument))
-    try:
-        return await asyncio.shield(task)
-    except asyncio.CancelledError:
-        # Cancellation does not stop a running thread. Keep the slot until it exits.
-        await task
-        raise
-
-
 def check_voice_limits(voice: Voice) -> str | None:
     """Предварительная проверка по метаданным Telegram; полная защита — T10."""
     if voice.duration > MAX_VOICE_SECONDS:
@@ -243,7 +231,7 @@ async def recognize_and_classify_voice(bot: Bot, speech: SpeechRecognizer, voice
     if result.status != "ok":
         logger.warning("Speech recognition failed: %s", result.error_code)
         return SPEECH_ERROR_MESSAGE
-    return await _run_in_worker(classify_transcript_for_bot, result.text)
+    return await run_in_thread(classify_transcript_for_bot, result.text)
 
 
 @router.message(CommandStart())
@@ -278,7 +266,8 @@ async def text_handler(message: Message) -> None:
         await message.answer(BUSY_MESSAGE)
         return
     async with _classification_lock:
-        answer = await _run_in_worker(classify_text_for_bot, text)
+        # Returns only after the worker thread ends, so the slot is held until then.
+        answer = await run_in_thread(classify_text_for_bot, text)
     await message.answer(answer)
 
 
@@ -320,13 +309,84 @@ def get_bot_token() -> str:
     return token
 
 
+_ABSOLUTE_PATH_START = r"(?:[A-Za-z]:[\\/]|\\\\|/)"
+# Quoted paths (repr of OSError) may contain spaces; unquoted ones end at whitespace.
+_QUOTED_ABSOLUTE_PATH = re.compile(rf"""(['"])({_ABSOLUTE_PATH_START}[^'"]*)\1""")
+_ABSOLUTE_PATH = re.compile(rf"""(?<![\w.~/\\>]){_ABSOLUTE_PATH_START}[^\s'"]*""")
+
+
+def _public_path(path: str) -> str:
+    """Путь внутри проекта — относительный, любой другой абсолютный — только имя файла."""
+    normalized = path.replace("\\\\", "\\")
+    for root in (str(ROOT), ROOT.as_posix()):
+        rest = normalized[len(root):]
+        if normalized.startswith(root) and (not rest or rest[0] in "/\\"):
+            return "." + rest.replace("\\", "/")
+    name = re.split(r"[\\/]", normalized.rstrip("\\/"))[-1]
+    return f"<path>/{name}" if name else "<path>"
+
+
 def _public_reason(exc: BaseException) -> str:
-    """Причина отказа без абсолютных путей рабочего каталога и домашней папки."""
+    """Причина отказа без абсолютных путей, в том числе внешних и Windows-путей."""
     cause = exc.__cause__ or exc
     reason = f"{type(cause).__name__}: {cause}"
-    for private, public in ((str(ROOT), "."), (str(Path.home()), "~")):
-        reason = reason.replace(private, public)
-    return reason
+    reason = _QUOTED_ABSOLUTE_PATH.sub(lambda m: m[1] + _public_path(m[2]) + m[1], reason)
+    return _ABSOLUTE_PATH.sub(lambda m: _public_path(m[0]), reason)
+
+
+class _SecretRedactingFilter(logging.Filter):
+    """Убирает токен из текста записи и traceback до передачи любому обработчику.
+
+    aiohttp включает URL запроса с токеном в тексты своих ошибок (например,
+    TooManyRedirects), а aiogram пишет их в журнал polling.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.secrets: set[str] = set()
+
+    def _redact(self, text: str) -> str:
+        for secret in sorted(self.secrets, key=len, reverse=True):
+            text = text.replace(secret, "<redacted>")
+        return text
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            message = record.getMessage()
+        except Exception:
+            message = str(record.msg)
+        record.msg, record.args = self._redact(message), None
+        if record.exc_info:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if record.exc_text:
+            record.exc_text = self._redact(record.exc_text)
+        if record.stack_info:
+            record.stack_info = self._redact(record.stack_info)
+        return True
+
+
+_secret_filter = _SecretRedactingFilter()
+
+
+def protect_token_in_logs(token: str) -> None:
+    """Скрыть токен в каждой записи журнала при её создании.
+
+    Обработчики могут быть на любом логгере (например, на aiogram.dispatcher без
+    передачи записей в root), поэтому токен убирается в фабрике записей, а не в них.
+    """
+    # The part after ":" is the secret; the numeric bot ID alone is public.
+    _secret_filter.secrets.update({token, token.partition(":")[2]} - {""})
+    base_factory = logging.getLogRecordFactory()
+    if getattr(base_factory, "redacts_secrets", False):
+        return
+
+    def redacting_factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
+        record = base_factory(*args, **kwargs)
+        _secret_filter.filter(record)
+        return record
+
+    redacting_factory.redacts_secrets = True  # type: ignore[attr-defined]
+    logging.setLogRecordFactory(redacting_factory)
 
 
 def load_models(speech: SpeechRecognizer | None = None) -> SpeechRecognizer:
@@ -357,6 +417,7 @@ async def run_bot(token: str | None = None, speech: SpeechRecognizer | None = No
     """Запустить Telegram polling с моделями, загруженными один раз."""
     if token is None:
         token = get_bot_token()
+    protect_token_in_logs(token)
     if speech is None:
         speech = load_models()
     bot = Bot(token=token)
@@ -376,7 +437,13 @@ def main() -> None:
     except StartupError as exc:
         logger.error("Startup failed: %s", exc)
         raise SystemExit(1) from None
-    asyncio.run(run_bot(token, speech))
+    protect_token_in_logs(token)
+    try:
+        asyncio.run(run_bot(token, speech))
+    except Exception:
+        # Through logging, so the traceback is redacted (not the default excepthook).
+        logger.exception("Bot stopped because of an error")
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

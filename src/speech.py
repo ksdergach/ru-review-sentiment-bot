@@ -10,9 +10,34 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import threading
 from time import perf_counter
-from typing import Literal
+from typing import Any, Callable, Literal, TypeVar
 
 ROOT = Path(__file__).resolve().parents[1]
+
+_T = TypeVar("_T")
+
+
+async def run_in_thread(func: Callable[..., _T], /, *args: Any) -> _T:
+    """Run func in a worker thread; return or raise only after the thread finished.
+
+    Cancelling an asyncio task or future does not stop a running thread, so the
+    executor future itself is never cancelled and is the only completion signal.
+    Repeated cancellation and event loop shutdown are re-raised after func returns:
+    callers keep locks and temporary files until then. This is NOT a hard timeout.
+    """
+    future = asyncio.get_running_loop().run_in_executor(None, func, *args)
+    cancelled: asyncio.CancelledError | None = None
+    while not future.done():
+        try:
+            # Unlike awaiting the future directly, wait() never cancels it.
+            await asyncio.wait((future,))
+        except asyncio.CancelledError as exc:
+            cancelled = exc
+    if cancelled is not None:
+        if not future.cancelled():
+            future.exception()  # Retrieved; the cancellation is reported instead.
+        raise cancelled
+    return future.result()
 
 
 @dataclass(frozen=True)
@@ -161,19 +186,11 @@ class SpeechRecognizer:
     async def transcribe_async(self, audio_path: str | Path) -> SpeechResult:
         """Run the whole operation in a worker, keeping audio alive through cancellation.
 
-        Cancellation waits for the worker before propagating: the caller may then
-        safely delete its temporary audio in finally. This is NOT a hard timeout.
+        Cancellation, including event loop shutdown, waits for the worker before
+        propagating: the caller may then safely delete its temporary audio in finally.
+        This is NOT a hard timeout.
         """
-        worker = asyncio.create_task(asyncio.to_thread(self.transcribe, audio_path))
-        try:
-            return await asyncio.shield(worker)
-        except asyncio.CancelledError:
-            while not worker.done():
-                try:
-                    await asyncio.shield(worker)
-                except asyncio.CancelledError:
-                    continue
-            raise
+        return await run_in_thread(self.transcribe, audio_path)
 
 
 def main() -> int:

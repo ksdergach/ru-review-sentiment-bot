@@ -689,7 +689,41 @@ def test_public_reason_hides_repository_and_home_paths():
     error = classifier.ModelUnavailableError("wrapper")
     error.__cause__ = FileNotFoundError(f"No such file: '{bot.ROOT}/reports/x.json' or '{Path.home()}/y'")
     reason = bot._public_reason(error)
-    assert reason == "FileNotFoundError: No such file: './reports/x.json' or '~/y'"
+    assert reason == "FileNotFoundError: No such file: './reports/x.json' or '<path>/y'"
+
+
+def test_public_reason_hides_windows_paths():
+    error = classifier.ModelUnavailableError("wrapper")
+    error.__cause__ = FileNotFoundError(2, "No such file or directory",
+                                        r"C:\Users\Private User\models\run_metadata.json")
+    reason = bot._public_reason(error)
+    assert reason == "FileNotFoundError: [Errno 2] No such file or directory: '<path>/run_metadata.json'"
+    unquoted = bot._public_reason(ValueError(r"bad D:\data\model.joblib and \\server\share\x.bin"))
+    assert unquoted == "ValueError: bad <path>/model.joblib and <path>/x.bin"
+
+
+def test_public_reason_hides_absolute_paths_outside_project():
+    reason = bot._public_reason(ValueError("checksum of /srv/private/models/x.joblib differs; see ./reports/a.json"))
+    assert reason == "ValueError: checksum of <path>/x.joblib differs; see ./reports/a.json"
+    assert bot._public_reason(ValueError("CLASSIFIER_BACKEND must be baseline or rubert")).endswith("baseline or rubert")
+
+
+def test_missing_classifier_report_fails_startup_without_absolute_path(tmp_path, monkeypatch):
+    model_path = tmp_path / "model.joblib"
+    model_path.write_bytes(b"not used: the report is read first")
+    report_path = tmp_path / "private dir" / "run_metadata.json"
+    monkeypatch.setattr(classifier, "_default_classifier", None)
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "baseline")
+    monkeypatch.setenv("CLASSIFIER_MODEL_PATH", str(model_path))
+    monkeypatch.setenv("CLASSIFIER_REPORT_PATH", str(report_path))
+    speech, calls = fake_speech(monkeypatch)
+    with pytest.raises(bot.StartupError) as error:
+        bot.load_models(speech)
+    message = str(error.value)
+    assert "FileNotFoundError" in message and "<path>/run_metadata.json" in message
+    assert "CLASSIFIER_REPORT_PATH" in message
+    assert str(tmp_path) not in message and "private dir" not in message
+    assert calls.loads == 0
 
 
 @pytest.mark.parametrize("token,reason", [(None, "is not set"), ("123:has space", "invalid format")])
@@ -826,3 +860,229 @@ def test_real_router_rejects_unsupported_formats(monkeypatch, kind):
     answers, downloads = _propagate(monkeypatch, lambda c: _telegram_message(c, **fields), speech)
     assert answers == [bot.UNSUPPORTED_MESSAGE]
     assert downloads == [] and predicted == [] and calls.loads == 0
+
+
+# --- T09 review fixes: token in logs, cancellation -----------------------------------
+
+import contextlib
+import io
+
+from aiogram import Bot
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
+
+FAKE_TOKEN = "123456:FAKE-local-test-secret-not-a-real-token_xx"
+FAKE_SECRET = FAKE_TOKEN.partition(":")[2]
+
+
+@pytest.fixture(autouse=True)
+def reset_secret_filter():
+    factory = logging.getLogRecordFactory()
+    yield
+    logging.setLogRecordFactory(factory)
+    bot._secret_filter.secrets.clear()
+
+
+@pytest.fixture
+def log_stream():
+    """Actual formatted log output, as a console handler would write it."""
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    root = logging.getLogger()
+    level = root.level
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+    yield stream
+    root.removeHandler(handler)
+    root.setLevel(level)
+
+
+@pytest.fixture
+def telegram_stand(monkeypatch):
+    """Local Telegram API stub; getUpdates (and optionally getMe) loops redirects."""
+    from aiohttp import web
+
+    state = {"redirect_get_me": False}
+
+    async def handle(request):
+        if request.path.endswith("/getMe") and not state["redirect_get_me"]:
+            return web.json_response({"ok": True, "result": {
+                "id": 123456, "is_bot": True, "first_name": "Stand", "username": "stand_bot"}})
+        raise web.HTTPFound(request.path)
+
+    async def start():
+        app = web.Application()
+        app.router.add_route("*", "/{tail:.*}", handle)
+        runner = web.AppRunner(app, access_log=None)
+        await runner.setup()
+        await web.TCPSite(runner, "127.0.0.1", 0).start()
+        return runner
+
+    loop = asyncio.new_event_loop()
+    runner = loop.run_until_complete(start())
+    thread = threading.Thread(target=loop.run_forever, daemon=True)
+    thread.start()
+    api = TelegramAPIServer.from_base(f"http://127.0.0.1:{runner.addresses[0][1]}")
+    monkeypatch.setattr(bot, "Bot", lambda token: Bot(token, session=AiohttpSession(api=api)))
+    # The module router attaches to one Dispatcher per process; detach it after the test.
+    monkeypatch.setattr(bot.router, "_parent_router", None)
+    try:
+        yield state
+    finally:
+        asyncio.run_coroutine_threadsafe(runner.cleanup(), loop).result(5)
+        loop.call_soon_threadsafe(loop.stop)
+        thread.join(5)
+        loop.close()
+
+
+def test_token_is_redacted_from_polling_network_error_logs(telegram_stand, log_stream, caplog):
+    async def run():
+        task = asyncio.create_task(bot.run_bot(FAKE_TOKEN, object()))  # type: ignore[arg-type]
+        for _ in range(500):
+            if "Failed to fetch updates" in log_stream.getvalue():
+                break
+            await asyncio.sleep(.01)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+    with caplog.at_level(logging.INFO):
+        asyncio.run(run())
+    text = log_stream.getvalue()
+    assert "Run polling for bot @stand_bot" in text, "polling must still start"
+    assert "TooManyRedirects" in text and "/bot<redacted>/getUpdates" in text
+    assert FAKE_SECRET not in text and FAKE_SECRET not in caplog.text
+
+
+def test_token_is_redacted_from_startup_traceback(telegram_stand, log_stream, monkeypatch, capsys):
+    telegram_stand["redirect_get_me"] = True
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", FAKE_TOKEN)
+    monkeypatch.setattr(bot, "load_models", lambda: object())
+    with pytest.raises(SystemExit) as exit_info:
+        bot.main()
+    assert exit_info.value.code == 1
+    text = log_stream.getvalue()
+    assert "Bot stopped because of an error" in text and "Traceback" in text
+    # The chained aiohttp error keeps its diagnostics, only the token is hidden.
+    assert "TooManyRedirects" in text and "/bot<redacted>/getMe" in text
+    captured = capsys.readouterr()
+    assert FAKE_SECRET not in text + captured.out + captured.err
+
+
+@contextlib.contextmanager
+def own_logger_stream(name):
+    """Handler set directly on a logger that does not propagate to root."""
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    target = logging.getLogger(name)
+    level, propagate = target.level, target.propagate
+    target.addHandler(handler)
+    target.setLevel(logging.INFO)
+    target.propagate = False
+    try:
+        yield stream
+    finally:
+        target.removeHandler(handler)
+        target.setLevel(level)
+        target.propagate = propagate
+
+
+def test_token_is_redacted_for_handler_on_aiogram_dispatcher_logger(telegram_stand):
+    async def run(stream):
+        task = asyncio.create_task(bot.run_bot(FAKE_TOKEN, object()))  # type: ignore[arg-type]
+        for _ in range(500):
+            if "Failed to fetch updates" in stream.getvalue():
+                break
+            await asyncio.sleep(.01)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+    with own_logger_stream("aiogram.dispatcher") as stream:
+        asyncio.run(run(stream))
+    text = stream.getvalue()
+    assert "TooManyRedirects" in text and "/bot<redacted>/getUpdates" in text
+    assert FAKE_SECRET not in text
+
+
+def test_token_is_redacted_from_traceback_for_handler_on_bot_logger(telegram_stand, monkeypatch):
+    telegram_stand["redirect_get_me"] = True
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", FAKE_TOKEN)
+    monkeypatch.setattr(bot, "load_models", lambda: object())
+    with own_logger_stream("src.bot") as stream, pytest.raises(SystemExit):
+        bot.main()
+    text = stream.getvalue()
+    assert "Traceback" in text and "/bot<redacted>/getMe" in text
+    assert FAKE_SECRET not in text
+
+
+def test_redaction_covers_arguments_tracebacks_and_bad_records(log_stream):
+    bot.protect_token_in_logs(FAKE_TOKEN)
+    log = logging.getLogger("tests.redaction")
+    try:
+        raise RuntimeError(f"url=https://api.telegram.org/bot{FAKE_TOKEN}/getMe")
+    except RuntimeError:
+        log.exception("request %s failed", f"/bot{FAKE_TOKEN}/x")
+    log.error("secret part alone: %s", FAKE_SECRET)
+    log.error("unformattable %s %s " + FAKE_SECRET, "one")
+    text = log_stream.getvalue()
+    assert FAKE_SECRET not in text
+    assert text.count("<redacted>") >= 4 and "RuntimeError: url=" in text
+
+
+def test_repeated_cancellation_keeps_slot_until_classification_finishes(monkeypatch):
+    started, release = threading.Event(), threading.Event()
+
+    def slow_classification(text):
+        started.set()
+        assert release.wait(5)
+        return "done"
+    monkeypatch.setattr(bot, "classify_text_for_bot", slow_classification)
+
+    async def run():
+        message = FakeMessage("отзыв")
+        task = asyncio.create_task(bot.text_handler(message))  # type: ignore[arg-type]
+        try:
+            assert await asyncio.to_thread(started.wait, 5)
+            for _ in range(3):
+                task.cancel()
+                await asyncio.sleep(.01)
+                assert not task.done() and bot._classification_lock.locked()
+            busy = FakeMessage("второй отзыв")
+            await bot.text_handler(busy)  # type: ignore[arg-type]
+            assert busy.answers == [bot.BUSY_MESSAGE]
+        finally:
+            release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not bot._classification_lock.locked() and message.answers == []
+
+    asyncio.run(run())
+
+
+def test_event_loop_shutdown_keeps_voice_audio_until_asr_finishes(monkeypatch):
+    started, release = threading.Event(), threading.Event()
+    speech, calls = fake_speech(monkeypatch, started=started, release=release)
+    predicted = recording_predict(monkeypatch)
+    client, message = FakeBot(), FakeVoiceMessage()
+    audio_present_when_worker_ended = []
+    transcribe = speech.transcribe
+
+    def observed_transcribe(path):
+        result = transcribe(path)
+        audio_present_when_worker_ended.append(Path(path).exists())
+        return result
+    monkeypatch.setattr(speech, "transcribe", observed_transcribe)
+
+    async def main():
+        asyncio.create_task(bot.voice_handler(message, client, speech))  # type: ignore[arg-type]
+        assert await asyncio.to_thread(started.wait, 5)
+        # Return with the handler pending: asyncio.run cancels it while ASR still runs.
+        threading.Timer(.3, release.set).start()
+
+    asyncio.run(main())
+    assert audio_present_when_worker_ended == [True]
+    assert not client.downloads[0][1].parent.exists()
+    assert message.answers == [] and predicted == [] and calls.loads == 1
