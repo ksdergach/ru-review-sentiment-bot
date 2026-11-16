@@ -8,7 +8,7 @@ import wave
 import numpy as np
 import pytest
 
-from src.speech import SpeechConfig, SpeechRecognizer
+from src.speech import SpeechConfig, SpeechRecognizer, run_in_thread
 
 
 @pytest.fixture
@@ -129,6 +129,25 @@ def test_model_load_failure_is_distinct_and_recoverable(monkeypatch, audio_path)
     assert recognizer.transcribe(audio_path).status == "empty"
 
 
+def test_eager_load_is_reused_and_failure_propagates(monkeypatch, audio_path):
+    recognizer, loads = setup_fake(monkeypatch, lambda *a, **kw: (iter([SimpleNamespace(text="Привет")]), None))
+    recognizer.load()
+    recognizer.load()
+    result = recognizer.transcribe(audio_path)
+    assert result.status == "ok" and result.model_load_seconds == 0
+    assert len(loads) == 1
+
+    failing = SpeechRecognizer()
+
+    def fail():
+        raise RuntimeError("missing local weights")
+
+    monkeypatch.setattr(failing, "_load_model", fail)
+    with pytest.raises(RuntimeError, match="missing local weights"):
+        failing.load()
+    assert failing._model is None
+
+
 def test_cancellation_waits_for_worker_before_caller_deletes_file(monkeypatch, audio_path):
     started, release, finished = threading.Event(), threading.Event(), threading.Event()
 
@@ -166,6 +185,50 @@ def test_cancellation_waits_for_worker_before_caller_deletes_file(monkeypatch, a
 
     asyncio.run(run())
     assert not audio_path.exists() and len(loads) == 1
+
+
+def test_event_loop_shutdown_waits_for_worker_before_caller_deletes_file(monkeypatch, audio_path):
+    started, release = threading.Event(), threading.Event()
+    events = []
+
+    def transcribe(*args, **kwargs):
+        def segments():
+            started.set()
+            assert release.wait(5)
+            events.append(("worker sees audio", audio_path.exists()))
+            yield SimpleNamespace(text="Готово")
+        return segments(), None
+
+    recognizer, _ = setup_fake(monkeypatch, transcribe)
+
+    async def caller():
+        try:
+            await recognizer.transcribe_async(audio_path)
+        finally:
+            events.append(("caller cleanup", audio_path.exists()))
+            audio_path.unlink()
+
+    async def main():
+        asyncio.create_task(caller())
+        assert await asyncio.to_thread(started.wait, 5)
+        # Return with the task pending: asyncio.run cancels it while the worker runs.
+        threading.Timer(.3, release.set).start()
+
+    asyncio.run(main())
+    assert events == [("worker sees audio", True), ("caller cleanup", True)]
+    assert not audio_path.exists()
+
+
+def test_run_in_thread_returns_results_and_propagates_errors():
+    def fail(value):
+        raise ValueError(value)
+
+    async def run():
+        assert await run_in_thread(lambda a, b: a + b, 2, 3) == 5
+        with pytest.raises(ValueError, match="boom"):
+            await run_in_thread(fail, "boom")
+
+    asyncio.run(run())
 
 
 def test_concurrent_requests_share_one_model(monkeypatch, audio_path):
