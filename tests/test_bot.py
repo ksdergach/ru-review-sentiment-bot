@@ -1472,9 +1472,10 @@ def test_delayed_download_counts_towards_threshold_and_is_cleaned(monkeypatch, t
                 task.cancel()
                 await asyncio.sleep(0)
             await asyncio.sleep(0)
-            # The download stage is being stopped, no new stage starts; slot and file stay.
+            # The download stage is being stopped, no new stage starts; slot and directory
+            # stay (downloaded bytes are kept in memory until the download ends).
             assert client.cancellations >= 1 and not task.done()
-            assert bot._classification_lock.locked() and audio_path.exists()
+            assert bot._classification_lock.locked() and audio_path.parent.exists()
             busy = FakeMessage("второй")
             await bot.text_handler(busy)  # type: ignore[arg-type]
             assert busy.answers == [bot.BUSY_MESSAGE]
@@ -1569,28 +1570,43 @@ def test_unavailable_model_on_text_is_not_a_label(monkeypatch):
     assert "Тональность" not in message.answers[0]
 
 
-# --- T10 review fixes: real aiogram download, safe classifier diagnostics -----------
+# --- T10 review fixes: real aiogram download, file I/O off the event loop, safe logs --
 
 import os
+import time
 
-import aiofiles.threadpool
 from aiogram.types import File
 
+GATE_TIMEOUT = 5  # seconds; bounds every wait so a broken run fails instead of hanging
 
-class GatedWriter(io.BufferedWriter):
-    """A real buffered file; each write (run by aiofiles in a worker thread) waits for a gate."""
+
+class GatedFile(io.BufferedWriter):
+    """The real voice file; write() or flush() (close() runs flush) waits for a gate."""
+
+    def _gated(self, operation):
+        probe = self.probe
+        if operation != probe.stage:
+            return
+        probe.calls.append(threading.get_ident())
+        probe.in_progress += 1
+        probe.started.set()
+        try:
+            if not probe.gate.wait(GATE_TIMEOUT):
+                probe.timed_out = True
+                probe.gate.set()  # never hang the run, even when blocked inside the event loop
+        finally:
+            probe.ends.append((Path(self.name).exists(), bot._classification_lock.locked()))
+            probe.in_progress -= 1
 
     def write(self, data):
+        self._gated("write")
         probe = self.probe
-        probe.writes_in_progress += 1
-        probe.write_started.set()
-        try:
-            assert probe.gate.wait(5), "write was not released"
-            return super().write(data)
-        finally:
-            probe.write_ends.append((Path(self.name).exists(), bot._classification_lock.locked()))
-            probe.writes_in_progress -= 1
-            probe.write_done.set()
+        probe.bytes_written += memoryview(data).nbytes
+        return super().write(data)
+
+    def flush(self):
+        self._gated("flush")
+        return super().flush()
 
 
 def _open_fds_under(directory):
@@ -1607,100 +1623,232 @@ def _open_fds_under(directory):
     return found
 
 
-@pytest.mark.parametrize("handler_cancellations", [0, 1, 3])
-def test_real_aiogram_download_is_finished_before_audio_cleanup(monkeypatch, handler_cancellations):
-    """Real Bot.download and its file adapters; only the Telegram HTTP layer is replaced."""
-    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
-    speech, calls = fake_speech(monkeypatch)
-    predicted = recording_predict(monkeypatch)
-    chunk = b"\x4f\x67\x67\x53" * 1024
-    probe = SimpleNamespace(gate=threading.Event(), write_started=threading.Event(),
-                            write_done=threading.Event(), writes_in_progress=0, write_ends=[])
-    paths, cleanups, stream_ends, stages = [], [], [], []
+NO_OPEN_FDS = 0 if Path("/proc/self/fd").is_dir() else None
 
-    real_sync_open = aiofiles.threadpool.sync_open
 
-    def gated_open(file, mode="r", *args, **kwargs):
-        if "w" not in mode:
-            return real_sync_open(file, mode, *args, **kwargs)
-        writer = GatedWriter(io.FileIO(file, mode))
-        writer.probe = probe
-        return writer
-    monkeypatch.setattr(aiofiles.threadpool, "sync_open", gated_open)
+def instrument_voice_files(monkeypatch, stage):
+    """Every real open of voice.ogg for writing returns a GatedFile; cleanups are recorded."""
+    probe = SimpleNamespace(stage=stage, gate=threading.Event(), started=threading.Event(), calls=[],
+                            ends=[], in_progress=0, timed_out=False, bytes_written=0, files=[], cleanups=[])
+    real_open = Path.open
 
-    real_temporary_path = bot._temporary_voice_path
-
-    @contextlib.contextmanager
-    def recording_temporary_path():
-        with real_temporary_path() as path:
-            paths.append(path)
-            yield path
-    monkeypatch.setattr(bot, "_temporary_voice_path", recording_temporary_path)
+    def gated_open(self, mode="r", *args, **kwargs):
+        if self.name != "voice.ogg" or "w" not in mode:
+            return real_open(self, mode, *args, **kwargs)
+        file = GatedFile(io.FileIO(self, mode))
+        file.probe = probe
+        probe.files.append(file)
+        return file
+    monkeypatch.setattr(Path, "open", gated_open)
 
     real_rmtree = bot.shutil.rmtree
 
     def recording_rmtree(directory, *args, **kwargs):
-        cleanups.append({"writes_in_progress": probe.writes_in_progress,
-                         "download_open": len(stream_ends) == 0,
-                         "open_fds": _open_fds_under(directory)})
+        if Path(directory).name.startswith("ru-review-voice-"):
+            probe.cleanups.append({"directory": Path(directory), "in_progress": probe.in_progress,
+                                   "files_closed": all(file.closed for file in probe.files),
+                                   "open_fds": _open_fds_under(directory)})
         return real_rmtree(directory, *args, **kwargs)
     monkeypatch.setattr(bot.shutil, "rmtree", recording_rmtree)
+    return probe
 
-    async def stream_content(url, timeout, chunk_size, raise_for_status):
-        try:
-            yield chunk
-            await asyncio.Event().wait()  # no more data arrives: the download hangs
-            yield b"never"
-        finally:
-            path = paths[0]
-            stream_ends.append((path.exists(), path.stat().st_size if path.exists() else None,
-                                bot._classification_lock.locked()))
+
+def local_aiogram_bot(chunks, yielded, hang=False):
+    """Real aiogram Bot: download, download_file and its file adapter run unchanged.
+
+    Only get_file and the HTTP stream are local; no Telegram network request is made.
+    """
+    client = bot.Bot("123456:LOCAL_TEST")
 
     async def get_file(file_id):
-        return File(file_id=file_id, file_unique_id="unique", file_size=len(chunk), file_path="voice/file_0.oga")
+        return File(file_id=file_id, file_unique_id="unique", file_path="voice/file_0.oga")
 
-    message = notifying(FakeVoiceMessage())
+    async def stream_content(url, timeout, chunk_size, raise_for_status):
+        for chunk in chunks:
+            yielded.append(len(chunk))
+            yield chunk
+        if hang:
+            await asyncio.Event().wait()  # no more data arrives: the download hangs
+
+    client.get_file = get_file
+    client.session.stream_content = stream_content
+    return client
+
+
+async def wait_until(condition, timeout=GATE_TIMEOUT):
+    deadline = time.monotonic() + timeout
+    while not condition():
+        if time.monotonic() > deadline:
+            return False
+        await asyncio.sleep(.005)
+    return True
+
+
+@pytest.mark.parametrize("extra_cancellations", [1, 3])
+@pytest.mark.parametrize("stage", ["write", "flush"])
+def test_delayed_audio_file_operation_keeps_loop_responsive(monkeypatch, stage, extra_cancellations):
+    """S1: slow write(); S2: slow flush() on close of the real voice file, after a real download."""
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .5)
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    probe = instrument_voice_files(monkeypatch, stage)
+    chunks, yielded = [b"\x4f\x67\x67\x53" * 1024] * 3, []
+    message = notifying(FakeVoiceMessage(file_size=None))
+    seen = {}
 
     async def run():
-        client = bot.Bot("123456:LOCAL_TEST")
-        client.get_file = get_file
-        client.session.stream_content = stream_content
+        seen["loop_thread"] = threading.get_ident()
+        client = local_aiogram_bot(chunks, yielded)
+        beats = [0]
+
+        async def heartbeat():
+            while True:
+                beats[0] += 1
+                await asyncio.sleep(.005)
+        pulse = asyncio.create_task(heartbeat())
+        task = asyncio.create_task(bot.voice_handler(message, client, speech))  # type: ignore[arg-type]
+        try:
+            assert await wait_until(probe.started.is_set), "the delayed file operation never started"
+            beats_at_start = beats[0]
+            help_message, start_message = FakeMessage("/help"), FakeMessage("/start")
+            await bot.help_handler(help_message)  # type: ignore[arg-type]
+            await bot.start_handler(start_message)  # type: ignore[arg-type]
+            seen["commands"] = (help_message.answers, start_message.answers, probe.in_progress)
+            await asyncio.wait_for(message.answered.wait(), GATE_TIMEOUT)  # the threshold passes
+            for _ in range(extra_cancellations):
+                task.cancel()
+                await asyncio.sleep(0)
+            busy = FakeVoiceMessage()
+            await bot.voice_handler(busy, FakeBot(), speech)  # type: ignore[arg-type]
+            await asyncio.sleep(.05)
+            seen["blocked"] = {
+                "in_progress": probe.in_progress, "released": probe.gate.is_set(),
+                "answers": list(message.answers), "busy": busy.answers,
+                "locked": bot._classification_lock.locked(), "task_done": task.done(),
+                "file_exists": Path(probe.files[0].name).exists(),
+            }
+            seen["beats"] = beats[0] - beats_at_start
+        finally:
+            probe.gate.set()
+        try:
+            done, _ = await asyncio.wait((task,), timeout=GATE_TIMEOUT)
+            assert done and task.cancelled()
+            seen["unlocked"] = not bot._classification_lock.locked()
+            seen["stages"] = (len(calls.decoded), len(predicted))
+            probe.stage = None
+            next_message = FakeVoiceMessage()
+            await bot.voice_handler(next_message, FakeBot(), speech)  # type: ignore[arg-type]
+            seen["next"] = next_message.answers
+        finally:
+            pulse.cancel()
+            await client.session.close()
+
+    run_checked(run())
+    assert not probe.timed_out
+    # The gated operation really ran, in a worker thread, never in the event loop thread.
+    assert len(probe.calls) == 1 and seen["loop_thread"] not in probe.calls
+    assert yielded == [4096] * 3
+    # While it was blocked the loop served commands, the threshold and a busy reply.
+    assert seen["commands"] == ([bot.HELP_TEXT], [bot.START_TEXT], 1)
+    assert seen["beats"] >= 5
+    assert seen["blocked"] == {
+        "in_progress": 1, "released": False, "answers": [bot.RESPONSE_TIMEOUT_MESSAGE],
+        "busy": [bot.BUSY_MESSAGE], "locked": True, "task_done": False, "file_exists": True,
+    }
+    # It finished with the file and the slot still held; cleanup came after, once.
+    assert probe.ends == [(True, True)]
+    first_cleanup = probe.cleanups[0]
+    assert first_cleanup["directory"] == Path(probe.files[0].name).parent
+    assert {key: first_cleanup[key] for key in ("in_progress", "files_closed", "open_fds")} == {
+        "in_progress": 0, "files_closed": True, "open_fds": NO_OPEN_FDS}
+    assert not first_cleanup["directory"].exists() and seen["unlocked"]
+    # Nothing late and no later stage after the timeout; the next review is accepted.
+    assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE] and seen["stages"] == (0, 0)
+    assert seen["next"][0].startswith("Распознанный текст:") and len(probe.cleanups) == 2
+
+
+@pytest.mark.parametrize("handler_cancellations", [0, 1, 3])
+def test_timeout_during_real_aiogram_download_writes_no_file(monkeypatch, handler_cancellations):
+    """The threshold passes while the network stream hangs, before any file operation."""
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    probe = instrument_voice_files(monkeypatch, stage="write")
+    yielded = []
+    message = notifying(FakeVoiceMessage(file_size=None))
+
+    async def run():
+        client = local_aiogram_bot([b"\x4f\x67\x67\x53" * 1024], yielded, hang=True)
         try:
             task = asyncio.create_task(bot.voice_handler(message, client, speech))  # type: ignore[arg-type]
             try:
-                await asyncio.wait_for(message.answered.wait(), 5)
+                await asyncio.wait_for(message.answered.wait(), GATE_TIMEOUT)
                 for _ in range(handler_cancellations):
                     task.cancel()
                     await asyncio.sleep(0)
             finally:
-                probe.gate.set()  # a write delayed past the threshold finishes only now
-            if handler_cancellations:
-                with pytest.raises(asyncio.CancelledError):
-                    await task
-            else:
-                await task
-            if probe.write_started.is_set():
-                assert await asyncio.to_thread(probe.write_done.wait, 5)
+                probe.gate.set()
+            done, _ = await asyncio.wait((task,), timeout=GATE_TIMEOUT)
+            assert done and task.cancelled() == bool(handler_cancellations)
             assert not bot._classification_lock.locked()
-            stages.extend([len(calls.decoded), len(predicted)])
-            # The slot is free again: the next voice review is accepted.
-            next_message = FakeVoiceMessage()
-            await bot.voice_handler(next_message, FakeBot(), speech)  # type: ignore[arg-type]
-            assert next_message.answers[0].startswith("Распознанный текст:")
         finally:
             await client.session.close()
 
     run_checked(run())
-    # One delay notice and nothing late; the timeout stopped the work before Whisper.
     assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE]
-    assert stages == [0, 0]
-    # Data reached the file through aiogram; download ended while file and slot were held.
-    assert stream_ends == [(True, len(chunk), True)]
-    assert all(exists and locked for exists, locked in probe.write_ends), probe.write_ends
-    # Cleanup ran once, after the download and every file write and close had finished.
-    expected_fds = 0 if cleanups and cleanups[0]["open_fds"] is not None else None
-    assert cleanups[:1] == [{"writes_in_progress": 0, "download_open": False, "open_fds": expected_fds}]
-    assert not paths[0].parent.exists()
+    assert yielded == [4096] and probe.files == [] and probe.calls == []
+    assert calls.decoded == [] and predicted == []
+    assert len(probe.cleanups) == 1 and not probe.cleanups[0]["directory"].exists()
+    assert probe.cleanups[0]["open_fds"] == NO_OPEN_FDS
+
+
+def test_audio_save_failure_is_controlled(monkeypatch, caplog):
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    probe = instrument_voice_files(monkeypatch, stage=None)
+
+    def full_disk(path, data):
+        raise OSError(28, f"No space left on device: {PRIVATE_POSIX_PATH}")
+    monkeypatch.setattr(bot, "_save_audio", full_disk)
+    client, message = FakeBot(), FakeVoiceMessage()
+    with caplog.at_level(logging.WARNING):
+        run_voice(message, client, speech)
+    assert message.answers == [bot.VOICE_DOWNLOAD_ERROR_MESSAGE]
+    assert "Voice download failed: OSError" in caplog.text and "private-path-marker" not in caplog.text
+    assert calls.decoded == [] and predicted == []
+    assert len(probe.cleanups) == 1 and not client.downloads[0][1].parent.exists()
+
+
+@pytest.mark.parametrize("extra_bytes,rejected", [(0, False), (1, True)])
+def test_real_aiogram_download_limit_is_enforced_in_memory(monkeypatch, caplog, extra_bytes, rejected):
+    """At most MAX_VOICE_BYTES are buffered; a larger download stops and never reaches the disk."""
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    probe = instrument_voice_files(monkeypatch, stage=None)
+    chunk = b"\0" * 65536
+    chunks = [chunk] * (bot.MAX_VOICE_BYTES // len(chunk)) + [b"\0"] * extra_bytes + [chunk] * 3 * extra_bytes
+    yielded = []
+    message = FakeVoiceMessage(file_size=None)
+
+    async def run():
+        client = local_aiogram_bot(chunks, yielded)
+        try:
+            await bot.voice_handler(message, client, speech)  # type: ignore[arg-type]
+        finally:
+            await client.session.close()
+
+    with caplog.at_level(logging.WARNING):
+        run_checked(run())
+    assert len(probe.cleanups) == 1 and not probe.cleanups[0]["directory"].exists()
+    if rejected:
+        assert message.answers == [bot.VOICE_TOO_LARGE_MESSAGE]
+        assert "downloaded file exceeds the size limit" in caplog.text
+        # The download stopped at the first byte over the limit; nothing was written to disk.
+        assert sum(yielded) == bot.MAX_VOICE_BYTES + 1 and probe.files == []
+        assert calls.decoded == [] and calls.loads == 0 and predicted == []
+    else:
+        assert message.answers[0].startswith("Распознанный текст:")
+        assert probe.bytes_written == bot.MAX_VOICE_BYTES and calls.decoded[0][1]
 
 
 PRIVATE_POSIX_PATH = "/srv/private-path-marker/models/tfidf_logreg_baseline.joblib"

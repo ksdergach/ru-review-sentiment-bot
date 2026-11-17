@@ -8,14 +8,15 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
+import io
 import logging
 import os
 from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Any, Coroutine, Iterator
+from typing import Any, AsyncIterator, Coroutine
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
@@ -211,7 +212,7 @@ def classify_transcript_for_bot(transcript: str) -> str:
 
 
 def check_voice_limits(voice: Voice) -> str | None:
-    """Проверка по метаданным Telegram до скачивания; размер файла проверяется и после."""
+    """Проверка по метаданным Telegram до скачивания; фактический размер — при скачивании."""
     if voice.duration > MAX_VOICE_SECONDS:
         return VOICE_TOO_LONG_MESSAGE
     if voice.file_size is not None and voice.file_size > MAX_VOICE_BYTES:
@@ -219,36 +220,74 @@ def check_voice_limits(voice: Voice) -> str | None:
     return None
 
 
-@contextmanager
-def _temporary_voice_path() -> Iterator[Path]:
-    """Уникальный закрытый каталог для одного аудио; удаляется при любом исходе."""
-    directory = Path(tempfile.mkdtemp(prefix="ru-review-voice-"))
+class _VoiceTooLarge(Exception):
+    """Скачанные байты превысили MAX_VOICE_BYTES."""
+
+
+class _VoiceBuffer(io.BytesIO):
+    """Download target in memory, never larger than MAX_VOICE_BYTES.
+
+    aiogram calls write() and flush() of a file object in the event loop, so they must
+    not touch the disk. For a path it writes through aiofiles worker threads that
+    cancellation abandons. name is the file the audio is saved to after the download.
+    """
+
+    def __init__(self, path: Path) -> None:
+        super().__init__()
+        self.name = str(path)
+
+    def write(self, data: Any) -> int:
+        # file_size may be absent or wrong; the downloaded bytes decide before Whisper.
+        if self.tell() + memoryview(data).nbytes > MAX_VOICE_BYTES:
+            raise _VoiceTooLarge
+        return super().write(data)
+
+
+def _save_audio(path: Path, data: memoryview) -> None:
+    with path.open("wb") as file:
+        file.write(data)
+
+
+def _remove_directory(directory: Path) -> None:
     try:
-        yield directory / "voice.ogg"
+        shutil.rmtree(directory)
+    except OSError:
+        logger.warning("Could not remove temporary voice directory")
+
+
+@asynccontextmanager
+async def _temporary_voice_path() -> AsyncIterator[Path]:
+    """Уникальный закрытый каталог для одного аудио; удаляется при любом исходе.
+
+    Disk work runs in worker threads through run_in_thread, which returns or re-raises a
+    cancellation only after its thread ended: no file operation outlives the directory,
+    and the caller keeps the slot until the directory is removed.
+    """
+    created: list[Path] = []
+    try:
+        await run_in_thread(lambda: created.append(Path(tempfile.mkdtemp(prefix="ru-review-voice-"))))
+        yield created[0] / "voice.ogg"
     finally:
-        try:
-            shutil.rmtree(directory)
-        except OSError:
-            logger.warning("Could not remove temporary voice directory")
+        if created:
+            await run_in_thread(_remove_directory, created[0])
 
 
 async def recognize_and_classify_voice(bot: Bot, speech: SpeechRecognizer, voice: Voice) -> str:
     """Скачать голос, распознать его и классифицировать полный текст."""
-    with _temporary_voice_path() as audio_path:
+    async with _temporary_voice_path() as audio_path:
+        buffer = _VoiceBuffer(audio_path)
         try:
-            # An open file, not a path: aiogram then writes each chunk synchronously in the
-            # event loop. For a path it writes through aiofiles worker threads that
-            # cancellation does not stop, so the file could be removed while still written.
-            with audio_path.open("wb") as destination:
-                await bot.download(voice.file_id, destination=destination)
-            size = audio_path.stat().st_size
+            await bot.download(voice.file_id, destination=buffer)
+            with buffer.getbuffer() as data:
+                await run_in_thread(_save_audio, audio_path, data)
+        except _VoiceTooLarge:
+            logger.warning("Voice rejected: downloaded file exceeds the size limit")
+            return VOICE_TOO_LARGE_MESSAGE
         except Exception as exc:
             logger.warning("Voice download failed: %s", type(exc).__name__)
             return VOICE_DOWNLOAD_ERROR_MESSAGE
-        # file_size may be absent or wrong; the downloaded bytes decide before Whisper.
-        if size > MAX_VOICE_BYTES:
-            logger.warning("Voice rejected: downloaded file exceeds the size limit")
-            return VOICE_TOO_LARGE_MESSAGE
+        finally:
+            buffer.close()
         # Waits for the worker even on cancellation, so the file outlives its use.
         result = await speech.transcribe_async(audio_path)
 
