@@ -224,6 +224,10 @@ class _VoiceTooLarge(Exception):
     """Скачанные байты превысили MAX_VOICE_BYTES."""
 
 
+class _VoiceStorageError(Exception):
+    """Временный каталог для аудио не создан; сообщение — только тип исходной ошибки."""
+
+
 class _VoiceBuffer(io.BytesIO):
     """Download target in memory, never larger than MAX_VOICE_BYTES.
 
@@ -265,7 +269,11 @@ async def _temporary_voice_path() -> AsyncIterator[Path]:
     """
     created: list[Path] = []
     try:
-        await run_in_thread(lambda: created.append(Path(tempfile.mkdtemp(prefix="ru-review-voice-"))))
+        try:
+            await run_in_thread(lambda: created.append(Path(tempfile.mkdtemp(prefix="ru-review-voice-"))))
+        except OSError as exc:
+            # The OSError message holds an absolute path; keep only its type.
+            raise _VoiceStorageError(type(exc).__name__) from None
         yield created[0] / "voice.ogg"
     finally:
         if created:
@@ -274,22 +282,26 @@ async def _temporary_voice_path() -> AsyncIterator[Path]:
 
 async def recognize_and_classify_voice(bot: Bot, speech: SpeechRecognizer, voice: Voice) -> str:
     """Скачать голос, распознать его и классифицировать полный текст."""
-    async with _temporary_voice_path() as audio_path:
-        buffer = _VoiceBuffer(audio_path)
-        try:
-            await bot.download(voice.file_id, destination=buffer)
-            with buffer.getbuffer() as data:
-                await run_in_thread(_save_audio, audio_path, data)
-        except _VoiceTooLarge:
-            logger.warning("Voice rejected: downloaded file exceeds the size limit")
-            return VOICE_TOO_LARGE_MESSAGE
-        except Exception as exc:
-            logger.warning("Voice download failed: %s", type(exc).__name__)
-            return VOICE_DOWNLOAD_ERROR_MESSAGE
-        finally:
-            buffer.close()
-        # Waits for the worker even on cancellation, so the file outlives its use.
-        result = await speech.transcribe_async(audio_path)
+    try:
+        async with _temporary_voice_path() as audio_path:
+            buffer = _VoiceBuffer(audio_path)
+            try:
+                await bot.download(voice.file_id, destination=buffer)
+                with buffer.getbuffer() as data:
+                    await run_in_thread(_save_audio, audio_path, data)
+            except _VoiceTooLarge:
+                logger.warning("Voice rejected: downloaded file exceeds the size limit")
+                return VOICE_TOO_LARGE_MESSAGE
+            except Exception as exc:
+                logger.warning("Voice download failed: %s", type(exc).__name__)
+                return VOICE_DOWNLOAD_ERROR_MESSAGE
+            finally:
+                buffer.close()
+            # Waits for the worker even on cancellation, so the file outlives its use.
+            result = await speech.transcribe_async(audio_path)
+    except _VoiceStorageError as exc:
+        logger.warning("Could not create temporary voice directory: %s", exc)
+        return VOICE_DOWNLOAD_ERROR_MESSAGE
 
     if result.status == "empty":
         return EMPTY_SPEECH_MESSAGE

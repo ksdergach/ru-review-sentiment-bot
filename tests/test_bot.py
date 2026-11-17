@@ -1920,3 +1920,104 @@ def test_worker_failure_after_threshold_is_logged_by_type_only(monkeypatch, capl
     assert "Worker failed after cancellation: RuntimeError" in caplog.text
     assert USER_TEXT_MARKER not in caplog.text and "private-path-marker" not in caplog.text
     assert not bot._classification_lock.locked()
+
+
+# --- T10 review fixes: the temporary audio directory cannot be created ----------------
+
+from datetime import datetime, timezone
+
+from aiogram import Dispatcher
+from aiogram.types import Chat, Message, Update, Voice
+
+PRIVATE_TEMP_DIR = PRIVATE_POSIX_PATH.rsplit("/", 1)[0] + "/ru-review-voice-x"
+
+
+def denied_mkdtemp(*args, **kwargs):
+    raise PermissionError(13, f"Permission denied ({USER_TEXT_MARKER})", PRIVATE_TEMP_DIR)
+
+
+class RecordingBot(Bot):
+    """Real aiogram Bot; Telegram API calls are recorded instead of sent."""
+
+    def __init__(self) -> None:
+        super().__init__("123456:LOCAL_TEST")
+        self.sent = []
+
+    async def __call__(self, method, request_timeout=None):
+        self.sent.append(method)
+        return True
+
+
+def test_mkdtemp_failure_through_dispatcher_is_safe(monkeypatch, log_stream, caplog):
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    monkeypatch.setattr(bot.tempfile, "mkdtemp", denied_mkdtemp)
+    # The module router attaches to one Dispatcher per process; detach it after the test.
+    monkeypatch.setattr(bot.router, "_parent_router", None)
+    dispatcher = Dispatcher(speech=speech)
+    dispatcher.include_router(bot.router)
+    client = RecordingBot()
+    update = Update(update_id=1, message=Message(
+        message_id=1, date=datetime.now(timezone.utc), chat=Chat(id=1, type="private"),
+        voice=Voice(file_id="voice-file-id", file_unique_id="unique", duration=5, file_size=20_000)))
+
+    async def run():
+        try:
+            return await dispatcher._process_update(client, update)
+        finally:
+            await client.session.close()
+
+    with caplog.at_level(logging.DEBUG):
+        handled = run_checked(run())
+    assert handled is True
+    # Exactly one safe message to the user, no later stage, the slot is free again.
+    assert [(type(m).__name__, m.text) for m in client.sent] == [("SendMessage", bot.VOICE_DOWNLOAD_ERROR_MESSAGE)]
+    assert calls.decoded == [] and calls.loads == 0 and predicted == []
+    assert not bot._classification_lock.locked()
+    output = logged_output(log_stream, caplog)
+    assert "Could not create temporary voice directory: PermissionError" in output
+    for marker in ("private-path-marker", USER_TEXT_MARKER, "Traceback", "Cause exception while process update"):
+        assert marker not in output, marker
+
+
+@pytest.mark.parametrize("when,handler_cancellations", [("threshold", 0), ("threshold", 1), ("threshold", 3),
+                                                         ("cancel", 1)])
+def test_mkdtemp_failure_after_threshold_or_cancel_sends_nothing_late(monkeypatch, caplog, when, handler_cancellations):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01 if when == "threshold" else 60)
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    started, release = threading.Event(), threading.Event()
+
+    def slow_denied_mkdtemp(*args, **kwargs):
+        started.set()
+        assert release.wait(GATE_TIMEOUT)
+        denied_mkdtemp()
+    monkeypatch.setattr(bot.tempfile, "mkdtemp", slow_denied_mkdtemp)
+    client, message = FakeBot(), notifying(FakeVoiceMessage())
+
+    async def run():
+        task = asyncio.create_task(bot.voice_handler(message, client, speech))  # type: ignore[arg-type]
+        try:
+            assert await wait_until(started.is_set)
+            if when == "threshold":
+                await asyncio.wait_for(message.answered.wait(), GATE_TIMEOUT)
+            for _ in range(handler_cancellations):
+                task.cancel()
+                await asyncio.sleep(0)
+            await asyncio.sleep(.05)
+            # The directory is still being created: the slot is held, nothing else started.
+            assert bot._classification_lock.locked() and not task.done()
+        finally:
+            release.set()
+        done, _ = await asyncio.wait((task,), timeout=GATE_TIMEOUT)
+        # Cancellation is never swallowed by the directory error handling.
+        assert done and task.cancelled() == bool(handler_cancellations)
+        assert not bot._classification_lock.locked()
+
+    with caplog.at_level(logging.DEBUG):
+        run_checked(run())
+    assert message.answers == ([bot.RESPONSE_TIMEOUT_MESSAGE] if when == "threshold" else [])
+    assert client.downloads == [] and calls.decoded == [] and predicted == []
+    assert "Worker failed after cancellation: PermissionError" in caplog.text
+    for marker in ("private-path-marker", USER_TEXT_MARKER, "Traceback"):
+        assert marker not in caplog.text, marker
