@@ -171,6 +171,12 @@ def format_prediction(result: dict[str, Any]) -> str:
     )
 
 
+def _error_kind(exc: BaseException) -> str:
+    """Типы ошибки и её причины без сообщений и traceback: там бывают пути и текст отзыва."""
+    cause = exc.__cause__
+    return type(exc).__name__ if cause is None else f"{type(exc).__name__} ({type(cause).__name__})"
+
+
 def classify_text_for_bot(text: str) -> str:
     """Выполнить тот же predict, который доступен для прямого вызова."""
     try:
@@ -181,8 +187,8 @@ def classify_text_for_bot(text: str) -> str:
         return TOO_LONG_MESSAGE
     except InvalidTextError:
         return EMPTY_TEXT_MESSAGE
-    except ClassifierError:
-        logger.exception("Text classification failed")
+    except ClassifierError as exc:
+        logger.error("Text classification failed: %s", _error_kind(exc))
         return MODEL_ERROR_MESSAGE
 
     return format_prediction(result)
@@ -197,8 +203,8 @@ def classify_transcript_for_bot(transcript: str) -> str:
         return TRANSCRIPT_TOO_LONG_MESSAGE
     except InvalidTextError:
         return EMPTY_SPEECH_MESSAGE
-    except ClassifierError:
-        logger.exception("Voice transcript classification failed")
+    except ClassifierError as exc:
+        logger.error("Voice transcript classification failed: %s", _error_kind(exc))
         return MODEL_ERROR_MESSAGE
 
     return f"Распознанный текст:\n{transcript}\n\n{format_prediction(result)}"
@@ -230,7 +236,11 @@ async def recognize_and_classify_voice(bot: Bot, speech: SpeechRecognizer, voice
     """Скачать голос, распознать его и классифицировать полный текст."""
     with _temporary_voice_path() as audio_path:
         try:
-            await bot.download(voice.file_id, destination=audio_path)
+            # An open file, not a path: aiogram then writes each chunk synchronously in the
+            # event loop. For a path it writes through aiofiles worker threads that
+            # cancellation does not stop, so the file could be removed while still written.
+            with audio_path.open("wb") as destination:
+                await bot.download(voice.file_id, destination=destination)
             size = audio_path.stat().st_size
         except Exception as exc:
             logger.warning("Voice download failed: %s", type(exc).__name__)

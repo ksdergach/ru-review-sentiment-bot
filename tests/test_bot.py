@@ -362,6 +362,19 @@ class FakeVoiceMessage(FakeMessage):
         self.voice = SimpleNamespace(file_id=file_id, duration=duration, file_size=file_size)
 
 
+def write_destination(destination, data: bytes) -> Path:
+    """Write like Bot.download: into an open binary file or to a path; return the path."""
+    if hasattr(destination, "write"):
+        destination.write(data)
+        return Path(destination.name)
+    Path(destination).write_bytes(data)
+    return Path(destination)
+
+
+def destination_path(destination) -> Path:
+    return Path(destination.name if hasattr(destination, "write") else destination)
+
+
 class FakeBot:
     """Telegram download stub: writes synthetic bytes, never touches the network."""
 
@@ -370,11 +383,11 @@ class FakeBot:
         self.payload = payload
         self.downloads: list[tuple[str, Path]] = []
 
-    async def download(self, file_id: str, destination: Path) -> None:
-        self.downloads.append((file_id, Path(destination)))
+    async def download(self, file_id: str, destination) -> None:
+        self.downloads.append((file_id, destination_path(destination)))
         if self.error is not None:
             raise self.error
-        Path(destination).write_bytes(self.payload)
+        write_destination(destination, self.payload)
 
 
 def fake_speech(monkeypatch, segments=("Отличный фильм,", "понравился сюжет."), *, fail=False, started=None, release=None):
@@ -806,7 +819,7 @@ def _propagate(monkeypatch, build, speech):
 
     async def download(self, file_id, destination=None, **kwargs):
         downloads.append(file_id)
-        Path(destination).write_bytes(b"synthetic voice")
+        write_destination(destination, b"synthetic voice")
 
     monkeypatch.setattr(bot.Bot, "__call__", answer)
     monkeypatch.setattr(bot.Bot, "download", download)
@@ -1176,8 +1189,8 @@ def test_duration_limit_without_file_size(monkeypatch, duration, accepted):
 
 class PartialDownloadBot(FakeBot):
     async def download(self, file_id, destination):
-        self.downloads.append((file_id, Path(destination)))
-        Path(destination).write_bytes(b"partial")
+        self.downloads.append((file_id, destination_path(destination)))
+        write_destination(destination, b"partial")
         raise ConnectionError("connection reset")
 
 
@@ -1423,8 +1436,8 @@ class SlowDownloadBot(FakeBot):
         self.cancellations = 0
 
     async def download(self, file_id, destination):
-        self.downloads.append((file_id, Path(destination)))
-        Path(destination).write_bytes(b"partial")
+        self.downloads.append((file_id, destination_path(destination)))
+        write_destination(destination, b"partial")
         self.in_progress.set()
         try:
             await asyncio.Event().wait()
@@ -1554,3 +1567,208 @@ def test_unavailable_model_on_text_is_not_a_label(monkeypatch):
     asyncio.run(bot.text_handler(message))  # type: ignore[arg-type]
     assert message.answers == [bot.MODEL_ERROR_MESSAGE]
     assert "Тональность" not in message.answers[0]
+
+
+# --- T10 review fixes: real aiogram download, safe classifier diagnostics -----------
+
+import os
+
+import aiofiles.threadpool
+from aiogram.types import File
+
+
+class GatedWriter(io.BufferedWriter):
+    """A real buffered file; each write (run by aiofiles in a worker thread) waits for a gate."""
+
+    def write(self, data):
+        probe = self.probe
+        probe.writes_in_progress += 1
+        probe.write_started.set()
+        try:
+            assert probe.gate.wait(5), "write was not released"
+            return super().write(data)
+        finally:
+            probe.write_ends.append((Path(self.name).exists(), bot._classification_lock.locked()))
+            probe.writes_in_progress -= 1
+            probe.write_done.set()
+
+
+def _open_fds_under(directory):
+    """Open descriptors of this process that point into directory (Linux /proc)."""
+    fd_dir = Path("/proc/self/fd")
+    if not fd_dir.is_dir():
+        return None
+    found = 0
+    for fd in fd_dir.iterdir():
+        try:
+            found += os.readlink(fd).startswith(str(directory))
+        except OSError:
+            pass
+    return found
+
+
+@pytest.mark.parametrize("handler_cancellations", [0, 1, 3])
+def test_real_aiogram_download_is_finished_before_audio_cleanup(monkeypatch, handler_cancellations):
+    """Real Bot.download and its file adapters; only the Telegram HTTP layer is replaced."""
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    chunk = b"\x4f\x67\x67\x53" * 1024
+    probe = SimpleNamespace(gate=threading.Event(), write_started=threading.Event(),
+                            write_done=threading.Event(), writes_in_progress=0, write_ends=[])
+    paths, cleanups, stream_ends, stages = [], [], [], []
+
+    real_sync_open = aiofiles.threadpool.sync_open
+
+    def gated_open(file, mode="r", *args, **kwargs):
+        if "w" not in mode:
+            return real_sync_open(file, mode, *args, **kwargs)
+        writer = GatedWriter(io.FileIO(file, mode))
+        writer.probe = probe
+        return writer
+    monkeypatch.setattr(aiofiles.threadpool, "sync_open", gated_open)
+
+    real_temporary_path = bot._temporary_voice_path
+
+    @contextlib.contextmanager
+    def recording_temporary_path():
+        with real_temporary_path() as path:
+            paths.append(path)
+            yield path
+    monkeypatch.setattr(bot, "_temporary_voice_path", recording_temporary_path)
+
+    real_rmtree = bot.shutil.rmtree
+
+    def recording_rmtree(directory, *args, **kwargs):
+        cleanups.append({"writes_in_progress": probe.writes_in_progress,
+                         "download_open": len(stream_ends) == 0,
+                         "open_fds": _open_fds_under(directory)})
+        return real_rmtree(directory, *args, **kwargs)
+    monkeypatch.setattr(bot.shutil, "rmtree", recording_rmtree)
+
+    async def stream_content(url, timeout, chunk_size, raise_for_status):
+        try:
+            yield chunk
+            await asyncio.Event().wait()  # no more data arrives: the download hangs
+            yield b"never"
+        finally:
+            path = paths[0]
+            stream_ends.append((path.exists(), path.stat().st_size if path.exists() else None,
+                                bot._classification_lock.locked()))
+
+    async def get_file(file_id):
+        return File(file_id=file_id, file_unique_id="unique", file_size=len(chunk), file_path="voice/file_0.oga")
+
+    message = notifying(FakeVoiceMessage())
+
+    async def run():
+        client = bot.Bot("123456:LOCAL_TEST")
+        client.get_file = get_file
+        client.session.stream_content = stream_content
+        try:
+            task = asyncio.create_task(bot.voice_handler(message, client, speech))  # type: ignore[arg-type]
+            try:
+                await asyncio.wait_for(message.answered.wait(), 5)
+                for _ in range(handler_cancellations):
+                    task.cancel()
+                    await asyncio.sleep(0)
+            finally:
+                probe.gate.set()  # a write delayed past the threshold finishes only now
+            if handler_cancellations:
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            else:
+                await task
+            if probe.write_started.is_set():
+                assert await asyncio.to_thread(probe.write_done.wait, 5)
+            assert not bot._classification_lock.locked()
+            stages.extend([len(calls.decoded), len(predicted)])
+            # The slot is free again: the next voice review is accepted.
+            next_message = FakeVoiceMessage()
+            await bot.voice_handler(next_message, FakeBot(), speech)  # type: ignore[arg-type]
+            assert next_message.answers[0].startswith("Распознанный текст:")
+        finally:
+            await client.session.close()
+
+    run_checked(run())
+    # One delay notice and nothing late; the timeout stopped the work before Whisper.
+    assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE]
+    assert stages == [0, 0]
+    # Data reached the file through aiogram; download ended while file and slot were held.
+    assert stream_ends == [(True, len(chunk), True)]
+    assert all(exists and locked for exists, locked in probe.write_ends), probe.write_ends
+    # Cleanup ran once, after the download and every file write and close had finished.
+    expected_fds = 0 if cleanups and cleanups[0]["open_fds"] is not None else None
+    assert cleanups[:1] == [{"writes_in_progress": 0, "download_open": False, "open_fds": expected_fds}]
+    assert not paths[0].parent.exists()
+
+
+PRIVATE_POSIX_PATH = "/srv/private-path-marker/models/tfidf_logreg_baseline.joblib"
+PRIVATE_WINDOWS_PATH = r"C:\Users\Private Path Marker\models\run_metadata.json"
+USER_TEXT_MARKER = "ЛИЧНЫЙ-ТЕКСТ-МАРКЕР"
+PROTECTED_MARKERS = ("private-path-marker", "Private Path Marker", USER_TEXT_MARKER, FAKE_SECRET, "Traceback")
+
+
+def run_mode(monkeypatch, mode, text):
+    if mode == "voice":
+        speech, _ = fake_speech(monkeypatch, segments=(text,))
+        message = FakeVoiceMessage()
+        run_voice(message, FakeBot(), speech)
+    else:
+        message = FakeMessage(text)
+        asyncio.run(bot.text_handler(message))  # type: ignore[arg-type]
+    return message
+
+
+def logged_output(log_stream, caplog):
+    """Formatted records as handlers write them, plus what caplog captured with tracebacks."""
+    assert all(record.exc_info is None and not record.exc_text for record in caplog.records)
+    return log_stream.getvalue() + caplog.text
+
+
+@pytest.mark.parametrize("mode", ["text", "voice"])
+def test_classifier_failure_log_has_no_paths_text_or_token(monkeypatch, log_stream, caplog, mode):
+    bot.protect_token_in_logs(FAKE_TOKEN)
+    cause = FileNotFoundError(2, f"No such file ({USER_TEXT_MARKER}, {FAKE_TOKEN})", PRIVATE_WINDOWS_PATH)
+    error = classifier.ModelUnavailableError(
+        f"Could not load verified baseline bundle {PRIVATE_POSIX_PATH}: {cause}")
+    error.__cause__ = cause
+    predicted = recording_predict(monkeypatch, error=error)
+    with caplog.at_level(logging.DEBUG):
+        message = run_mode(monkeypatch, mode, f"{USER_TEXT_MARKER} отзыв")
+    assert predicted and message.answers == [bot.MODEL_ERROR_MESSAGE]
+    output = logged_output(log_stream, caplog)
+    assert "classification failed: ModelUnavailableError (FileNotFoundError)" in output
+    for marker in PROTECTED_MARKERS:
+        assert marker not in output, marker
+
+
+@pytest.mark.parametrize("mode", ["text", "voice"])
+def test_unavailable_real_bundle_log_has_no_absolute_path(tmp_path, monkeypatch, log_stream, caplog, mode):
+    model_path = tmp_path / "private-path-marker" / "missing.joblib"
+    monkeypatch.setattr(classifier, "_default_classifier", baseline(model_path))
+    with caplog.at_level(logging.DEBUG):
+        message = run_mode(monkeypatch, mode, f"{USER_TEXT_MARKER} отзыв")
+    assert message.answers == [bot.MODEL_ERROR_MESSAGE]
+    assert "Тональность" not in message.answers[0]
+    output = logged_output(log_stream, caplog)
+    assert "classification failed: ModelUnavailableError" in output
+    for marker in (str(tmp_path), "private-path-marker", USER_TEXT_MARKER, "Traceback"):
+        assert marker not in output, marker
+
+
+def test_worker_failure_after_threshold_is_logged_by_type_only(monkeypatch, caplog):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
+    release = threading.Event()
+
+    def failing_classify(text):
+        assert release.wait(5)
+        raise RuntimeError(f"internal detail for {text} at {PRIVATE_POSIX_PATH}")
+    monkeypatch.setattr(bot, "classify_text_for_bot", failing_classify)
+    message = notifying(FakeMessage(USER_TEXT_MARKER), on_answer=lambda text: release.set())
+    with caplog.at_level(logging.DEBUG):
+        run_checked(bot.text_handler(message))  # type: ignore[arg-type]
+    assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE]
+    assert "Worker failed after cancellation: RuntimeError" in caplog.text
+    assert USER_TEXT_MARKER not in caplog.text and "private-path-marker" not in caplog.text
+    assert not bot._classification_lock.locked()

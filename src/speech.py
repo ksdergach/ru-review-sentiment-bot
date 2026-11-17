@@ -6,6 +6,7 @@ import argparse
 import asyncio
 from dataclasses import asdict, dataclass
 import json
+import logging
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import threading
@@ -13,6 +14,7 @@ from time import perf_counter
 from typing import Any, Callable, Literal, TypeVar
 
 ROOT = Path(__file__).resolve().parents[1]
+logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 
@@ -34,8 +36,9 @@ async def run_in_thread(func: Callable[..., _T], /, *args: Any) -> _T:
         except asyncio.CancelledError as exc:
             cancelled = exc
     if cancelled is not None:
-        if not future.cancelled():
-            future.exception()  # Retrieved; the cancellation is reported instead.
+        if not future.cancelled() and future.exception() is not None:
+            # The cancellation is re-raised instead; keep the worker failure visible by type.
+            logger.warning("Worker failed after cancellation: %s", type(future.exception()).__name__)
         raise cancelled
     return future.result()
 
