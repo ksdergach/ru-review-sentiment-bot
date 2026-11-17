@@ -1086,3 +1086,471 @@ def test_event_loop_shutdown_keeps_voice_audio_until_asr_finishes(monkeypatch):
     assert audio_present_when_worker_ended == [True]
     assert not client.downloads[0][1].parent.exists()
     assert message.answers == [] and predicted == [] and calls.loads == 1
+
+
+# --- T10: actual size, busy slot, response timeout, cleanup ---------------------------
+
+import gc
+
+MAX = 5_242_880  # 5 MiB, not 5_000_000
+
+
+def notifying(message, fail_on=None, on_answer=None):
+    """Lets a test await the first answer instead of sleeping; optionally fails a send."""
+    message.answered = asyncio.Event()
+
+    async def answer(text):
+        message.answers.append(text)
+        message.answered.set()
+        if on_answer is not None:
+            on_answer(text)
+        if text == fail_on:
+            raise ConnectionError("telegram unavailable")
+    message.answer = answer
+    return message
+
+
+def run_checked(coro):
+    """asyncio.run that fails on unretrieved task exceptions and other loop errors."""
+    errors = []
+
+    async def main():
+        asyncio.get_running_loop().set_exception_handler(lambda loop, context: errors.append(context))
+        try:
+            return await coro
+        finally:
+            gc.collect()
+    result = asyncio.run(main())
+    gc.collect()  # Task.__del__ of finished tasks reports to the same handler
+    assert errors == [], errors
+    return result
+
+
+def observe_audio_at_worker_end(monkeypatch, speech):
+    seen = []
+    transcribe = speech.transcribe
+
+    def observed(path):
+        result = transcribe(path)
+        seen.append(Path(path).exists())
+        return result
+    monkeypatch.setattr(speech, "transcribe", observed)
+    return seen
+
+
+@pytest.mark.parametrize("file_size,payload_size,rejected", [
+    (None, MAX, False),
+    (None, MAX + 1, True),
+    (1000, MAX + 1, True),   # metadata smaller than the real file
+    (MAX, MAX, False),
+])
+def test_downloaded_size_is_checked_before_whisper(monkeypatch, caplog, file_size, payload_size, rejected):
+    assert bot.MAX_VOICE_BYTES == MAX
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    client = FakeBot(payload=b"\0" * payload_size)
+    message = FakeVoiceMessage(file_size=file_size)
+    with caplog.at_level(logging.WARNING):
+        run_voice(message, client, speech)
+    assert len(client.downloads) == 1
+    if rejected:
+        assert message.answers == [bot.VOICE_TOO_LARGE_MESSAGE]
+        assert calls.decoded == [] and calls.loads == 0 and predicted == []
+        assert "downloaded file exceeds the size limit" in caplog.text
+    else:
+        assert calls.decoded and message.answers[0].startswith("Распознанный текст:")
+    assert not client.downloads[0][1].parent.exists()
+
+
+@pytest.mark.parametrize("duration,accepted", [(30, True), (31, False)])
+def test_duration_limit_without_file_size(monkeypatch, duration, accepted):
+    speech, _ = fake_speech(monkeypatch)
+    recording_predict(monkeypatch)
+    client, message = FakeBot(), FakeVoiceMessage(duration=duration, file_size=None)
+    run_voice(message, client, speech)
+    if accepted:
+        assert len(client.downloads) == 1 and "Тональность:" in message.answers[0]
+    else:
+        assert message.answers == [bot.VOICE_TOO_LONG_MESSAGE] and client.downloads == []
+
+
+class PartialDownloadBot(FakeBot):
+    async def download(self, file_id, destination):
+        self.downloads.append((file_id, Path(destination)))
+        Path(destination).write_bytes(b"partial")
+        raise ConnectionError("connection reset")
+
+
+def test_partially_downloaded_audio_is_removed(monkeypatch):
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    client, message = PartialDownloadBot(), FakeVoiceMessage()
+    run_voice(message, client, speech)
+    assert message.answers == [bot.VOICE_DOWNLOAD_ERROR_MESSAGE]
+    assert calls.decoded == [] and predicted == []
+    assert not client.downloads[0][1].parent.exists()
+
+
+def test_text_handler_length_boundary(tmp_path, monkeypatch):
+    monkeypatch.setattr(classifier, "_default_classifier", baseline(make_real_bundle(tmp_path)))
+    accepted, rejected = FakeMessage("а" * 2000), FakeMessage("а" * 2001)
+    asyncio.run(bot.text_handler(accepted))  # type: ignore[arg-type]
+    asyncio.run(bot.text_handler(rejected))  # type: ignore[arg-type]
+    assert "Тональность:" in accepted.answers[0]
+    assert rejected.answers == [bot.TOO_LONG_MESSAGE]
+
+
+@pytest.mark.parametrize("first,second", [("voice", "voice"), ("voice", "text"),
+                                          ("text", "voice"), ("text", "text")])
+def test_near_simultaneous_requests_start_one_heavy_operation(monkeypatch, first, second):
+    started, release = threading.Event(), threading.Event()
+    speech, calls = fake_speech(monkeypatch, started=started, release=release)
+    recording_predict(monkeypatch)
+    texts = []
+    real_classify = bot.classify_text_for_bot
+
+    def slow_classify(text):
+        texts.append(text)
+        started.set()
+        assert release.wait(5)
+        return real_classify(text)
+    monkeypatch.setattr(bot, "classify_text_for_bot", slow_classify)
+    client = FakeBot()
+
+    def request(kind):
+        message = FakeVoiceMessage() if kind == "voice" else FakeMessage("отзыв")
+        handler = (bot.voice_handler(message, client, speech) if kind == "voice"
+                   else bot.text_handler(message))  # type: ignore[arg-type]
+        return message, handler
+
+    async def run():
+        (m1, h1), (m2, h2) = request(first), request(second)
+        # Both scheduled before either runs: admission must not let both in.
+        t1, t2 = asyncio.create_task(h1), asyncio.create_task(h2)
+        try:
+            assert await asyncio.to_thread(started.wait, 5)
+            await asyncio.wait_for(t2, .5)
+            assert m2.answers == [bot.BUSY_MESSAGE]
+            help_message = FakeMessage()
+            await asyncio.wait_for(bot.help_handler(help_message), .5)  # type: ignore[arg-type]
+            assert help_message.answers == [bot.HELP_TEXT]
+            assert len(calls.threads) + len(texts) == 1 and bot._classification_lock.locked()
+        finally:
+            release.set()
+        await t1
+        assert len(m1.answers) == 1 and "Тональность:" in m1.answers[0]
+        assert not bot._classification_lock.locked()
+        # The slot is free again: the next request of the rejected kind is accepted.
+        m3, h3 = request(second)
+        await h3
+        assert "Тональность:" in m3.answers[0]
+        assert len(calls.threads) + len(texts) == 2
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("kind", ["voice", "text"])
+def test_result_before_threshold_sends_no_delay_notice(monkeypatch, kind):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", 5)
+    speech, _ = fake_speech(monkeypatch)
+    recording_predict(monkeypatch)
+    if kind == "voice":
+        message = FakeVoiceMessage()
+        run_voice(message, FakeBot(), speech)
+    else:
+        message = FakeMessage("отзыв")
+        asyncio.run(bot.text_handler(message))  # type: ignore[arg-type]
+    assert len(message.answers) == 1 and "Тональность:" in message.answers[0]
+    assert bot.RESPONSE_TIMEOUT_MESSAGE not in message.answers
+
+
+def test_production_threshold_is_60_seconds():
+    assert bot.RESPONSE_TIMEOUT_SECONDS == 60
+    assert "60 секунд" in bot.RESPONSE_TIMEOUT_MESSAGE and "60 секунд" in bot.HELP_TEXT
+
+
+@pytest.mark.parametrize("cancellations", [0, 1, 3])
+def test_slow_voice_gets_one_notice_and_holds_slot_and_audio_until_asr_ends(monkeypatch, caplog, cancellations):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
+    started, release = threading.Event(), threading.Event()
+    speech, calls = fake_speech(monkeypatch, started=started, release=release)
+    audio_at_worker_end = observe_audio_at_worker_end(monkeypatch, speech)
+    predicted = recording_predict(monkeypatch)
+    client, message = FakeBot(), notifying(FakeVoiceMessage())
+
+    async def run():
+        task = asyncio.create_task(bot.voice_handler(message, client, speech))  # type: ignore[arg-type]
+        try:
+            assert await asyncio.to_thread(started.wait, 5)
+            await asyncio.wait_for(message.answered.wait(), 5)
+            audio_path = client.downloads[0][1]
+            for _ in range(cancellations):
+                task.cancel()
+                await asyncio.sleep(.01)
+            assert not task.done() and bot._classification_lock.locked()
+            assert audio_path.exists(), "audio must outlive the running ASR worker"
+            busy_voice, busy_text = FakeVoiceMessage(), FakeMessage("второй")
+            await asyncio.wait_for(bot.voice_handler(busy_voice, client, speech), .5)  # type: ignore[arg-type]
+            await asyncio.wait_for(bot.text_handler(busy_text), .5)  # type: ignore[arg-type]
+            assert busy_voice.answers == busy_text.answers == [bot.BUSY_MESSAGE]
+            assert len(client.downloads) == 1 and len(calls.threads) == 1
+        finally:
+            release.set()
+        if cancellations:
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            await task
+        assert audio_at_worker_end == [True]
+        assert not audio_path.parent.exists()
+        assert not bot._classification_lock.locked()
+        # One notice, no late transcript or label; classification after ASR is skipped.
+        assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE] and predicted == []
+        monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", 60)
+        next_message = FakeVoiceMessage()
+        await bot.voice_handler(next_message, client, speech)  # type: ignore[arg-type]
+        assert next_message.answers[0].startswith("Распознанный текст:")
+
+    with caplog.at_level(logging.INFO):
+        run_checked(run())
+    assert "Response timeout reached" in caplog.text
+    assert "Отличный" not in caplog.text
+
+
+@pytest.mark.parametrize("outcome", ["result", "error"])
+def test_slow_text_after_threshold_sends_nothing_late(monkeypatch, caplog, outcome):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
+    started, release = threading.Event(), threading.Event()
+    finished = []
+
+    def slow_classify(text):
+        started.set()
+        assert release.wait(5)
+        finished.append(text)
+        if outcome == "error":
+            raise RuntimeError("worker failed")
+        return "late classification result"
+    monkeypatch.setattr(bot, "classify_text_for_bot", slow_classify)
+    message = notifying(FakeMessage("отзыв"))
+
+    async def run():
+        task = asyncio.create_task(bot.text_handler(message))  # type: ignore[arg-type]
+        try:
+            await asyncio.wait_for(message.answered.wait(), 5)
+            assert bot._classification_lock.locked() and not task.done()
+        finally:
+            release.set()
+        await task
+        assert finished == ["отзыв"] and not bot._classification_lock.locked()
+        monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", 60)
+        monkeypatch.setattr(bot, "classify_text_for_bot", lambda text: "next result")
+        next_message = FakeMessage("следующий")
+        await bot.text_handler(next_message)  # type: ignore[arg-type]
+        assert next_message.answers == ["next result"]
+
+    with caplog.at_level(logging.WARNING):
+        run_checked(run())
+    assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE]
+    assert "never retrieved" not in caplog.text
+
+
+def test_cancel_before_threshold_never_sends_notice(monkeypatch):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
+    started, release = threading.Event(), threading.Event()
+    speech, _ = fake_speech(monkeypatch, started=started, release=release)
+    predicted = recording_predict(monkeypatch)
+    client, message = FakeBot(), FakeVoiceMessage()
+
+    async def run():
+        task = asyncio.create_task(bot.voice_handler(message, client, speech))  # type: ignore[arg-type]
+        try:
+            assert await asyncio.to_thread(started.wait, 5)
+            task.cancel()
+            await asyncio.sleep(.1)  # well past the shortened threshold
+            assert not task.done() and bot._classification_lock.locked()
+            assert client.downloads[0][1].exists()
+        finally:
+            release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not client.downloads[0][1].parent.exists()
+        assert not bot._classification_lock.locked()
+
+    run_checked(run())
+    assert message.answers == [] and predicted == []
+
+
+def test_failed_delay_notice_keeps_lifecycle(monkeypatch, caplog):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
+    started, release = threading.Event(), threading.Event()
+    calls = []
+
+    def slow_classify(text):
+        calls.append(text)
+        started.set()
+        assert release.wait(5)
+        return "late classification result"
+    monkeypatch.setattr(bot, "classify_text_for_bot", slow_classify)
+    message = notifying(FakeMessage("отзыв"), fail_on=bot.RESPONSE_TIMEOUT_MESSAGE)
+
+    async def run():
+        task = asyncio.create_task(bot.text_handler(message))  # type: ignore[arg-type]
+        try:
+            await asyncio.wait_for(message.answered.wait(), 5)
+            await asyncio.sleep(0)
+            assert bot._classification_lock.locked() and not task.done()
+            busy = FakeMessage("второй")
+            await bot.text_handler(busy)  # type: ignore[arg-type]
+            assert busy.answers == [bot.BUSY_MESSAGE]
+        finally:
+            release.set()
+        await task  # the send error does not escape or end the operation early
+        assert not bot._classification_lock.locked()
+
+    with caplog.at_level(logging.WARNING):
+        run_checked(run())
+    assert calls == ["отзыв"]
+    assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE]
+    assert "Could not send the delay notice: ConnectionError" in caplog.text
+
+
+class SlowDownloadBot(FakeBot):
+    """Writes part of the file and hangs; once cancelled, aborts only when allowed."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.in_progress, self.abort = asyncio.Event(), asyncio.Event()
+        self.cancellations = 0
+
+    async def download(self, file_id, destination):
+        self.downloads.append((file_id, Path(destination)))
+        Path(destination).write_bytes(b"partial")
+        self.in_progress.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancellations += 1
+            while not self.abort.is_set():  # a slow abort, still owning the file
+                try:
+                    await self.abort.wait()
+                except asyncio.CancelledError:
+                    self.cancellations += 1
+            raise
+
+
+@pytest.mark.parametrize("timeout,handler_cancellations", [(.01, 0), (.01, 1), (.01, 3), (60, 1)])
+def test_delayed_download_counts_towards_threshold_and_is_cleaned(monkeypatch, timeout, handler_cancellations):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", timeout)
+    speech, calls = fake_speech(monkeypatch)
+    predicted = recording_predict(monkeypatch)
+    client, message = SlowDownloadBot(), notifying(FakeVoiceMessage())
+    timed_out = timeout < 1
+
+    async def run():
+        task = asyncio.create_task(bot.voice_handler(message, client, speech))  # type: ignore[arg-type]
+        try:
+            await asyncio.wait_for(client.in_progress.wait(), 5)
+            audio_path = client.downloads[0][1]
+            if timed_out:
+                # The notice comes while bot.download is still pending: the threshold covers it.
+                await asyncio.wait_for(message.answered.wait(), 5)
+                assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE]
+            for _ in range(handler_cancellations):
+                task.cancel()
+                await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            # The download stage is being stopped, no new stage starts; slot and file stay.
+            assert client.cancellations >= 1 and not task.done()
+            assert bot._classification_lock.locked() and audio_path.exists()
+            busy = FakeMessage("второй")
+            await bot.text_handler(busy)  # type: ignore[arg-type]
+            assert busy.answers == [bot.BUSY_MESSAGE]
+        finally:
+            client.abort.set()
+        if handler_cancellations:
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            await task
+        assert not audio_path.parent.exists() and not bot._classification_lock.locked()
+        assert calls.decoded == [] and predicted == []
+        assert message.answers == ([bot.RESPONSE_TIMEOUT_MESSAGE] if timed_out else [])
+        monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", 60)
+        next_client, next_message = FakeBot(), FakeVoiceMessage()
+        await bot.voice_handler(next_message, next_client, speech)  # type: ignore[arg-type]
+        assert next_message.answers[0].startswith("Распознанный текст:")
+        assert not next_client.downloads[0][1].parent.exists()
+
+    run_checked(run())
+
+
+def test_completion_in_the_threshold_iteration_sends_result_only(monkeypatch):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", 0)
+
+    async def finished_work():
+        return "result"
+
+    async def run():
+        message = notifying(FakeMessage())
+        assert await bot.answer_within_timeout(message, finished_work()) == "result"  # type: ignore[arg-type]
+        assert message.answers == []
+    asyncio.run(run())
+
+
+def test_completion_right_after_the_threshold_decision_sends_notice_only(monkeypatch):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", .01)
+    release = threading.Event()
+
+    def worker():
+        assert release.wait(5)
+        return "late result"
+    # The worker ends as soon as the notice is chosen, before the handler resumes.
+    message = notifying(FakeMessage(), on_answer=lambda text: release.set())
+
+    async def run():
+        answer = await bot.answer_within_timeout(message, bot.run_in_thread(worker))  # type: ignore[arg-type]
+        assert answer is None
+    asyncio.run(run())
+    assert message.answers == [bot.RESPONSE_TIMEOUT_MESSAGE]
+
+
+def test_every_interleaving_at_the_threshold_has_exactly_one_outcome(monkeypatch):
+    monkeypatch.setattr(bot, "RESPONSE_TIMEOUT_SECONDS", 0)
+
+    async def work(steps):
+        for _ in range(steps):
+            await asyncio.sleep(0)
+        return "result"
+
+    async def run():
+        outcomes = set()
+        for steps in range(8):
+            message = notifying(FakeMessage())
+            answer = await bot.answer_within_timeout(message, work(steps))  # type: ignore[arg-type]
+            sent = message.answers + ([answer] if answer is not None else [])
+            assert sent in (["result"], [bot.RESPONSE_TIMEOUT_MESSAGE]), sent
+            outcomes.add(sent[0])
+        assert outcomes == {"result", bot.RESPONSE_TIMEOUT_MESSAGE}, "both sides exercised"
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("kind", ["voice", "text"])
+def test_truncation_warning_is_shown_in_both_modes(monkeypatch, kind):
+    recording_predict(monkeypatch, result={**positive_prediction(), "truncated": True})
+    speech, _ = fake_speech(monkeypatch)
+    if kind == "voice":
+        message = FakeVoiceMessage()
+        run_voice(message, FakeBot(), speech)
+    else:
+        message = FakeMessage("длинный отзыв")
+        asyncio.run(bot.text_handler(message))  # type: ignore[arg-type]
+    assert "Тональность: положительная" in message.answers[0]
+    assert "текст усечён моделью" in message.answers[0]
+
+
+def test_unavailable_model_on_text_is_not_a_label(monkeypatch):
+    recording_predict(monkeypatch, error=classifier.ModelUnavailableError("bundle missing"))
+    message = FakeMessage("отзыв")
+    asyncio.run(bot.text_handler(message))  # type: ignore[arg-type]
+    assert message.answers == [bot.MODEL_ERROR_MESSAGE]
+    assert "Тональность" not in message.answers[0]

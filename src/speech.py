@@ -100,7 +100,7 @@ class SpeechRecognizer:
 
     All decoding, loading and lazy segment iteration happen inside transcribe().
     The lock serializes use and protects initialization if several threads arrive.
-    Request limits, admission/busy policy and hard timeouts belong to T10.
+    Request limits, the busy slot and the response timeout live in src/bot.py (T10).
     """
 
     def __init__(self, config: SpeechConfig | None = None, *, allow_download: bool = False):

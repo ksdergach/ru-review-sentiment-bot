@@ -1,8 +1,8 @@
 """Telegram-интерфейс общего классификатора: текстовые и голосовые киноотзывы.
 
 Голос распознаётся общим ``SpeechRecognizer`` (T08), текст обоих режимов
-классифицируется одним ``predict`` (T07). Окончательная политика лимитов,
-занятости, таймаутов и жизненного цикла аудио относится к T10.
+классифицируется одним ``predict`` (T07). Лимиты, занятость, порог ожидания
+ответа и жизненный цикл аудио — T10.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Any, Iterator
+from typing import Any, Coroutine, Iterator
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
@@ -42,6 +42,8 @@ BUSY_MESSAGE = "Сейчас обрабатывается другой отзы�
 # Начальные ограничения из docs/team_plan.md, раздел 7.
 MAX_VOICE_SECONDS = 30
 MAX_VOICE_BYTES = 5 * 1024 * 1024
+# Порог ожидания ответа пользователем, а не предел длительности вычисления.
+RESPONSE_TIMEOUT_SECONDS = 60
 
 RUSSIAN_LABELS = {
     "negative": "отрицательная",
@@ -74,7 +76,9 @@ HELP_TEXT = (
     "Ограничения:\n"
     f"• голосовое сообщение — до {MAX_VOICE_SECONDS} секунд и до 5 МиБ;\n"
     f"• текст или распознанная речь — до {MAX_TEXT_LENGTH} символов;\n"
-    "• одновременно обрабатывается один отзыв.\n\n"
+    "• одновременно обрабатывается один отзыв;\n"
+    f"• если ответ не готов за {RESPONSE_TIMEOUT_SECONDS} секунд, бот сообщит "
+    "о задержке, а результат этого запроса не отправит.\n\n"
     "Распознавание речи может содержать ошибки. "
     "Показанная уверенность модели не является гарантией "
     "правильности классификации."
@@ -142,6 +146,13 @@ TRANSCRIPT_TOO_LONG_MESSAGE = (
 )
 
 
+RESPONSE_TIMEOUT_MESSAGE = (
+    f"Обработка отзыва заняла больше {RESPONSE_TIMEOUT_SECONDS} секунд, "
+    "результат этого запроса не будет отправлен. "
+    "Повторите попытку позже или отправьте более короткий отзыв."
+)
+
+
 class StartupError(RuntimeError):
     """Приложение нельзя запустить; сообщение безопасно для вывода."""
 
@@ -194,7 +205,7 @@ def classify_transcript_for_bot(transcript: str) -> str:
 
 
 def check_voice_limits(voice: Voice) -> str | None:
-    """Предварительная проверка по метаданным Telegram; полная защита — T10."""
+    """Проверка по метаданным Telegram до скачивания; размер файла проверяется и после."""
     if voice.duration > MAX_VOICE_SECONDS:
         return VOICE_TOO_LONG_MESSAGE
     if voice.file_size is not None and voice.file_size > MAX_VOICE_BYTES:
@@ -220,9 +231,14 @@ async def recognize_and_classify_voice(bot: Bot, speech: SpeechRecognizer, voice
     with _temporary_voice_path() as audio_path:
         try:
             await bot.download(voice.file_id, destination=audio_path)
+            size = audio_path.stat().st_size
         except Exception as exc:
             logger.warning("Voice download failed: %s", type(exc).__name__)
             return VOICE_DOWNLOAD_ERROR_MESSAGE
+        # file_size may be absent or wrong; the downloaded bytes decide before Whisper.
+        if size > MAX_VOICE_BYTES:
+            logger.warning("Voice rejected: downloaded file exceeds the size limit")
+            return VOICE_TOO_LARGE_MESSAGE
         # Waits for the worker even on cancellation, so the file outlives its use.
         result = await speech.transcribe_async(audio_path)
 
@@ -232,6 +248,51 @@ async def recognize_and_classify_voice(bot: Bot, speech: SpeechRecognizer, voice
         logger.warning("Speech recognition failed: %s", result.error_code)
         return SPEECH_ERROR_MESSAGE
     return await run_in_thread(classify_transcript_for_bot, result.text)
+
+
+async def _wait_until_done(task: asyncio.Task[Any]) -> None:
+    """Return or re-raise cancellation only after task ended; pass each cancel on to it."""
+    cancelled: asyncio.CancelledError | None = None
+    while not task.done():
+        try:
+            # Unlike awaiting the task directly, wait() never cancels it.
+            await asyncio.wait((task,))
+        except asyncio.CancelledError as exc:
+            cancelled = exc
+            task.cancel()
+    if cancelled is not None:
+        raise cancelled
+
+
+async def answer_within_timeout(message: Message, work: Coroutine[Any, Any, str]) -> str | None:
+    """Return the answer of work, or None after sending one delay notice at the threshold.
+
+    Call while holding _classification_lock: it returns only after work and its worker
+    thread ended, also after the notice or on (repeated) cancellation, so the slot and
+    the temporary audio are released no earlier. Which outcome wins is decided once, in
+    the event loop, so a result is never sent after the notice. Not a hard timeout:
+    a running thread finishes naturally; only the later stages are cancelled.
+    """
+    task = asyncio.create_task(work)
+    try:
+        done, _ = await asyncio.wait((task,), timeout=RESPONSE_TIMEOUT_SECONDS)
+        if done:
+            return task.result()
+        task.cancel()
+        logger.warning("Response timeout reached; the result will not be sent")
+        try:
+            await message.answer(RESPONSE_TIMEOUT_MESSAGE)
+        except Exception as exc:
+            logger.warning("Could not send the delay notice: %s", type(exc).__name__)
+    except asyncio.CancelledError:
+        task.cancel()
+        raise
+    finally:
+        await _wait_until_done(task)
+    if not task.cancelled() and task.exception() is not None:
+        logger.warning("Processing failed after the response timeout: %s",
+                       type(task.exception()).__name__)
+    return None
 
 
 @router.message(CommandStart())
@@ -265,10 +326,12 @@ async def text_handler(message: Message) -> None:
     if _classification_lock.locked():
         await message.answer(BUSY_MESSAGE)
         return
+    # No await between the check and the acquisition: admission is atomic in the loop.
     async with _classification_lock:
         # Returns only after the worker thread ends, so the slot is held until then.
-        answer = await run_in_thread(classify_text_for_bot, text)
-    await message.answer(answer)
+        answer = await answer_within_timeout(message, run_in_thread(classify_text_for_bot, text))
+    if answer is not None:
+        await message.answer(answer)
 
 
 @router.message(F.voice)
@@ -283,8 +346,9 @@ async def voice_handler(message: Message, bot: Bot, speech: SpeechRecognizer) ->
         await message.answer(BUSY_MESSAGE)
         return
     async with _classification_lock:
-        answer = await recognize_and_classify_voice(bot, speech, voice)
-    await message.answer(answer)
+        answer = await answer_within_timeout(message, recognize_and_classify_voice(bot, speech, voice))
+    if answer is not None:
+        await message.answer(answer)
 
 
 @router.message()
