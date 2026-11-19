@@ -101,10 +101,9 @@ Python 3.13.7, Windows и macOS. Это входит в независимый �
 0. **Версия и среда.** Выполните `git clone`, `git checkout <SHA>` и `git rev-parse HEAD`
    по [README, «Установка»](../../README.md#установка). Запишите ОС, `python --version`, SHA.
 1. **Установка** — по README, «Установка» (вариант PyTorch для вашей ОС), затем:
-   `python -m pip check`, `python tools/check_environment.py`, `python -m pytest -q`.
+   `python -m pip check`, `python tools/check_environment.py`.
    Ожидается: `No broken requirements found`; `"status": "PASS"` на Python 3.13.7
-   (на 3.11/3.12 допустима единственная ошибка версии Python — запишите её);
-   тесты без failed, допустим один skipped по принятому baseline.
+   (на 3.11/3.12 допустима единственная ошибка версии Python — запишите её).
 2. **Модели.**
    - `python tools/fetch_transformer.py`, `python tools/restore_nlp_splits.py`,
      `python tools/verify_transformer.py` → «все 7 файлов совпали» и `"status": "passed"`.
@@ -113,6 +112,10 @@ Python 3.13.7, Windows и macOS. Это входит в независимый �
      `.cache/huggingface/models--Systran--faster-whisper-small/snapshots/536b0662742c02347bc0e980a01041f333bce120/`
      (`shasum -a 256 model.bin` или PowerShell `Get-FileHash model.bin`): ожидается
      `3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671`.
+   - После установки моделей обязательно выполните `python -m pytest -q`.
+     Ожидается: нет `failed` и `errors`; допустим один `skipped` по отсутствующему
+     принятому baseline. `tests/test_classifier_accepted_rubert.py` должен
+     выполниться без пропуска.
 3. **Запуск** — по README, раздел [«Голосовой Telegram-бот T09» → «Запуск»](../../README.md#запуск),
    с `CLASSIFIER_BACKEND=rubert`. Ожидается: в журнале нет `Startup failed`, бот отвечает
    на `/start`. Если бот не подключается к Telegram API (сетевые ошибки в журнале),
