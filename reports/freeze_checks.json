@@ -1,0 +1,123 @@
+{
+  "task": "T12",
+  "date": "2026-11-19",
+  "status": "technical_checks_passed_protocol_approved",
+  "final_text_inference_run": false,
+  "t11_model_inference_run": false,
+  "new_training_run": false,
+  "unit_and_accepted_bundle_tests": {
+    "command": ".venv/bin/python -m pytest -q -rs --tb=short tests/test_restore_frozen_test.py tests/test_classifier_accepted_baseline.py",
+    "exit_code": 0,
+    "passed": 16,
+    "seconds": 6.54,
+    "scope": "6 синтетических проверок восстановления + 10 проверок принятого baseline, включая hash предсказаний на всей принятой validation."
+  },
+  "file_checks": {
+    "frozen_source_config_evidence_files": 27,
+    "baseline_bundle_matches_accepted_report": true,
+    "rubert_bundle_files": 7,
+    "whisper_bundle_files": 4,
+    "text_test_bytes_match": true,
+    "t11_audio_files_match": 36,
+    "t11_xlsx_matches": true,
+    "tracked_files_unchanged": true,
+    "private_artifacts_ignored": true
+  },
+  "t11_validation": {
+    "command": ".venv/bin/python tools/validate_voice_test.py",
+    "exit_code": 0,
+    "status": "UNCHANGED",
+    "records": 36,
+    "content_sha256": "4004319e4f5b728b7edb006a4ca717bfd5a16bfa864709d34ca8f0fe1943c8c6",
+    "warning_samples": {
+      "voice_007": 14,
+      "voice_027": 17,
+      "voice_035": 6
+    },
+    "warnings_unchanged": true,
+    "new_human_listening_claimed": false,
+    "all_participants_access_retested": false
+  },
+  "test_restoration": {
+    "status": "RESTORED",
+    "path": "data/processed/test.parquet",
+    "rows": 9324,
+    "source_parquet_sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+    "parquet_sha256": "5854f134883efdfa45987602c0e90b8f777fea7af4ec93b5d566875fa1e14ab1",
+    "ids_sha256": "2128997f2edf8ed5ec1b95665edb4062cc47d41da002064f7b7e68bbfbbd73eb",
+    "data_preparation_only": true,
+    "model_inference_run": false,
+    "final_metrics_computed": false,
+    "texts_printed": false,
+    "date": "2026-11-19",
+    "initial_attempt": "Stopped before Parquet decoding: training metadata has no test source entry; source checksum now taken from its hash-pinned T03 audit."
+  },
+  "resource_check": {
+    "task": "T12",
+    "date": "2026-11-19",
+    "status": "passed",
+    "bot_backend": "baseline",
+    "machine": {
+      "system": "Darwin",
+      "release": "26.5.2",
+      "architecture": "arm64",
+      "python": "3.13.7",
+      "cpu_brand": "Apple M1",
+      "physical_cores": 8,
+      "logical_cores": 8,
+      "ram_bytes": 17179869184,
+      "hardware_source": "read-only sysctl query in this session"
+    },
+    "libraries": {
+      "numpy": "2.3.3",
+      "pandas": "2.3.2",
+      "pyarrow": "24.0.0",
+      "scipy": "1.15.3",
+      "scikit-learn": "1.7.2",
+      "joblib": "1.5.2",
+      "torch": "2.10.0",
+      "transformers": "5.5.0",
+      "tokenizers": "0.22.2",
+      "faster-whisper": "1.2.1",
+      "ctranslate2": "4.8.2",
+      "av": "18.1.0",
+      "psutil": "7.1.0",
+      "aiogram": "3.22.0",
+      "pytest": "8.4.2"
+    },
+    "baseline_load_seconds": 0.31677183300053,
+    "whisper_load_seconds": 1.3390668339998228,
+    "peak_process_rss_bytes": 941916160,
+    "baseline_and_whisper_loaded_together": true,
+    "fixed_text_predictions_unchanged": true,
+    "fixed_text_label_ids": [
+      2,
+      0,
+      1
+    ],
+    "download_allowed": false,
+    "telegram_started": false,
+    "final_text_test_used": false,
+    "t11_inference_run": false,
+    "limitations": [
+      "Single offline startup check; not a comparative inference benchmark.",
+      "No ASR decoding in this startup check; T16 ASR evidence is recorded separately."
+    ]
+  },
+  "implementation_notes": [
+    "Первая попытка восстановления остановилась до чтения Parquet: training report намеренно не содержит test. Исправлено использование test SHA из уже закреплённого T03 audit; синтетическая fixture отражает эту структуру.",
+    "Изменены только новые файлы T12. Исходники данных, старые отчёты, модели и конфиги приложения не заменялись.",
+    "Исходник оценщика PR43 прочитан, но его тесты/финальный запуск здесь не выполнялись."
+  ],
+  "remaining": [
+    "Ревью и слияние PR по T12.",
+    "T13/T14 выполняются следующими согласованными шагами; финальных метрик пока нет."
+  ],
+  "protocol_approval": {
+    "approved_at": "2026-11-19",
+    "approved_by": [
+      "Координатор проекта — пользователь этой сессии"
+    ],
+    "source": "Ответ пользователя «да» на вопрос об утверждении подготовленного протокола и разрешении оформить commit и PR по №15."
+  }
+}

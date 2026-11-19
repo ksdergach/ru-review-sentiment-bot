@@ -1,0 +1,479 @@
+{
+  "schema": "t13-final-text-eval-input/draft-1",
+  "protocol_version": "t12/1",
+  "protocol_path": "reports/freeze.md",
+  "status": "approved",
+  "prepared_at": "2026-11-19",
+  "approved_by": [
+    "Координатор проекта — пользователь этой сессии"
+  ],
+  "approved_at": "2026-11-19",
+  "pending_approval": [],
+  "confirmed_decisions": {
+    "bot_model": "baseline",
+    "measurement_machine": "this_mac",
+    "source": "Явные ответы пользователя: выбран baseline и этот Mac, затем утверждён полный протокол и публикация commit/PR по T12."
+  },
+  "frozen_commit": "5f22d93a8cff63b30fc129bb68a1cfbd4230995d",
+  "frozen_commit_scope": "Неизменяемая основа приложения. Коммит оценщика записывается отдельно; file_sha256 проверяются до запуска.",
+  "final_test_used_before_freeze": false,
+  "test_preparation_disclosure": {
+    "text_parquet_decoded_for_fixed_id_copy": true,
+    "texts_printed_or_reviewed": false,
+    "model_inference_run": false,
+    "final_metrics_computed": false,
+    "model_selected_before_copy": true,
+    "scope": "Техническое восстановление принятых строк T03. Отсутствие финальной оценки установлено по принятым отчётам и действиям этой сессии."
+  },
+  "bot_model": "baseline",
+  "bot_model_selected_by": "validation_and_resources",
+  "label_mapping": {
+    "negative": 0,
+    "neutral": 1,
+    "positive": 2
+  },
+  "selection": {
+    "validation_rows": 10396,
+    "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+    "baseline": {
+      "accuracy": 0.8893805309734514,
+      "macro_f1": 0.7180146428367195,
+      "per_class": {
+        "negative": {
+          "f1": 0.8751100933591686,
+          "precision": 0.8709677419354839,
+          "recall": 0.8792920353982301,
+          "support": 2825
+        },
+        "neutral": {
+          "f1": 0.3388937664618086,
+          "precision": 0.27453769559032715,
+          "recall": 0.4426605504587156,
+          "support": 436
+        },
+        "positive": {
+          "f1": 0.9400400686891814,
+          "precision": 0.9602397310334746,
+          "recall": 0.9206727400140154,
+          "support": 7135
+        }
+      },
+      "winner_C": 2.0
+    },
+    "rubert": {
+      "accuracy": 0.8183916891111966,
+      "macro_f1": 0.6678240259861936,
+      "negative_precision": 0.8589599700710812,
+      "negative_recall": 0.8127433628318584,
+      "negative_f1": 0.8352128046562386,
+      "neutral_precision": 0.1723076923076923,
+      "neutral_recall": 0.6422018348623854,
+      "neutral_f1": 0.2717127607957302,
+      "positive_precision": 0.972777959986881,
+      "positive_recall": 0.8313945339873862,
+      "positive_f1": 0.8965465125066122
+    },
+    "rule": "Более высокий validation macro-F1 и работоспособность на выбранном Mac. Test не меняет выбор бота.",
+    "limitations": "Validation использовалась при выборе C/чекпоинта. Сравнительный замер скорости в T12 не проводился."
+  },
+  "data_prep": {
+    "audit_sha256": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
+    "split_ids_sha256": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
+    "train_rows": 76971,
+    "validation_rows": 10396,
+    "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+    "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+    "train_parquet_sha256": "4889825b5bdc86c83ed69c7cdf3c4b073b9ebad36b2f6ca45b5204969422c675",
+    "validation_parquet_sha256": "f95a9223e216c4fe3be1e4a9a23a0dfd65ea81e8b37c0a680c0a4b1fe411c214"
+  },
+  "test": {
+    "path": "data/processed/test.parquet",
+    "rows": 9324,
+    "parquet_sha256": "5854f134883efdfa45987602c0e90b8f777fea7af4ec93b5d566875fa1e14ab1",
+    "ids_sha256": "2128997f2edf8ed5ec1b95665edb4062cc47d41da002064f7b7e68bbfbbd73eb",
+    "source_parquet_sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f"
+  },
+  "models": {
+    "baseline": {
+      "model_path": "models/nlp_baseline/tfidf_logreg_baseline.joblib",
+      "model_sha256": "389a768bcd108721c79ebf3a7b9dc5212ec100f5c2e1b06cf519ed076cd9bee3",
+      "bytes": 3598091,
+      "report_path": "reports/nlp/training/run_metadata.json",
+      "report_sha256": "1499b4f14572ebcbaf864b1e865add01e7472e26d7ae48e745d50ee72f531ad6",
+      "config_path": "configs/nlp_baseline.json",
+      "manual_normalization": "none",
+      "truncation": null
+    },
+    "rubert": {
+      "model_path": "models/transformer",
+      "report_path": "reports/transformer/run_metadata.json",
+      "report_sha256": "d5042a09380a79cb64585445704f55424aac091f0a2ba06d72383ed80cc31584",
+      "bundle_files_sha256": {
+        "config.json": "60f99dfe240f5dc1efce5df2340ed0c8eea543d6bb75d61d9d827a8a6752d893",
+        "label_mapping.json": "37d1487643d4a1642c1528e5f0c316243f4512a863f209bb021a5d9e2e162f97",
+        "metadata.json": "c18f6f1951ce28ccab5eb705ec6be0531cb2ac6bffa8405095c5fb4fc3df23bd",
+        "model.safetensors": "57d96aea79f03328370af6ca570f5403551a434751930699366d8537f13efa76",
+        "tokenizer.json": "df7038a0fd14044f6cb95b7581d72bae39749316080e31c78b07cefbc6bdc7fd",
+        "tokenizer_config.json": "31d22df502dc5c6bdb106fbf71823d24afcce6715a56d11b189434b7585429e3",
+        "training_config.json": "fe0d2828e1eef487e2c70cafbb128917cc211915d5221233e5714646b27e1f42"
+      },
+      "config_path": "configs/transformer.json",
+      "base_model": "cointegrated/rubert-tiny2",
+      "base_revision": "e8ed3b0c8bbf4fb6984c3de043bf7d2f4e5969ae",
+      "max_length_tokens": 64,
+      "truncation_side": "right"
+    }
+  },
+  "inference": {
+    "batch_size": 64,
+    "device": "cpu",
+    "num_threads": 2
+  },
+  "runtime_environment_variables": {
+    "CLASSIFIER_BACKEND": "baseline",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1"
+  },
+  "text_protocol": {
+    "models": [
+      "baseline",
+      "rubert"
+    ],
+    "runs": 1,
+    "max_text_length": null,
+    "labels": [
+      0,
+      1,
+      2
+    ],
+    "zero_division": 0,
+    "warmup": "Один predict_batch на трёх фиксированных src.train_baseline._smoke_texts(), не из test.",
+    "repeat_sensitivity": "Основной test неизменен; отдельная оценка на первой копии каждой группы повторов по аудиту T03, без новых предсказаний.",
+    "details": "reports/freeze.md: Текстовая оценка T13"
+  },
+  "voice_test": {
+    "private_manifest_path": "artifacts/t11/manifest.json",
+    "composition_path": "reports/voice_test/composition.json",
+    "composition_sha256": "a1fca980550bcd8ae20112b79a08ab2e577a8b47c03308a3df4b04ebf4a6dc63",
+    "human_confirmation_sha256": "98418a6fec486f0c48b4149c19e7f2ccb002bac080b3a606c0723e8663e30976",
+    "content_sha256": "4004319e4f5b728b7edb006a4ca717bfd5a16bfa864709d34ca8f0fe1943c8c6",
+    "xlsx_sha256": "b6d2ce446c2b3db9702a949831b7985270117be82189dd7a44eeb4f1a62811e3",
+    "rows": 36,
+    "record_ids": [
+      "voice_001",
+      "voice_002",
+      "voice_003",
+      "voice_004",
+      "voice_005",
+      "voice_006",
+      "voice_007",
+      "voice_008",
+      "voice_009",
+      "voice_010",
+      "voice_011",
+      "voice_012",
+      "voice_013",
+      "voice_014",
+      "voice_015",
+      "voice_016",
+      "voice_017",
+      "voice_018",
+      "voice_019",
+      "voice_020",
+      "voice_021",
+      "voice_022",
+      "voice_023",
+      "voice_024",
+      "voice_025",
+      "voice_026",
+      "voice_027",
+      "voice_028",
+      "voice_029",
+      "voice_030",
+      "voice_031",
+      "voice_032",
+      "voice_033",
+      "voice_034",
+      "voice_035",
+      "voice_036"
+    ],
+    "speakers": 4,
+    "class_counts": {
+      "negative": 12,
+      "neutral": 12,
+      "positive": 12
+    },
+    "file_hashes_location": "reports/voice_test/composition.json: records[].audio_sha256",
+    "validation_status": "UNCHANGED",
+    "verified_on": "2026-11-19"
+  },
+  "speech": {
+    "config": {
+      "model": "Systran/faster-whisper-small",
+      "revision": "536b0662742c02347bc0e980a01041f333bce120",
+      "device": "cpu",
+      "compute_type": "int8",
+      "cpu_threads": 8,
+      "beam_size": 5,
+      "language": "ru",
+      "vad_filter": true,
+      "temperature": 0.0,
+      "condition_on_previous_text": true,
+      "cache_dir": ".cache/huggingface"
+    },
+    "bundle_files": {
+      "config.json": {
+        "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828",
+        "bytes": 2370
+      },
+      "model.bin": {
+        "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671",
+        "bytes": 483546902
+      },
+      "tokenizer.json": {
+        "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+        "bytes": 2203239
+      },
+      "vocabulary.txt": {
+        "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+        "bytes": 459861
+      }
+    }
+  },
+  "voice_protocol": {
+    "backend": "baseline",
+    "modes": [
+      "reference_text",
+      "whisper_text"
+    ],
+    "records": 36,
+    "order": "voice_001 … voice_036",
+    "batch_size": 1,
+    "max_text_length": 2000,
+    "target_labels": [
+      0,
+      1,
+      2
+    ],
+    "error_prediction": -1,
+    "zero_division": 0,
+    "wer": {
+      "implementation": "tools.report_nlp_data_quality.words / word_error_rate",
+      "normalization": [
+        "Unicode NFC",
+        "casefold",
+        "Unicode punctuation category P → space",
+        "split whitespace"
+      ],
+      "yo_equals_ye": false,
+      "numbers": "literal",
+      "aggregation": "sum(minimum_word_edits) / sum(reference_words), все 36 записей",
+      "empty_or_asr_failure": "Пустая гипотеза: все слова эталона — удаления; сбои дополнительно считаются отдельно.",
+      "empty_reference": "Ошибка предусловий; не удалять запись.",
+      "may_exceed_one": true
+    },
+    "warmup": {
+      "classifier": "Один вызов на трёх _smoke_texts().",
+      "asr": "Один проход отдельной отладочной записи T16 с указанной SHA-256; не использовать T11.",
+      "audio_sha256": "d6a29c51a3e22a08dafcbfdd045769bd4c6481f982e9ec03b7f91f382a0fa530",
+      "audio_bytes": 204813,
+      "include_in_metrics": false
+    },
+    "details": "reports/freeze.md: Голосовая оценка T14"
+  },
+  "optional_experiments": {
+    "approval_status": "approved_exclusion",
+    "excluded_from_this_cycle": [
+      21,
+      22,
+      23,
+      44
+    ],
+    "scope": "Перенос тем, noise, TTS-аугментация и дообучение сложных случаев; сами задачи не закрываются."
+  },
+  "post_test_policy": "Не менять обучение, веса, пороги, предобработку или Whisper по финальным ошибкам. Отклонения протоколировать; для нового подтверждающего голосового сравнения нужен новый независимый набор.",
+  "environment": {
+    "machine": {
+      "os": "macOS",
+      "os_version": "26.5.2",
+      "architecture": "arm64",
+      "cpu": "Apple M1",
+      "physical_cores": 8,
+      "logical_cores": 8,
+      "ram_bytes": 17179869184,
+      "python": "3.13.7"
+    },
+    "packages": {
+      "Jinja2": "3.1.6",
+      "MarkupSafe": "3.0.4",
+      "PyYAML": "6.0.3",
+      "Pygments": "2.21.0",
+      "aiofiles": "24.1.0",
+      "aiogram": "3.22.0",
+      "aiohappyeyeballs": "2.7.1",
+      "aiohttp": "3.12.15",
+      "aiosignal": "1.4.0",
+      "annotated-doc": "0.0.7",
+      "annotated-types": "0.8.0",
+      "anyio": "4.16.0",
+      "attrs": "26.1.0",
+      "av": "18.1.0",
+      "certifi": "2026.10.23",
+      "click": "8.5.1",
+      "ctranslate2": "4.8.2",
+      "faster-whisper": "1.2.1",
+      "filelock": "4.2.12",
+      "flatbuffers": "25.12.19",
+      "frozenlist": "1.8.0",
+      "fsspec": "2026.9.0",
+      "h11": "0.16.0",
+      "hf-xet": "1.8.0",
+      "httpcore": "1.0.9",
+      "httpx": "0.28.1",
+      "huggingface_hub": "1.33.0",
+      "idna": "3.20",
+      "iniconfig": "2.3.1",
+      "joblib": "1.5.2",
+      "magic-filter": "1.0.12",
+      "markdown-it-py": "4.3.0",
+      "mdurl": "0.1.2",
+      "mpmath": "1.3.0",
+      "multidict": "6.9.1",
+      "networkx": "3.7",
+      "numpy": "2.3.3",
+      "onnxruntime": "1.32.0",
+      "packaging": "26.3",
+      "pandas": "2.3.2",
+      "pip": "25.2",
+      "pluggy": "1.7.0",
+      "propcache": "0.5.4",
+      "protobuf": "7.36.2",
+      "psutil": "7.1.0",
+      "pyarrow": "24.0.0",
+      "pydantic": "2.11.10",
+      "pydantic_core": "2.33.2",
+      "pytest": "8.4.2",
+      "python-dateutil": "4.0.0",
+      "pytz": "2026.6",
+      "regex": "2026.11.19",
+      "rich": "15.0.0",
+      "safetensors": "0.8.0",
+      "scikit-learn": "1.7.2",
+      "scipy": "1.15.3",
+      "setuptools": "84.2.1",
+      "shellingham": "1.5.4",
+      "sympy": "1.14.0",
+      "threadpoolctl": "3.8.0",
+      "tokenizers": "0.22.2",
+      "torch": "2.10.0",
+      "tqdm": "4.70.1",
+      "transformers": "5.5.0",
+      "typer": "0.29.2",
+      "typing-inspection": "0.4.5",
+      "typing_extensions": "4.16.0",
+      "tzdata": "2026.6",
+      "yarl": "1.25.1"
+    }
+  },
+  "resource_check": {
+    "task": "T12",
+    "date": "2026-11-19",
+    "status": "passed",
+    "bot_backend": "baseline",
+    "machine": {
+      "system": "Darwin",
+      "release": "26.5.2",
+      "architecture": "arm64",
+      "python": "3.13.7",
+      "cpu_brand": "Apple M1",
+      "physical_cores": 8,
+      "logical_cores": 8,
+      "ram_bytes": 17179869184,
+      "hardware_source": "read-only sysctl query in this session"
+    },
+    "libraries": {
+      "numpy": "2.3.3",
+      "pandas": "2.3.2",
+      "pyarrow": "24.0.0",
+      "scipy": "1.15.3",
+      "scikit-learn": "1.7.2",
+      "joblib": "1.5.2",
+      "torch": "2.10.0",
+      "transformers": "5.5.0",
+      "tokenizers": "0.22.2",
+      "faster-whisper": "1.2.1",
+      "ctranslate2": "4.8.2",
+      "av": "18.1.0",
+      "psutil": "7.1.0",
+      "aiogram": "3.22.0",
+      "pytest": "8.4.2"
+    },
+    "baseline_load_seconds": 0.31677183300053,
+    "whisper_load_seconds": 1.3390668339998228,
+    "peak_process_rss_bytes": 941916160,
+    "baseline_and_whisper_loaded_together": true,
+    "fixed_text_predictions_unchanged": true,
+    "fixed_text_label_ids": [
+      2,
+      0,
+      1
+    ],
+    "download_allowed": false,
+    "telegram_started": false,
+    "final_text_test_used": false,
+    "t11_inference_run": false,
+    "limitations": [
+      "Single offline startup check; not a comparative inference benchmark.",
+      "No ASR decoding in this startup check; T16 ASR evidence is recorded separately."
+    ]
+  },
+  "evaluation_implementation": {
+    "t13_pr": 43,
+    "reviewed_head": "408895eb06d5322f7231fc15d7fde0358a835ea4",
+    "availability": "Оценщик из отдельного чернового PR ещё не входит в frozen_commit. Перед запуском принять реализацию и записать commit.",
+    "checker_limit": "PR43 проверяет минимальную схему, но не все дополнительные поля T12, окружение и голосовой протокол."
+  },
+  "file_sha256": {
+    "requirements.txt": "958b649a7edaf492e59ca74f720687bc263f5a855fff3668d9ba4d8ed501c66c",
+    "configs/nlp_baseline.json": "74ff00ab59a2a881eb5c7724a9d800ae57ecb530ee5b80be4f6a5e2d0c1e5619",
+    "configs/transformer.json": "c1a17085e3d2d6f79c6c486f6125e8e025fba1eb522ec7d1a59eb75b68767b9c",
+    "configs/speech.json": "754def54709819f315a3952c1fcd8793e8be602b3956b6c934eecbaa57075ba0",
+    "configs/resource_check.json": "8537a840a6686205369247e2ae2c68e6fff191549d6af1178cfa842a7175849c",
+    "configs/data_prep.json": "329489bd27b3185f8eae82ed15bc45e918b75090866aef8b67c34b8aafe3b7ae",
+    "reports/data_prep/audit.json": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
+    "reports/data_prep/split_ids.csv": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
+    "reports/data_prep/near_duplicate_candidates.csv": "cdb49c93191e4fb86018641f07c15d1c7e13fdefb2fce29da82881c481c10f34",
+    "configs/near_duplicate_decisions.csv": "0239a977b9d531ffb8f3926294fa94757bf62104ff54a8cd01705fa96aaead70",
+    "reports/nlp/training/run_metadata.json": "1499b4f14572ebcbaf864b1e865add01e7472e26d7ae48e745d50ee72f531ad6",
+    "reports/nlp/baseline_metrics.json": "ef0a5074e084cd342676ca9bcbfc850f6e4984ae0b53c53b9e9f95c0e71f1b18",
+    "reports/transformer/run_metadata.json": "d5042a09380a79cb64585445704f55424aac091f0a2ba06d72383ed80cc31584",
+    "reports/voice_test/composition.json": "a1fca980550bcd8ae20112b79a08ab2e577a8b47c03308a3df4b04ebf4a6dc63",
+    "reports/voice_test/human_confirmation.json": "98418a6fec486f0c48b4149c19e7f2ccb002bac080b3a606c0723e8663e30976",
+    "tools/validate_voice_test.py": "885fd33a505d10d8cbd75f30654704f74f8caaa5c83c45a07a68d3eb5d70a1a7",
+    "tools/report_nlp_data_quality.py": "42523f901ef82fe214cab3877b479000314aa8f8e94a70576119630cb876f2f5",
+    "tools/restore_frozen_test.py": "7eba1839e12bdc336d2d7cde45c1c975b093bce22356d74e60d07bbfeab1e681",
+    "tests/test_restore_frozen_test.py": "5e6bd63da59f24fdcffc42849ca80473b81ff2f9915470250f994c603496d6c8",
+    "src/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "src/bot.py": "ef0393b319f3cf68703097ec8aad24eb7131f7aa5e096f5b38dc175229485a63",
+    "src/check_resources.py": "7655bfe34e18125a15a318163616c9823300b519a61a76bd3783a7f0b7c87d97",
+    "src/classifier.py": "c30533364346787bc5e446b43b433f74809582e4415f150da2c0313b5f2e09e3",
+    "src/prepare_data.py": "599b7d5e9efe0ca3bcd391835554b07ef85150ec7eaab902b53f0cc5b37853cf",
+    "src/speech.py": "bf5452d9969bb0f78402a8abd9be8333d57b8e7a8042f0fd6c992715ea73972f",
+    "src/train_baseline.py": "ae889bbc7a2863ff3bca45788b9a7fc0cacb097b763eada9bc05fbb5b9fc0e70",
+    "src/train_transformer.py": "c31da4045631f821fe5328837b0a0706f266095de98e2e4ea984c1f2c5eed218"
+  },
+  "approval_record": {
+    "source": "Ответ пользователя «да» на вопрос об утверждении подготовленного протокола и разрешении оформить commit и PR по №15.",
+    "date": "2026-11-19",
+    "scope": [
+      "Протокол T13/T14 из reports/freeze.md",
+      "Исключение #21/#22/#23/#44 из текущего цикла",
+      "Commit и публикация PR по T12"
+    ],
+    "other_team_members_approval_claimed": false,
+    "final_evaluation_execution_authorized_by_this_step": false
+  }
+}
