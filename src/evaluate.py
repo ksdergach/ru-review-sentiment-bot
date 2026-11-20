@@ -9,8 +9,8 @@
 версия файлов фиксации, суммы всех ``file_sha256``, git (оценщик закоммичен в HEAD),
 среда измерений, назначение результатов, отчёты и комплекты обеих моделей, байтовая
 сумма test. Любое несовпадение останавливает запуск; суммы фиксации никогда не
-обновляются автоматически. Финальный запуск в одном репозитории исключителен:
-второй процесс получает отказ до загрузки моделей.
+обновляются автоматически. Оба режима используют одну блокировку на Git worktree.
+Второй процесс в этом worktree получает отказ до загрузки моделей.
 
 Предсказания обеих моделей получаются через общий интерфейс ``src.classifier``
 (тот же путь, что у бота и ``tools/evaluate_classifier.py``), метрики — функциями
@@ -33,6 +33,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -80,11 +81,9 @@ REQUIRED_PINNED = (
 )
 # Модули src, добавленные после frozen_commit самим оценщиком; остальные должны быть закреплены.
 EVALUATOR_FILES = ("src/evaluate.py",)
-# Исполняемая версия оценщика (прочитана при импорте) сверяется с версией в Git HEAD.
-_EVALUATOR_SOURCE = Path(__file__).read_bytes()
-# Межпроцессная блокировка финального запуска: flock на канонической фиксации репозитория,
-# не зависит от --freeze и --out-dir; снимается ядром при завершении процесса.
-LOCK_FILE = "reports/freeze.json"
+# Объект исполняющегося модуля CPython, включая код вложенных функций.
+_EVALUATOR_CODE = sys._getframe().f_code
+LOCK_FILE = "t13-evaluate.lock"
 # Версия данных, которая должна совпадать у обеих моделей.
 SHARED_VERSION_KEYS = ("train_ids_sha256", "train_rows", "validation_ids_sha256", "validation_rows",
                        "t03_split_ids_sha256", "t03_audit_sha256")
@@ -105,7 +104,7 @@ class DataMismatchError(ValueError):
 
 
 class ConcurrentRunError(OSError):
-    """Финальный запуск в этом репозитории уже выполняется другим процессом."""
+    """Блокировка T13 для этого worktree недоступна."""
 
 
 # --------------------------------------------------------------------------- #
@@ -116,6 +115,9 @@ def _class_ids(values: Sequence[Any], name: str) -> np.ndarray:
     items = list(values)
     if not all(isinstance(v, (int, np.integer)) and not isinstance(v, (bool, np.bool_)) for v in items):
         raise DataMismatchError(f"{name} must be integer class ids")
+    invalid = sorted(set(items) - set(CLASS_IDS))
+    if invalid:
+        raise DataMismatchError(f"Unexpected class id(s) in {name}: {invalid}")
     return np.asarray(items, dtype=int)
 
 
@@ -128,10 +130,6 @@ def compute_metrics(y_true: Sequence[int], y_pred: Sequence[int]) -> dict[str, A
     predicted = _class_ids(y_pred, "predictions")
     if truth.ndim != 1 or truth.shape != predicted.shape or not len(truth):
         raise DataMismatchError("Labels and predictions must be non-empty and of equal length")
-    for name, values in (("labels", truth), ("predictions", predicted)):
-        invalid = sorted(set(values.tolist()) - set(CLASS_IDS))
-        if invalid:
-            raise DataMismatchError(f"Unexpected class id(s) in {name}: {invalid}")
     flat = base.validation_metrics(truth, predicted)
     return {
         "rows": int(len(truth)),
@@ -373,14 +371,15 @@ def _check_inference(freeze: Mapping[str, Any], root: Path) -> None:
     _require(not differing, f"T12 text protocol is not supported by this evaluator: {', '.join(differing)}")
 
 
-def _check_git(freeze: Mapping[str, Any], root: Path) -> None:
-    state = git_state(root, freeze["frozen_commit"])
+def _check_git(freeze: Mapping[str, Any], root: Path, *, expected_commit: str | None = None) -> str:
+    state = git_state(root, freeze["frozen_commit"], expected_commit=expected_commit)
     _require(state["commit"] is not None, "Git commit of the evaluation code is unknown")
     _require(state["frozen_commit_is_ancestor"], "Evaluated code does not descend from the T12 frozen commit")
     _require(not state["tracked_changes"], "Tracked files have uncommitted changes; commit before the final run")
     _require(state["evaluator_in_head"], f"{EVALUATOR_FILES[0]} is not committed in Git HEAD; commit it first")
     _require(state["evaluator_matches_head"],
              f"Running {EVALUATOR_FILES[0]} differs from the version committed in Git HEAD")
+    return state["commit"]
 
 
 def _sysctl(name: str) -> str | None:
@@ -448,10 +447,9 @@ def _check_environment(freeze: Mapping[str, Any], root: Path) -> None:
 
 # Статические проверки разобранной фиксации (после _check_accepted_t12 по её байтам):
 # модели и test здесь не загружаются и не декодируются.
-# Порядок: протокол → файлы → данные → модели → параметры → git → среда.
 FREEZE_CHECKS: list[Callable[[Mapping[str, Any], Path], None]] = [
     _check_schema, _check_frozen_files, _check_data_prep, _check_test_entry,
-    _check_models, _check_inference, _check_git, _check_environment,
+    _check_models, _check_inference, _check_environment,
 ]
 
 
@@ -463,17 +461,29 @@ def _git_blob(root: Path, spec: str) -> bytes | None:
     return proc.stdout if proc.returncode == 0 else None
 
 
-def git_state(root: Path, frozen_commit: str) -> dict[str, Any]:
-    """Commit, происхождение от frozen_commit, чистота отслеживаемых файлов и версия оценщика в HEAD."""
-    ancestor = base._git(root, "merge-base", "--is-ancestor", frozen_commit, "HEAD")
-    status = base._git(root, "status", "--porcelain", "--untracked-files=no")
-    committed = _git_blob(root, f"HEAD:{EVALUATOR_FILES[0]}")
+def git_state(root: Path, frozen_commit: str, *, expected_commit: str | None = None) -> dict[str, Any]:
+    """Сверить происхождение, индекс, рабочую копию и загруженный код с одним SHA."""
+    commit = base.git_commit(root) if expected_commit is None else expected_commit
+    _require(isinstance(commit, str) and bool(_COMMIT.fullmatch(commit)), "Git commit of the evaluation code is unknown")
+    ancestor = base._git(root, "merge-base", "--is-ancestor", frozen_commit, commit)
+    index = base._git(root, "diff", "--quiet", "--cached", commit, "--")
+    worktree = base._git(root, "diff", "--quiet", "--")
+    rel = EVALUATOR_FILES[0]
+    committed = _git_blob(root, f"{commit}:{rel}")
+    path = root / rel
+    matches = False
+    if committed is not None and path.is_file() and not path.is_symlink() and path.read_bytes() == committed:
+        try:
+            matches = compile(committed, _EVALUATOR_CODE.co_filename, "exec", dont_inherit=True) == _EVALUATOR_CODE
+        except (SyntaxError, ValueError) as exc:
+            raise FreezeError("Cannot compile the committed evaluator") from exc
+    _require(base.git_commit(root) == commit, "Git HEAD changed; evaluator commit cannot be verified")
     return {
-        "commit": base.git_commit(root),
+        "commit": commit,
         "frozen_commit_is_ancestor": ancestor is not None and ancestor.returncode == 0,
-        "tracked_changes": status is None or status.returncode != 0 or bool(status.stdout.strip()),
+        "tracked_changes": any(diff is None or diff.returncode != 0 for diff in (index, worktree)),
         "evaluator_in_head": committed is not None,
-        "evaluator_matches_head": committed == _EVALUATOR_SOURCE,
+        "evaluator_matches_head": matches,
     }
 
 
@@ -495,8 +505,8 @@ def read_freeze(path: Path, root: Path = ROOT) -> tuple[dict[str, Any], str]:
     return freeze, hashlib.sha256(data).hexdigest()
 
 
-def load_freeze(path: Path, root: Path = ROOT) -> tuple[dict[str, Any], str]:
-    """Прочитать и проверить фиксацию T12. Модели и test при этом не загружаются."""
+def load_freeze(path: Path, root: Path = ROOT) -> tuple[dict[str, Any], str, str]:
+    """Вернуть проверенную фиксацию T12, её SHA-256 и проверенный Git commit."""
     freeze, digest = read_freeze(path, root)
     _check_accepted_t12(digest, root)
     for check in FREEZE_CHECKS:
@@ -504,33 +514,30 @@ def load_freeze(path: Path, root: Path = ROOT) -> tuple[dict[str, Any], str]:
             check(freeze, root)
         except (KeyError, TypeError, OSError) as exc:
             raise FreezeError(f"T12 freeze check {check.__name__} failed: {type(exc).__name__}: {exc}") from exc
-    return freeze, digest
+    return freeze, digest, _check_git(freeze, root)
 
 
 @contextlib.contextmanager
 def final_run_lock(root: Path = ROOT) -> Iterator[None]:
-    """Исключительная блокировка финального запуска (flock, Linux и macOS).
-
-    Блокировка снимается при выходе из блока и ядром при аварийном завершении процесса,
-    поэтому зависшей блокировки не остаётся. Она исключает только одновременные запуски
-    в этом репозитории; от последовательного повторного запуска защищает итоговый каталог.
-    """
+    """Общий flock для обоих режимов. Служебный файл остаётся в Git-каталоге worktree."""
     try:
         import fcntl
     except ImportError as exc:
         raise ConcurrentRunError("Exclusive final-run lock requires fcntl (Linux or macOS)") from exc
+    git_dir = base._git(root, "rev-parse", "--absolute-git-dir")
+    if git_dir is None or git_dir.returncode != 0:
+        raise ConcurrentRunError("Cannot locate the Git worktree directory for the T13 lock")
+    lock_path = Path(git_dir.stdout.removesuffix("\n")) / LOCK_FILE
     try:
-        fd = os.open(root / LOCK_FILE, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
-    except FileNotFoundError as exc:
-        raise FreezeError(f"T12 freeze not found: {LOCK_FILE}; the final test stays closed") from exc
+        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     except OSError as exc:
-        raise ConcurrentRunError(f"Cannot open the final-run lock {LOCK_FILE}: {exc}") from exc
+        raise ConcurrentRunError(f"Cannot open the final-run lock {LOCK_FILE}: {exc.strerror}") from exc
     try:
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK, errno.EACCES):
-                raise ConcurrentRunError("Another final evaluation of this repository is running; "
+                raise ConcurrentRunError("Another final evaluation or readiness check is running in this worktree; "
                                          "refusing before loading models or reading the test") from exc
             raise ConcurrentRunError(f"Cannot lock {LOCK_FILE}: {exc}") from exc
         yield
@@ -876,11 +883,12 @@ def confusion_matrix_svg(matrix: Sequence[Sequence[int]], title: str) -> str:
 
 def _markdown(report: Mapping[str, Any]) -> str:
     run = report["run"]
+    command_label = ("Шаблон команды (подставьте локальные пути)" if run["required_local_paths"] else "Команда")
     lines = ["# T13: финальное сравнение на текстовом test", "",
              f"- Commit оценщика: `{run['git_commit']}`; основа T12: `{run['frozen_commit']}`",
              f"- Фиксация: `{run['freeze_path']}` (`{run['freeze_sha256']}`), протокол {run['protocol_version']}",
              f"- Test: {report['test']['rows']} строк, Parquet `{report['test']['parquet_sha256']}`",
-             f"- Команда: `{run['command']}`",
+             f"- {command_label}: `{run['command']}`",
              f"- Модель бота выбрана в T12 по validation: {report['bot_model']}; результат test её не меняет", "",
              "| Модель | Accuracy | Macro-F1 | F1 negative | F1 neutral | F1 positive | Ошибок | мс/текст |",
              "|---|---:|---:|---:|---:|---:|---:|---:|"]
@@ -961,7 +969,8 @@ def check_output_destination(out_dir: Path) -> None:
         shutil.rmtree(probe, ignore_errors=True)
 
 
-def write_reports(report: dict[str, Any], runs: Mapping[str, Mapping[str, Any]], out_dir: Path) -> list[Path]:
+def write_reports(report: dict[str, Any], runs: Mapping[str, Mapping[str, Any]], out_dir: Path,
+                  *, root: Path = ROOT) -> list[Path]:
     """Записать отчёты во временный каталог рядом и опубликовать его одним переименованием.
 
     Тексты отзывов не записываются. При обработанной ошибке временный каталог удаляется,
@@ -989,6 +998,7 @@ def write_reports(report: dict[str, Any], runs: Mapping[str, Mapping[str, Any]],
         base.write_json(staging / "final_metrics.json", report)
         if sorted(p.name for p in staging.iterdir()) != sorted(OUTPUT_FILES):
             raise OSError("Incomplete evaluation output")
+        _check_git(report["run"], root, expected_commit=report["run"]["git_commit"])
         _rename_noreplace(staging, out_dir)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
@@ -1027,26 +1037,32 @@ def load_models(freeze: Mapping[str, Any], *, root: Path = ROOT, factory: Callab
     return models, load_seconds, versions
 
 
-def _verified_commit(freeze: Mapping[str, Any], root: Path) -> str:
-    _check_git(freeze, root)
-    return git_state(root, freeze["frozen_commit"])["commit"]
-
-
-def run_command(freeze_path: Path, out_dir: Path, root: Path) -> str:
-    """Команда воспроизведения с фактически использованными --freeze и --out-dir."""
-    command = f"python -m src.evaluate --run-final --freeze {base.display_path(freeze_path, root)}"
-    if out_dir.resolve() != (root / "reports" / "evaluation").resolve():
-        command += f" --out-dir {base.display_path(out_dir, root)}"
-    return command
+def run_command(freeze_path: Path, out_dir: Path, root: Path) -> dict[str, Any]:
+    """Аргументы для запуска из корня репозитория. Внешние пути указывает владелец."""
+    argv = ["python", "-m", "src.evaluate", "--run-final"]
+    required = []
+    paths = {}
+    for option, path in (("--freeze", freeze_path), ("--out-dir", out_dir)):
+        try:
+            value = path.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            value = "<LOCAL_FREEZE_PATH>" if option == "--freeze" else "<LOCAL_OUT_DIR>"
+            required.append(option)
+        if value.startswith("-"):
+            value = "./" + value
+        argv.extend([option, value])
+        paths[option] = value
+    return {"argv": argv, "command": shlex.join(argv), "required_local_paths": required,
+            "freeze_path": paths["--freeze"], "out_dir": paths["--out-dir"]}
 
 
 def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
              factory: Callable[..., Any] = c.create_classifier,
              clock: Callable[[], float] = time.perf_counter) -> dict[str, Any]:
-    """Финальная оценка обеих моделей под исключительной блокировкой репозитория.
+    """Финальная оценка обеих моделей под исключительной блокировкой worktree.
 
     Порядок: блокировка → фиксация → назначение результатов → модели → test → предсказания →
-    повторная проверка git → отчёты. Test декодируется только после проверки фиксации,
+    запись временных отчётов → повторная проверка git → публикация. Test декодируется только после проверки фиксации,
     обоих комплектов и их версий данных; блокировка удерживается до публикации и очистки.
     """
     with final_run_lock(root):
@@ -1055,8 +1071,7 @@ def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
 
 def _evaluate_locked(freeze_path: Path, out_dir: Path, *, root: Path, factory: Callable[..., Any],
                      clock: Callable[[], float]) -> dict[str, Any]:
-    freeze, freeze_sha256 = load_freeze(freeze_path, root)
-    commit = _verified_commit(freeze, root)
+    freeze, freeze_sha256, commit = load_freeze(freeze_path, root)
     check_output_destination(out_dir)
     inference = freeze["inference"]
     models, load_seconds, versions = load_models(freeze, root=root, factory=factory, clock=clock)
@@ -1081,6 +1096,7 @@ def _evaluate_locked(freeze_path: Path, out_dir: Path, *, root: Path, factory: C
     audit = base.read_json(base.resolve_path(root, base.read_json(root / "configs/nlp_baseline.json")["data_prep_audit_path"]))
     groups = repeat_groups_in_test(frame, candidates, decisions, audit)
 
+    command = run_command(freeze_path, out_dir, root)
     report = {
         "task": "T13",
         "final_test_used": True,
@@ -1089,10 +1105,9 @@ def _evaluate_locked(freeze_path: Path, out_dir: Path, *, root: Path, factory: C
         "bot_model_changed_by_test": False,
         "labels": dict(zip(CLASS_NAMES, CLASS_IDS)),
         "run": {
-            "command": run_command(freeze_path, out_dir, root),
+            **command,
             "git_commit": commit,
             "frozen_commit": freeze["frozen_commit"],
-            "freeze_path": base.display_path(freeze_path, root),
             "freeze_sha256": freeze_sha256,
             "freeze_schema": freeze["schema"],
             "protocol_version": freeze["protocol_version"],
@@ -1124,18 +1139,10 @@ def _evaluate_locked(freeze_path: Path, out_dir: Path, *, root: Path, factory: C
         "repeat_sensitivity": {**sensitivity(runs, groups, main),
                                "t03_candidates_sha256": base.sha256_file(candidates),
                                "t03_decisions_sha256": base.sha256_file(decisions)},
-        "outputs": [base.display_path(out_dir / name, root) for name in OUTPUT_FILES],
+        "outputs": [str(Path(command["out_dir"]) / name) for name in OUTPUT_FILES],
     }
-    # Код и commit не менялись во время запуска: отчёт приписывается проверенному коммиту.
-    if _verified_commit(freeze, root) != commit:
-        raise FreezeError("Git HEAD changed during the final run; results are not published")
-    write_reports(report, runs, out_dir)
+    write_reports(report, runs, out_dir, root=root)
     return report
-
-
-def _lock_available(root: Path) -> None:
-    with final_run_lock(root):
-        pass
 
 
 def check_only(freeze_path: Path, root: Path = ROOT, *, out_dir: Path | None = None,
@@ -1148,7 +1155,8 @@ def check_only(freeze_path: Path, root: Path = ROOT, *, out_dir: Path | None = N
     Test проверяется только по пути и байтовой сумме файла.
     """
     out_dir = out_dir if out_dir is not None else root / "reports" / "evaluation"
-    freeze, freeze_sha256 = read_freeze(freeze_path, root)
+    freeze: dict[str, Any] = {}
+    freeze_sha256 = None
     checks: list[dict[str, str]] = []
 
     def stage(name: str, action: Callable[[], Any]) -> bool:
@@ -1164,15 +1172,17 @@ def check_only(freeze_path: Path, root: Path = ROOT, *, out_dir: Path | None = N
               ("frozen_files_and_reports", (_check_frozen_files, _check_data_prep, _check_test_entry,
                                             _check_models, _check_inference)),
               ("git", (_check_git,)), ("environment", (_check_environment,)),
-              ("output_dir", (lambda f, r: check_output_destination(out_dir),)),
-              ("exclusive_run", (lambda f, r: _lock_available(r),))]
-    for index, (name, functions) in enumerate(static):
-        if not stage(name, lambda: [check(freeze, root) for check in functions]) and index < 2:
-            break
-    else:
-        stage("models", lambda: load_models(freeze, root=root, factory=factory))
-        stage("test_file", lambda: frozen_test_path(freeze, root))
-    ready = len(checks) == len(static) + 2 and all(item["status"] == "passed" for item in checks)
+              ("output_dir", (lambda f, r: check_output_destination(out_dir),))]
+    with contextlib.ExitStack() as stack:
+        if stage("exclusive_run", lambda: stack.enter_context(final_run_lock(root))):
+            freeze, freeze_sha256 = read_freeze(freeze_path, root)
+            for index, (name, functions) in enumerate(static):
+                if not stage(name, lambda: [check(freeze, root) for check in functions]) and index < 2:
+                    break
+            else:
+                stage("models", lambda: load_models(freeze, root=root, factory=factory))
+                stage("test_file", lambda: frozen_test_path(freeze, root))
+    ready = all(item["status"] == "passed" for item in checks)
     return {"status": "ready" if ready else "not_ready", "freeze_path": base.display_path(freeze_path, root),
             "out_dir": base.display_path(out_dir, root),
             "freeze_sha256": freeze_sha256, "bot_model": freeze.get("bot_model"),

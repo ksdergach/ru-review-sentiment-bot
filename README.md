@@ -431,9 +431,10 @@ CLASSIFIER_BACKEND=rubert python tools/evaluate_classifier.py
 ```
 
 Финальное сравнение обеих моделей на test (T13) выполняет `src.evaluate` через тот же
-интерфейс по утверждённой фиксации T12: `python -m src.evaluate --check` проверяет
-готовность без чтения test, `--run-final` запускается только отдельно согласованным
-шагом на машине измерений. Подробности: [README_T13.md](README_T13.md).
+интерфейс по утверждённой фиксации T12. Команда `python -m src.evaluate --check`
+проверяет готовность и байтовую сумму test без декодирования текстов. Режим
+`--run-final` запускают на машине измерений после отдельного согласования.
+[Методика и команды T13](README_T13.md).
 
 `tools/verify_transformer.py` и `tools/report_nlp_baseline.py` намеренно не
 используют `src.classifier`: это независимые проверки результатов T06 и N02,
