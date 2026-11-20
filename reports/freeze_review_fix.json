@@ -1,0 +1,75 @@
+{
+  "task": "T12 / PR46 review fix",
+  "date": "2026-11-20",
+  "status": "local_checks_passed_pending_rereview",
+  "reviewed_commit": "eb2f14e2bb4280fb9bb58b81a3b9ab3e6ce6e6a1",
+  "changes": [
+    "Verify approved T12 status, pinned training report/T03 metadata/source hash, row count and ordered ID/label hash before decoding test.",
+    "Require the prepared Parquet byte hash to match T12 before publication; an existing file must also match T12.",
+    "Write a unique temporary file in the destination directory, close/sync/hash it, then publish with os.link without replacement; clean up only owned temporary files."
+  ],
+  "synthetic_regression_tests": {
+    "command": ".venv/bin/python -m pytest -q --tb=short tests/test_restore_frozen_test.py",
+    "exit_code": 0,
+    "passed": 18,
+    "seconds": 2.35,
+    "cases": [
+      "existing exact order/texts/labels",
+      "source and metadata changes before decoding",
+      "label disagreement",
+      "unchanged existing output without decoding",
+      "unapproved freeze",
+      "coherently changed old metadata rejected against T12",
+      "changed ordered IDs",
+      "frozen row count",
+      "wrong prepared-byte hash before publication",
+      "existing file disagrees with frozen hash",
+      "partial write followed by OSError or KeyboardInterrupt and successful retry",
+      "competing matching or different destination",
+      "fsync or link failure and successful retry",
+      "foreign temporary file preserved"
+    ]
+  },
+  "real_existing_test_check": {
+    "status": "UNCHANGED",
+    "path": "data/processed/test.parquet",
+    "rows": 9324,
+    "source_parquet_sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+    "parquet_sha256": "5854f134883efdfa45987602c0e90b8f777fea7af4ec93b5d566875fa1e14ab1",
+    "ids_sha256": "2128997f2edf8ed5ec1b95665edb4062cc47d41da002064f7b7e68bbfbbd73eb",
+    "data_preparation_only": true,
+    "model_inference_run": false,
+    "final_metrics_computed": false,
+    "texts_printed": false,
+    "parquet_decoding_forbidden": true,
+    "parquet_writing_forbidden": true,
+    "mode": "restore() with read_parquet and save_prepared_split patched to raise if called"
+  },
+  "protected_files": {
+    "count": 66,
+    "sha256_unchanged": true,
+    "mtime_unchanged": true,
+    "scope": "source/prepared text data, baseline, RuBERT, Whisper, T11 files/manifest/table/reports and configs"
+  },
+  "freeze_changes": {
+    "tools/restore_frozen_test.py": {
+      "before": "7eba1839e12bdc336d2d7cde45c1c975b093bce22356d74e60d07bbfeab1e681",
+      "after": "367c0d6cf3ac0e116b1e897a74964174d8fb2cdd530f16b48ef1ede280347014"
+    },
+    "tests/test_restore_frozen_test.py": {
+      "before": "5e6bd63da59f24fdcffc42849ca80473b81ff2f9915470250f994c603496d6c8",
+      "after": "df066ab50ed35a28cd7adbc23055d1af2e9e13f8214d3f17f96460561deee384"
+    }
+  },
+  "frozen_models_data_protocol_changed": false,
+  "final_text_inference_run": false,
+  "t11_inference_run": false,
+  "training_run": false,
+  "full_test_suite_run": false,
+  "limitations": [
+    "Only the changed restorer and a guarded existing-file path were exercised; the full project suite was not rerun.",
+    "Hard links must be supported by the destination filesystem; failure is reported without an unsafe fallback.",
+    "An uncatchable process kill may leave an owned temporary file; the final filename is either absent or fully written.",
+    "Repeat review is still pending; no merge or final evaluation performed."
+  ]
+}
