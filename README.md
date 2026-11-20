@@ -46,6 +46,16 @@ validation macro-F1 0,667824 против 0,718015 у baseline; преимуще
 из корня этого репозитория. Для установки нужен интернет; для быстрых проверок
 не нужны GPU, токен Telegram, веса моделей и финальные тестовые записи.
 
+Получите проверяемую версию: основная ветка — `master`; для независимой проверки
+перейдите на конкретный commit и запишите его SHA в протокол.
+
+```bash
+git clone https://github.com/ksdergach/ru-review-sentiment-bot.git
+cd ru-review-sentiment-bot
+git checkout <commit SHA>   # или master
+git rev-parse HEAD
+```
+
 Создайте новое окружение. Если `.venv` уже содержит другой проект или версии,
 создайте отдельное окружение, а не устанавливайте поверх него.
 
@@ -638,6 +648,9 @@ python -m pytest -q
 6. Заполнить обезличенный протокол [reports/bot/t09_smoke.md](reports/bot/t09_smoke.md):
    дата, backend, модель Whisper, метки и результат сравнения — без токена,
    имени пользователя, аудио и полного текста отзыва.
+
+Независимая установка и проверка другим участником (T16, #14): чек-лист и протокол —
+[reports/bot/t16_independent_check.md](reports/bot/t16_independent_check.md).
 
 ## Отчёт для сдачи NLP (№27)
 

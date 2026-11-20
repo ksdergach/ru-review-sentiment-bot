@@ -48,12 +48,13 @@ SHA-256 `68970b2e3422a873d14da75a4910f6f813ade73c3ca99c103068f6f2d9e4c703`.
 
 ### Шаги для нового пользователя
 
-1. **Получить репозиторий.** Пока PR №34 не слит, модель описана в ветке `vds/issue-8`.
+1. **Получить репозиторий.** PR №34 слит; актуальная версия — ветка `master`.
+   Ветка `vds/issue-8` устарела и не содержит голосового бота.
 
    ```bash
    git clone https://github.com/ksdergach/ru-review-sentiment-bot.git
    cd ru-review-sentiment-bot
-   git checkout vds/issue-8
+   git checkout master
    ```
 
 2. **Создать окружение и активировать его.**
@@ -129,8 +130,8 @@ SHA-256 `68970b2e3422a873d14da75a4910f6f813ade73c3ca99c103068f6f2d9e4c703`.
 
    Команда загружает комплект без сети и выводит классы и вероятности
    [negative, neutral, positive] для трёх фиксированных текстов. Ожидаемые top-1:
-   positive, negative, positive. RuBERT пока не подключён к Telegram-боту. Бот N03
-   использует baseline; подключение RuBERT — отдельная задача.
+   positive, negative, positive. В Telegram-боте RuBERT выбирается переменной
+   `CLASSIFIER_BACKEND=rubert` ([README, раздел T09](README.md#голосовой-telegram-бот-t09)).
 
 На удалённом сервере команды те же, выполняются по SSH. Браузер и графический
 интерфейс не нужны.
