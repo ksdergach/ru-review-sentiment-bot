@@ -430,9 +430,10 @@ pickle безопасным. Произвольные новые веса тре
 CLASSIFIER_BACKEND=rubert python tools/evaluate_classifier.py
 ```
 
-Финальное сравнение обеих моделей на test (T13) выполняет `python -m src.evaluate`
-через тот же интерфейс, но только после утверждённой фиксации T12; до неё
-запуск отказывает, не читая test. Подробности: [README_T13.md](README_T13.md).
+Финальное сравнение обеих моделей на test (T13) выполняет `src.evaluate` через тот же
+интерфейс по утверждённой фиксации T12: `python -m src.evaluate --check` проверяет
+готовность без чтения test, `--run-final` запускается только отдельно согласованным
+шагом на машине измерений. Подробности: [README_T13.md](README_T13.md).
 
 `tools/verify_transformer.py` и `tools/report_nlp_baseline.py` намеренно не
 используют `src.classifier`: это независимые проверки результатов T06 и N02,

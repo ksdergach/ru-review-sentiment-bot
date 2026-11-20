@@ -1,32 +1,37 @@
 """T13: финальное сравнение baseline и RuBERT на одном неизменном текстовом test.
 
-    python -m src.evaluate --check                        # только предусловия, test не читается
-    python -m src.evaluate --freeze reports/freeze.json   # финальный запуск после T12
+    python -m src.evaluate --check        # готовность: фиксация, файлы, среда, модели; test не декодируется
+    python -m src.evaluate --run-final    # финальный запуск по утверждённому протоколу T12
 
-Финальный test открывается только после подтверждённой фиксации T12: файл фиксации
-должен быть утверждён, а комплекты моделей, данные T03 и сам test — совпадать с
-записанными в нём суммами. Все проверки выполняются до декодирования текстов test.
+Источник истины — утверждённая фиксация T12 (``reports/freeze.json``, протокол
+``reports/freeze.md``). До декодирования текстов test проверяются: принятая версия
+файлов фиксации, суммы всех ``file_sha256``, git, среда измерений, отчёты и комплекты
+обеих моделей, байтовая сумма test. Любое несовпадение останавливает запуск; суммы
+фиксации никогда не обновляются автоматически.
 
 Предсказания обеих моделей получаются через общий интерфейс ``src.classifier``
 (тот же путь, что у бота и ``tools/evaluate_classifier.py``), метрики — функциями
 ``src.train_baseline`` в фиксированном порядке классов negative=0, neutral=1, positive=2.
+Test не меняет модель бота, выбранную в T12 по validation.
 
-Формат фиксации T12 ещё не утверждён. ``FREEZE_SCHEMA`` описывает минимум, который
-нужен T13; T12 может принять его или добавить адаптер и проверки в ``FREEZE_CHECKS``.
-
-Код выхода: 0 — отчёты записаны (или предусловия выполнены при --check);
-2 — предусловия, модели или данные не прошли проверку; отчёты не записываются.
+Код выхода: 0 — отчёты записаны (или все предусловия выполнены при --check);
+2 — предусловия, модели, данные или запись не прошли проверку; итоговый каталог не создаётся.
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import importlib.metadata
 import json
 import os
 import platform
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
+from html import escape
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -47,8 +52,26 @@ BACKENDS = ("baseline", "rubert")
 DEFAULT_FREEZE_PATH = ROOT / "reports" / "freeze.json"
 DEFAULT_OUT_DIR = ROOT / "reports" / "evaluation"
 
-# Черновик T13, а не утверждённый протокол T12.
+# Формат утверждённой фиксации T12 (``draft-1`` — версия формата, не статус) и версия протокола.
 FREEZE_SCHEMA = "t13-final-text-eval-input/draft-1"
+PROTOCOL_VERSION = "t12/1"
+# Принятая версия файлов T12 (master после PR46). Изменение фиксации требует
+# отдельного согласования и правки этих сумм в проверяемом коммите, а не подгонки.
+ACCEPTED_T12_SHA256 = {
+    "reports/freeze.json": "318712255d2b7074d1e03a75f6a2d2792cc61bcc119d9ff74313128149b452cd",
+    "reports/freeze.md": "a4fc4a7525b31635a7a3fcb8bb73cd3cf50acad191c2f10c9086ec2a106a540d",
+    "reports/freeze_checks.json": "46d17bc12c61580daf5e4e52bcdc2ac052ee9e2a98bd48c2d55875e471896197",
+    "reports/freeze_review_fix.json": "e161f1a352a8732ae1f1f038bf95c1e7058451761fdef81b0c3cf34a827b2de7",
+}
+# Входы T13, которые обязаны быть закреплены в file_sha256 (плюс отчёты и конфиги моделей).
+REQUIRED_PINNED = (
+    "requirements.txt", "configs/nlp_baseline.json", "configs/transformer.json", "configs/data_prep.json",
+    "configs/near_duplicate_decisions.csv", "reports/data_prep/audit.json", "reports/data_prep/split_ids.csv",
+    "reports/data_prep/near_duplicate_candidates.csv", "src/__init__.py", "src/classifier.py",
+    "src/train_baseline.py", "src/train_transformer.py", "src/prepare_data.py",
+)
+# Модули src, добавленные после frozen_commit самим оценщиком; остальные должны быть закреплены.
+EVALUATOR_FILES = ("src/evaluate.py",)
 # Версия данных, которая должна совпадать у обеих моделей.
 SHARED_VERSION_KEYS = ("train_ids_sha256", "train_rows", "validation_ids_sha256", "validation_rows",
                        "t03_split_ids_sha256", "t03_audit_sha256")
@@ -92,6 +115,14 @@ def compute_metrics(y_true: Sequence[int], y_pred: Sequence[int]) -> dict[str, A
         "per_class": {name: {key: flat[f"{name}_{key}"] for key in ("precision", "recall", "f1", "support")}
                       for name in CLASS_NAMES},
         "predicted_counts": {name: int(np.count_nonzero(predicted == i)) for i, name in zip(CLASS_IDS, CLASS_NAMES)},
+        "errors": {
+            "total": int(np.count_nonzero(truth != predicted)),
+            # Пропущенные записи истинного класса и ложные срабатывания предсказанного класса.
+            "by_true_class": {name: int(np.count_nonzero((truth == i) & (predicted != i)))
+                              for i, name in zip(CLASS_IDS, CLASS_NAMES)},
+            "by_predicted_class": {name: int(np.count_nonzero((predicted == i) & (truth != i)))
+                                   for i, name in zip(CLASS_IDS, CLASS_NAMES)},
+        },
         "confusion_matrix": base.validation_confusion_matrix(truth, predicted),
     }
 
@@ -117,9 +148,22 @@ def _repo_path(root: Path, value: Any, name: str) -> Path:
         raise FreezeError(f"{name}: {exc}") from exc
 
 
+def _file_sha256(root: Path, rel: str) -> str | None:
+    path = root / rel
+    return base.sha256_file(path) if path.is_file() and not path.is_symlink() else None
+
+
+def _is_positive_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
 def _check_schema(freeze: Mapping[str, Any], root: Path) -> None:
     _require(freeze.get("schema") == FREEZE_SCHEMA, f"Unsupported freeze schema: {freeze.get('schema')!r}")
+    _require(freeze.get("protocol_version") == PROTOCOL_VERSION,
+             f"Unsupported T12 protocol version: {freeze.get('protocol_version')!r}")
+    _require(freeze.get("protocol_path") == "reports/freeze.md", "T12 freeze must reference reports/freeze.md")
     _require(freeze.get("status") == "approved", "T12 freeze is not approved; the final test stays closed")
+    _require(freeze.get("pending_approval") == [], "T12 freeze has pending approvals")
     approvers = freeze.get("approved_by")
     _require(isinstance(approvers, list) and approvers and all(isinstance(a, str) and a.strip() for a in approvers),
              "T12 freeze has no approvers")
@@ -132,6 +176,43 @@ def _check_schema(freeze: Mapping[str, Any], root: Path) -> None:
     _require(freeze.get("bot_model") in BACKENDS, "T12 freeze must name the bot model chosen on validation")
     _require(freeze.get("bot_model_selected_by") == "validation_and_resources",
              "Bot model must be selected by validation and resources, not by test")
+    decisions = freeze.get("confirmed_decisions")
+    _require(isinstance(decisions, dict) and decisions.get("bot_model") == freeze["bot_model"],
+             "T12 confirmed bot model differs from bot_model")
+    _require(freeze.get("label_mapping") == base.EXPECTED_LABEL_MAPPING,
+             "T12 label mapping must be negative=0, neutral=1, positive=2")
+
+
+def _check_accepted_t12(freeze: Mapping[str, Any], root: Path) -> None:
+    """Файлы фиксации совпадают с принятой версией T12: сама фиксация не подменена."""
+    changed = [rel for rel, digest in ACCEPTED_T12_SHA256.items() if _file_sha256(root, rel) != digest]
+    _require(not changed, f"T12 freeze files differ from the accepted version: {', '.join(changed)}")
+
+
+def _check_frozen_files(freeze: Mapping[str, Any], root: Path) -> None:
+    """Все file_sha256 совпадают с файлами; входы T13 и все модули src, кроме оценщика, закреплены."""
+    pinned = freeze.get("file_sha256")
+    _require(isinstance(pinned, dict) and bool(pinned), "T12 freeze has no file_sha256")
+    models = freeze.get("models") if isinstance(freeze.get("models"), dict) else {}
+    required = list(REQUIRED_PINNED) + [entry.get(key) for entry in models.values() if isinstance(entry, dict)
+                                        for key in ("report_path", "config_path")]
+    missing = sorted({str(rel) for rel in required if rel not in pinned})
+    _require(not missing, f"Required T13 inputs are not pinned in file_sha256: {', '.join(missing)}")
+    changed = []
+    for rel, digest in pinned.items():
+        _require(_is_sha256(digest), f"file_sha256[{rel!r}] must be SHA-256")
+        _repo_path(root, rel, f"file_sha256[{rel!r}]")
+        if _file_sha256(root, rel) != digest:
+            changed.append(rel)
+    _require(not changed, f"Frozen files differ from T12 or are missing: {', '.join(sorted(changed))}")
+    unpinned = [path.relative_to(root).as_posix() for path in sorted((root / "src").glob("*.py"))
+                if path.relative_to(root).as_posix() not in pinned
+                and path.relative_to(root).as_posix() not in EVALUATOR_FILES]
+    _require(not unpinned, f"Source modules added after the freeze are not allowed: {', '.join(unpinned)}")
+
+
+DATA_PREP_VERSION_KEYS = ("train_rows", "validation_rows", "train_ids_sha256", "validation_ids_sha256",
+                          "train_parquet_sha256", "validation_parquet_sha256")
 
 
 def _check_data_prep(freeze: Mapping[str, Any], root: Path) -> None:
@@ -142,16 +223,92 @@ def _check_data_prep(freeze: Mapping[str, Any], root: Path) -> None:
         _require(_is_sha256(prep.get(key)), f"T12 freeze data_prep.{key} must be SHA-256")
         path = _repo_path(root, config[config_key], config_key)
         _require(path.is_file() and base.sha256_file(path) == prep[key], f"T03 {config_key} differs from T12 freeze")
+    for key in DATA_PREP_VERSION_KEYS:
+        valid = _is_positive_int(prep.get(key)) if key.endswith("_rows") else _is_sha256(prep.get(key))
+        _require(valid, f"T12 freeze data_prep.{key} is missing or invalid")
+    audit = base.load_t03_audit(base.resolve_path(root, config["data_prep_audit_path"]))
+    for key in ("final_movie_id_overlap", "final_exact_text_overlap"):
+        overlaps = audit.get(key)
+        _require(isinstance(overlaps, dict) and bool(overlaps) and all(v == 0 for v in overlaps.values()),
+                 f"T03 audit reports split overlap: {key}")
 
 
 def _check_test_entry(freeze: Mapping[str, Any], root: Path) -> None:
     test = freeze.get("test")
     _require(isinstance(test, dict), "T12 freeze has no test section")
     _repo_path(root, test.get("path"), "test.path")
-    for key in ("parquet_sha256", "ids_sha256"):
+    for key in ("parquet_sha256", "ids_sha256", "source_parquet_sha256"):
         _require(_is_sha256(test.get(key)), f"T12 freeze test.{key} must be SHA-256")
-    rows = test.get("rows")
-    _require(isinstance(rows, int) and not isinstance(rows, bool) and rows > 0, "T12 freeze test.rows must be positive")
+    _require(_is_positive_int(test.get("rows")), "T12 freeze test.rows must be positive")
+    config = base.read_json(root / "configs/nlp_baseline.json")
+    audit = base.load_t03_audit(base.resolve_path(root, config["data_prep_audit_path"]))
+    _require(audit["final_summary"]["test"]["rows"] == test["rows"], "T12 test size differs from T03 audit")
+    # Ordered test IDs and labels from T03 split_ids.csv (no texts) must give the frozen ids_sha256.
+    ids = pd.read_csv(base.resolve_path(root, config["data_prep_split_ids_path"]), dtype=str,
+                      keep_default_na=False, usecols=lambda col: col in {"split", ID_COLUMN, LABEL_COLUMN})
+    expected = ids.loc[ids["split"].str.lower() == "test"]
+    _require(len(expected) == test["rows"] and not expected[ID_COLUMN].duplicated().any(),
+             "T03 split_ids.csv test rows differ from T12 size or contain duplicates")
+    _require(base.ids_sha256(expected, id_column=ID_COLUMN, label_column=LABEL_COLUMN) == test["ids_sha256"],
+             "T03 split_ids.csv test IDs/labels differ from T12 ids_sha256")
+    source = audit["source_files"]["test"]
+    _require(source.get("sha256_after") == test["source_parquet_sha256"], "T12 test source differs from T03 audit")
+    # The original Parquet is tracked in Git; only its bytes are hashed, it is not decoded.
+    _require(_file_sha256(root, source["path"]) == test["source_parquet_sha256"],
+             "Original test Parquet differs from T12 freeze")
+
+
+def _differing_fields(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> list[str]:
+    return sorted(key for key, value in expected.items() if actual.get(key) != value)
+
+
+def _check_baseline_report(entry: Mapping[str, Any], freeze: Mapping[str, Any], root: Path) -> None:
+    prep, pinned = freeze["data_prep"], freeze["file_sha256"]
+    _require(_is_sha256(entry.get("model_sha256")) and _is_positive_int(entry.get("bytes")),
+             "T12 freeze models.baseline needs model_sha256 and bytes")
+    report = base.read_json(base.resolve_path(root, entry["report_path"]))
+    expected = {"bundle_path": entry["model_path"], "bundle_sha256": entry["model_sha256"],
+                "config_path": entry["config_path"], "config_sha256": pinned[entry["config_path"]],
+                "final_test_used": False, "selection_metric": "validation_macro_f1",
+                "t03_audit_sha256": prep["audit_sha256"], "t03_split_ids_sha256": prep["split_ids_sha256"],
+                **{key: prep[key] for key in DATA_PREP_VERSION_KEYS}}
+    differing = _differing_fields(expected, report)
+    _require(not differing, f"baseline run report differs from T12 freeze: {', '.join(differing)}")
+    independence = report.get("split_independence")
+    _require(isinstance(independence, dict) and bool(independence) and not any(independence.values()),
+             "baseline run report shows train/validation overlap")
+    config = base.read_json(base.resolve_path(root, entry["config_path"]))
+    processing = {"manual_normalization": entry.get("manual_normalization"), "truncation": entry.get("truncation")}
+    _require(config.get("text_processing") == processing and config.get("label_mapping") == base.EXPECTED_LABEL_MAPPING,
+             "baseline configuration differs from T12 text processing or label mapping")
+
+
+def _check_rubert_report(entry: Mapping[str, Any], freeze: Mapping[str, Any], root: Path) -> None:
+    prep = freeze["data_prep"]
+    files = entry.get("bundle_files_sha256")
+    _require(isinstance(files, dict) and len(files) == 7 and all(_is_sha256(v) for v in files.values()),
+             "T12 freeze models.rubert needs SHA-256 of all seven bundle files")
+    report = base.read_json(base.resolve_path(root, entry["report_path"]))
+    _require(report.get("bundle_files_sha256") == files, "rubert run report bundle files differ from T12 freeze")
+    _require(report.get("final_test_used") is False and report.get("selection_metric") == "validation_macro_f1",
+             "rubert run report must use validation selection without final test")
+    version = report.get("data_version") or {}
+    checksums = version.get("checksums") or {}
+    expected = {"final_test_used": False, "train_ids_equal_baseline": True,
+                **{key: prep[key] for key in ("train_rows", "validation_rows", "train_ids_sha256", "validation_ids_sha256")}}
+    differing = _differing_fields(expected, version) + _differing_fields(
+        {"train_path": prep["train_parquet_sha256"], "validation_path": prep["validation_parquet_sha256"],
+         "data_prep_audit_path": prep["audit_sha256"], "data_prep_split_ids_path": prep["split_ids_sha256"]}, checksums)
+    _require(not differing, f"rubert data version differs from T12 freeze: {', '.join(differing)}")
+    independence = version.get("split_independence")
+    _require(isinstance(independence, dict) and bool(independence) and not any(independence.values()),
+             "rubert run report shows train/validation overlap")
+    config = base.read_json(base.resolve_path(root, entry["config_path"]))
+    expected = {"model_name": entry.get("base_model"), "revision": entry.get("base_revision"),
+                "max_length": entry.get("max_length_tokens"), "truncation_side": entry.get("truncation_side"),
+                "label_mapping": base.EXPECTED_LABEL_MAPPING}
+    differing = _differing_fields(expected, config)
+    _require(not differing, f"rubert configuration differs from T12 freeze: {', '.join(differing)}")
 
 
 def _check_models(freeze: Mapping[str, Any], root: Path) -> None:
@@ -166,18 +323,23 @@ def _check_models(freeze: Mapping[str, Any], root: Path) -> None:
         _require(_is_sha256(entry.get("report_sha256")), f"T12 freeze models.{backend}.report_sha256 must be SHA-256")
         _require(report.is_file() and base.sha256_file(report) == entry["report_sha256"],
                  f"{backend} run report differs from T12 freeze")
+        _require(freeze["file_sha256"].get(entry["report_path"]) == entry["report_sha256"],
+                 f"{backend} run report SHA-256 is inconsistent within T12 freeze")
+    _check_baseline_report(models["baseline"], freeze, root)
+    _check_rubert_report(models["rubert"], freeze, root)
 
 
 def _check_inference(freeze: Mapping[str, Any], root: Path) -> None:
     inference = freeze.get("inference")
     _require(isinstance(inference, dict), "T12 freeze has no inference section")
-    batch = inference.get("batch_size")
-    _require(isinstance(batch, int) and not isinstance(batch, bool) and batch > 0,
-             "T12 freeze inference.batch_size must be positive")
+    _require(_is_positive_int(inference.get("batch_size")), "T12 freeze inference.batch_size must be positive")
     _require(inference.get("device") == "cpu", "Only CPU inference is supported by T13")
-    threads = inference.get("num_threads")
-    _require(threads is None or (isinstance(threads, int) and not isinstance(threads, bool) and threads > 0),
-             "T12 freeze inference.num_threads must be positive or null")
+    _require(_is_positive_int(inference.get("num_threads")), "T12 freeze inference.num_threads must be positive")
+    protocol = freeze.get("text_protocol")
+    _require(isinstance(protocol, dict), "T12 freeze has no text_protocol section")
+    expected = {"models": list(BACKENDS), "runs": 1, "max_text_length": None, "labels": CLASS_IDS, "zero_division": 0}
+    differing = [key for key, value in expected.items() if key not in protocol or protocol[key] != value]
+    _require(not differing, f"T12 text protocol is not supported by this evaluator: {', '.join(differing)}")
 
 
 def _check_git(freeze: Mapping[str, Any], root: Path) -> None:
@@ -187,9 +349,74 @@ def _check_git(freeze: Mapping[str, Any], root: Path) -> None:
     _require(not state["tracked_changes"], "Tracked files have uncommitted changes; commit before the final run")
 
 
-# T12 может дополнить список собственными проверками протокола.
+def _sysctl(name: str) -> str | None:
+    try:
+        proc = subprocess.run(["sysctl", "-n", name], capture_output=True, text=True, check=False, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
+
+
+def machine_info() -> dict[str, Any]:
+    """Характеристики машины в полях freeze.json: environment.machine."""
+    system = platform.system()
+    info: dict[str, Any] = {
+        "os": "macOS" if system == "Darwin" else system,
+        "os_version": platform.mac_ver()[0] if system == "Darwin" else platform.release(),
+        "architecture": platform.machine(), "cpu": platform.processor() or "unknown",
+        "physical_cores": None, "logical_cores": os.cpu_count(), "ram_bytes": None,
+        "python": platform.python_version(),
+    }
+    if system == "Darwin":
+        for key, name in (("cpu", "machdep.cpu.brand_string"), ("physical_cores", "hw.physicalcpu"),
+                          ("logical_cores", "hw.logicalcpu"), ("ram_bytes", "hw.memsize")):
+            value = _sysctl(name)
+            if value is not None:
+                info[key] = value if key == "cpu" else int(value)
+    else:
+        try:
+            import psutil
+            info.update(physical_cores=psutil.cpu_count(logical=False), ram_bytes=psutil.virtual_memory().total)
+        except ImportError:
+            pass
+    return info
+
+
+def installed_version(name: str) -> str | None:
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+def _check_environment(freeze: Mapping[str, Any], root: Path) -> None:
+    """Измерения выполняются только в зафиксированной среде T12; другая машина не подменяет её."""
+    variables = freeze.get("runtime_environment_variables")
+    environment = freeze.get("environment") or {}
+    machine, packages = environment.get("machine"), environment.get("packages")
+    for name, value in (("runtime_environment_variables", variables), ("environment.machine", machine),
+                        ("environment.packages", packages)):
+        _require(isinstance(value, dict) and bool(value), f"T12 freeze has no {name}")
+    problems = []
+    wrong = sorted(name for name, value in variables.items() if os.environ.get(name) != value)
+    if wrong:
+        problems.append(f"runtime environment variables differ from T12: {', '.join(wrong)}")
+    differing = _differing_fields(machine, machine_info())
+    if differing:
+        problems.append(f"machine differs from the T12 measurement machine: {', '.join(differing)}")
+    differing = sorted(name for name, version in packages.items() if installed_version(name) != version)
+    if differing:
+        problems.append(f"installed packages differ from T12: {', '.join(differing)}")
+    _require(not problems, "; ".join(problems))
+
+
+# Статические проверки фиксации: модели и test здесь не загружаются и не декодируются.
+# Порядок: протокол → файлы → данные → модели → параметры → git → среда.
 FREEZE_CHECKS: list[Callable[[Mapping[str, Any], Path], None]] = [
-    _check_schema, _check_data_prep, _check_test_entry, _check_models, _check_inference, _check_git,
+    _check_schema, _check_accepted_t12, _check_frozen_files, _check_data_prep, _check_test_entry,
+    _check_models, _check_inference, _check_git, _check_environment,
 ]
 
 
@@ -203,8 +430,7 @@ def git_state(root: Path, frozen_commit: str) -> dict[str, Any]:
     }
 
 
-def load_freeze(path: Path, root: Path = ROOT) -> dict[str, Any]:
-    """Прочитать и проверить фиксацию T12. Test при этом не читается."""
+def read_freeze(path: Path, root: Path = ROOT) -> dict[str, Any]:
     if not path.is_file():
         raise FreezeError(f"T12 freeze not found: {base.display_path(path, root)}; the final test stays closed")
     try:
@@ -212,9 +438,38 @@ def load_freeze(path: Path, root: Path = ROOT) -> dict[str, Any]:
     except (OSError, ValueError) as exc:
         raise FreezeError(f"T12 freeze is not valid JSON: {exc}") from exc
     _require(isinstance(freeze, dict), "T12 freeze must be a JSON object")
-    for check in FREEZE_CHECKS:
-        check(freeze, root)
     return freeze
+
+
+def load_freeze(path: Path, root: Path = ROOT) -> dict[str, Any]:
+    """Прочитать и проверить фиксацию T12. Модели и test при этом не загружаются."""
+    freeze = read_freeze(path, root)
+    for check in FREEZE_CHECKS:
+        try:
+            check(freeze, root)
+        except (KeyError, TypeError, OSError) as exc:
+            raise FreezeError(f"T12 freeze check {check.__name__} failed: {type(exc).__name__}: {exc}") from exc
+    return freeze
+
+
+def check_model_files(freeze: Mapping[str, Any], root: Path = ROOT) -> None:
+    """Файлы комплектов совпадают с суммами фиксации до загрузки через src.classifier."""
+    baseline = freeze["models"]["baseline"]
+    path = base.resolve_path(root, baseline["model_path"])
+    if not path.is_file() or path.is_symlink():
+        raise c.ModelUnavailableError(f"Frozen baseline bundle not found: {baseline['model_path']}")
+    if path.stat().st_size != baseline["bytes"] or base.sha256_file(path) != baseline["model_sha256"]:
+        raise FreezeError("Baseline bundle differs from T12 freeze")
+    rubert = freeze["models"]["rubert"]
+    directory = base.resolve_path(root, rubert["model_path"])
+    if not directory.is_dir():
+        raise c.ModelUnavailableError(f"Frozen RuBERT bundle not found: {rubert['model_path']}")
+    expected = rubert["bundle_files_sha256"]
+    if {p.name for p in directory.iterdir()} != set(expected):
+        raise FreezeError("RuBERT bundle files differ from T12 freeze")
+    changed = sorted(name for name, digest in expected.items() if _file_sha256(directory, name) != digest)
+    if changed:
+        raise FreezeError(f"RuBERT bundle checksum differs from T12 freeze: {', '.join(changed)}")
 
 
 # --------------------------------------------------------------------------- #
@@ -245,8 +500,10 @@ def load_frozen_test(freeze: Mapping[str, Any], root: Path = ROOT) -> pd.DataFra
         raise DataMismatchError("Test IDs/labels differ from the T12 freeze")
     config = base.read_json(root / "configs/nlp_baseline.json")
     audit = base.load_t03_audit(base.resolve_path(root, config["data_prep_audit_path"]))
-    if audit["final_summary"]["test"]["rows"] != len(frame):
-        raise DataMismatchError("Test row count differs from T03 audit")
+    summary = audit["final_summary"]["test"]
+    counts = {name: int((frame[LABEL_COLUMN] == i).sum()) for i, name in zip(CLASS_IDS, CLASS_NAMES)}
+    if summary["rows"] != len(frame) or any(summary[name] != count for name, count in counts.items()):
+        raise DataMismatchError("Test size or class counts differ from T03 audit")
     check_test_ids_against_t03(frame, base.resolve_path(root, config["data_prep_split_ids_path"]))
     return frame
 
@@ -282,6 +539,9 @@ def check_model_versions(versions: Mapping[str, Mapping[str, Any]], freeze: Mapp
         if (version["t03_split_ids_sha256"] != prep["split_ids_sha256"]
                 or version["t03_audit_sha256"] != prep["audit_sha256"]):
             raise DataMismatchError(f"{backend} was trained on a T03 version other than the T12 freeze")
+        differing = [key for key in SHARED_VERSION_KEYS[:4] if version[key] != prep[key]]
+        if differing:
+            raise DataMismatchError(f"{backend} train/validation version differs from T12: {', '.join(differing)}")
     reference = versions[BACKENDS[0]]
     differing = [key for key in SHARED_VERSION_KEYS if any(v[key] != reference[key] for v in versions.values())]
     if differing:
@@ -422,15 +682,10 @@ def sensitivity(runs: Mapping[str, Mapping[str, Any]], groups: Sequence[Sequence
 # --------------------------------------------------------------------------- #
 # Окружение и отчёты
 # --------------------------------------------------------------------------- #
-def environment() -> dict[str, Any]:
-    info: dict[str, Any] = {**base.library_versions(), "machine": platform.machine(),
-                            "processor": platform.processor() or "unknown", "logical_cpu_count": os.cpu_count()}
-    try:
-        import psutil
-        info["ram_total_mib"] = psutil.virtual_memory().total / (1024 * 1024)
-        info["physical_cpu_count"] = psutil.cpu_count(logical=False)
-    except ImportError:
-        pass
+def environment(variables: Sequence[str] = ()) -> dict[str, Any]:
+    """Фактическая среда запуска: машина, библиотеки, переменные протокола и потоки torch."""
+    info: dict[str, Any] = {"machine": machine_info(), "libraries": base.library_versions(),
+                            "runtime_environment_variables": {name: os.environ.get(name) for name in variables}}
     torch = sys.modules.get("torch")
     if torch is not None:
         info.update(torch=torch.__version__, torch_num_threads=torch.get_num_threads())
@@ -439,7 +694,10 @@ def environment() -> dict[str, Any]:
 
 TABLE_COLUMNS = (["model", "bot_model", "rows", "accuracy", "macro_f1"]
                  + [f"{name}_{key}" for name in CLASS_NAMES for key in ("precision", "recall", "f1", "support")]
-                 + ["load_seconds", "warmup_seconds", "inference_seconds", "ms_per_text", "batch_size"])
+                 + ["errors_total", "load_seconds", "warmup_seconds", "inference_seconds", "ms_per_text",
+                    "texts_per_second", "batch_size"])
+OUTPUT_FILES = ("final_metrics.json", "final_table.csv", "final_report.md", "predictions.csv",
+                *(f"confusion_matrix_{b}.{ext}" for b in BACKENDS for ext in ("csv", "svg")))
 
 
 def table_rows(report: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -451,8 +709,9 @@ def table_rows(report: Mapping[str, Any]) -> list[dict[str, Any]]:
                "accuracy": metrics["accuracy"], "macro_f1": metrics["macro_f1"]}
         for name in CLASS_NAMES:
             row.update({f"{name}_{key}": value for key, value in metrics["per_class"][name].items()})
+        row["errors_total"] = metrics["errors"]["total"]
         row.update({key: timing[key] for key in ("load_seconds", "warmup_seconds", "inference_seconds",
-                                                 "ms_per_text", "batch_size")})
+                                                 "ms_per_text", "texts_per_second", "batch_size")})
         rows.append(row)
     return rows
 
@@ -464,52 +723,146 @@ def _write_csv(path: Path, header: Sequence[str], rows: Sequence[Sequence[Any]])
         writer.writerows(rows)
 
 
+# Последовательная шкала одного оттенка (светлый → тёмный); точный ноль — нейтральный серый.
+_SEQUENTIAL = ("#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5",
+               "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b")
+_ZERO_FILL, _INK, _MUTED, _ON_DARK, _SURFACE = "#f0efec", "#1f1f1d", "#5f5e5a", "#ffffff", "#ffffff"
+
+
+def confusion_matrix_svg(matrix: Sequence[Sequence[int]], title: str) -> str:
+    """Статическая SVG-карта матрицы ошибок: цвет — доля строки (recall по истинному классу).
+
+    Каждая ячейка подписана числом и долей, поэтому значение не передаётся только цветом.
+    """
+    cell, gap, left, top = 110, 2, 150, 92
+    width, height = left + 3 * cell + 24, top + 3 * cell + 78
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+             f'viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc" '
+             'font-family="system-ui, -apple-system, Segoe UI, sans-serif">',
+             f'<title id="title">{escape(title)}</title>',
+             '<desc id="desc">Строки — истинный класс, столбцы — предсказанный. Цвет — доля строки.</desc>',
+             f'<rect width="{width}" height="{height}" fill="{_SURFACE}"/>',
+             f'<text x="16" y="28" font-size="16" font-weight="600" fill="{_INK}">{escape(title)}</text>',
+             f'<text x="{left + 1.5 * cell}" y="{top - 34}" font-size="13" fill="{_MUTED}" '
+             'text-anchor="middle">Предсказанный класс</text>',
+             f'<text x="22" y="{top + 1.5 * cell}" font-size="13" fill="{_MUTED}" text-anchor="middle" '
+             f'transform="rotate(-90 22 {top + 1.5 * cell})">Истинный класс</text>']
+    for j, name in enumerate(CLASS_NAMES):
+        parts.append(f'<text x="{left + j * cell + cell / 2}" y="{top - 10}" font-size="13" fill="{_INK}" '
+                     f'text-anchor="middle">{name}</text>')
+    for i, (name, row) in enumerate(zip(CLASS_NAMES, matrix)):
+        total = sum(row)
+        y = top + i * cell
+        parts.append(f'<text x="{left - 10}" y="{y + cell / 2 + 4}" font-size="13" fill="{_INK}" '
+                     f'text-anchor="end">{name}</text>')
+        for j, value in enumerate(row):
+            share = value / total if total else 0.0
+            fill = _ZERO_FILL if value == 0 else _SEQUENTIAL[round(share * (len(_SEQUENTIAL) - 1))]
+            ink = _ON_DARK if value and share > 0.5 else _INK
+            x = left + j * cell
+            parts += [f'<g><title>истина {name}, ответ {CLASS_NAMES[j]}: {value} ({share:.1%} строки)</title>',
+                      f'<rect x="{x + gap / 2}" y="{y + gap / 2}" width="{cell - gap}" height="{cell - gap}" '
+                      f'rx="4" fill="{fill}"/>',
+                      f'<text x="{x + cell / 2}" y="{y + cell / 2 - 2}" font-size="18" font-weight="600" '
+                      f'fill="{ink}" text-anchor="middle">{value}</text>',
+                      f'<text x="{x + cell / 2}" y="{y + cell / 2 + 18}" font-size="12" fill="{ink}" '
+                      f'text-anchor="middle">{share:.1%}</text></g>']
+    parts.append(f'<text x="16" y="{height - 20}" font-size="12" fill="{_MUTED}">Число записей и доля строки; '
+                 'серый — 0. Таблица: соседний CSV.</text>')
+    parts.append("</svg>")
+    return "\n".join(parts) + "\n"
+
+
 def _markdown(report: Mapping[str, Any]) -> str:
     run = report["run"]
     lines = ["# T13: финальное сравнение на текстовом test", "",
-             f"- Commit: `{run['git_commit']}`; фиксация T12: `{run['freeze_path']}` (`{run['freeze_sha256']}`)",
+             f"- Commit оценщика: `{run['git_commit']}`; основа T12: `{run['frozen_commit']}`",
+             f"- Фиксация: `{run['freeze_path']}` (`{run['freeze_sha256']}`), протокол {run['protocol_version']}",
              f"- Test: {report['test']['rows']} строк, Parquet `{report['test']['parquet_sha256']}`",
-             f"- Команда: `{run['command']}`", f"- Модель бота (выбрана в T12 по validation): {report['bot_model']}", "",
-             "| Модель | Accuracy | Macro-F1 | F1 negative | F1 neutral | F1 positive | мс/текст |",
-             "|---|---:|---:|---:|---:|---:|---:|"]
+             f"- Команда: `{run['command']}`",
+             f"- Модель бота выбрана в T12 по validation: {report['bot_model']}; результат test её не меняет", "",
+             "| Модель | Accuracy | Macro-F1 | F1 negative | F1 neutral | F1 positive | Ошибок | мс/текст |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|"]
     for row in table_rows(report):
         lines.append(f"| {row['model']} | {row['accuracy']:.4f} | {row['macro_f1']:.4f} | "
                      f"{row['negative_f1']:.4f} | {row['neutral_f1']:.4f} | {row['positive_f1']:.4f} | "
-                     f"{row['ms_per_text']:.3f} |")
+                     f"{row['errors_total']} | {row['ms_per_text']:.3f} |")
     for backend in BACKENDS:
         matrix = report["models"][backend]["metrics"]["confusion_matrix"]
-        lines += ["", f"## Confusion matrix: {backend}", "", "| истина \\ ответ | " + " | ".join(CLASS_NAMES) + " |",
-                  "|---|---:|---:|---:|"]
+        lines += ["", f"## Confusion matrix: {backend}", "", f"![{backend}](confusion_matrix_{backend}.svg)", "",
+                  "| истина \\ ответ | " + " | ".join(CLASS_NAMES) + " |", "|---|---:|---:|---:|"]
         lines += [f"| {name} | " + " | ".join(str(v) for v in values) + " |" for name, values in zip(CLASS_NAMES, matrix)]
     return "\n".join(lines) + "\n"
 
 
-def write_reports(report: Mapping[str, Any], runs: Mapping[str, Mapping[str, Any]], out_dir: Path) -> list[Path]:
-    """Агрегированные отчёты и предсказания по ID; тексты отзывов не записываются."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    paths = {"metrics": out_dir / "final_metrics.json", "table": out_dir / "final_table.csv",
-             "markdown": out_dir / "final_report.md", "predictions": out_dir / "predictions.csv"}
-    base.write_json(paths["metrics"], report)
-    _write_csv(paths["table"], TABLE_COLUMNS, [[row[col] for col in TABLE_COLUMNS] for row in table_rows(report)])
-    paths["markdown"].write_text(_markdown(report), encoding="utf-8")
-    reference = runs[BACKENDS[0]]
-    _write_csv(paths["predictions"], [ID_COLUMN, LABEL_COLUMN, *(f"{b}_label_id" for b in BACKENDS)],
-               list(zip(reference["record_ids"], reference["labels"], *(runs[b]["predictions"] for b in BACKENDS))))
-    for backend in BACKENDS:
-        path = out_dir / f"confusion_matrix_{backend}.csv"
-        matrix = report["models"][backend]["metrics"]["confusion_matrix"]
-        _write_csv(path, ["true\\predicted", *CLASS_NAMES], [[name, *values] for name, values in zip(CLASS_NAMES, matrix)])
-        paths[backend] = path
-    return list(paths.values())
+def check_out_dir(out_dir: Path) -> None:
+    """Существующие результаты не перезаписываются: каталог не должен существовать."""
+    if out_dir.exists() or out_dir.is_symlink():
+        raise FileExistsError(f"Evaluation output already exists; refusing to overwrite: {out_dir.name}")
+
+
+def write_reports(report: dict[str, Any], runs: Mapping[str, Mapping[str, Any]], out_dir: Path) -> list[Path]:
+    """Записать отчёты во временный каталог рядом и опубликовать его одним переименованием.
+
+    Тексты отзывов не записываются. При обработанной ошибке временный каталог удаляется,
+    итоговый каталог не появляется; существующий каталог не заменяется.
+    """
+    check_out_dir(out_dir)
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(dir=out_dir.parent, prefix=f".{out_dir.name}.", suffix=".tmp"))
+    try:
+        _write_csv(staging / "final_table.csv", TABLE_COLUMNS,
+                   [[row[col] for col in TABLE_COLUMNS] for row in table_rows(report)])
+        reference = runs[BACKENDS[0]]
+        _write_csv(staging / "predictions.csv", [ID_COLUMN, LABEL_COLUMN, *(f"{b}_label_id" for b in BACKENDS)],
+                   list(zip(reference["record_ids"], reference["labels"], *(runs[b]["predictions"] for b in BACKENDS))))
+        for backend in BACKENDS:
+            matrix = report["models"][backend]["metrics"]["confusion_matrix"]
+            _write_csv(staging / f"confusion_matrix_{backend}.csv", ["true\\predicted", *CLASS_NAMES],
+                       [[name, *values] for name, values in zip(CLASS_NAMES, matrix)])
+            (staging / f"confusion_matrix_{backend}.svg").write_text(
+                confusion_matrix_svg(matrix, f"Confusion matrix: {backend}, test {report['test']['rows']}"),
+                encoding="utf-8")
+        (staging / "final_report.md").write_text(_markdown(report), encoding="utf-8")
+        report["outputs_sha256"] = {name: base.sha256_file(staging / name)
+                                    for name in OUTPUT_FILES if name != "final_metrics.json"}
+        base.write_json(staging / "final_metrics.json", report)
+        if sorted(p.name for p in staging.iterdir()) != sorted(OUTPUT_FILES):
+            raise OSError("Incomplete evaluation output")
+        check_out_dir(out_dir)
+        os.rename(staging, out_dir)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return [out_dir / name for name in OUTPUT_FILES]
 
 
 # --------------------------------------------------------------------------- #
 # Финальный запуск
 # --------------------------------------------------------------------------- #
-def _set_torch_threads(threads: int | None) -> None:
-    if threads is not None:
-        import torch
-        torch.set_num_threads(threads)
+def _set_torch_threads(threads: int) -> int:
+    import torch
+    torch.set_num_threads(threads)
+    if torch.get_num_threads() != threads:
+        raise FreezeError(f"torch uses {torch.get_num_threads()} threads; T12 requires {threads}")
+    return threads
+
+
+def load_models(freeze: Mapping[str, Any], *, root: Path = ROOT, factory: Callable[..., Any] = c.create_classifier,
+                clock: Callable[[], float] = time.perf_counter) -> tuple[dict, dict, dict]:
+    """Проверить и загрузить оба комплекта через src.classifier, baseline первым; test не читается."""
+    check_model_files(freeze, root)
+    models, load_seconds, versions = {}, {}, {}
+    for backend in BACKENDS:
+        entry = freeze["models"][backend]
+        if backend == "rubert":
+            _set_torch_threads(freeze["inference"]["num_threads"])
+        models[backend] = factory(backend, base.resolve_path(root, entry["model_path"]),
+                                  report_path=base.resolve_path(root, entry["report_path"]))
+        load_seconds[backend] = timed_load(models[backend], clock)
+        versions[backend] = model_data_version(backend, models[backend].data_version)
+    check_model_versions(versions, freeze)
+    return models, load_seconds, versions
 
 
 def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
@@ -520,17 +873,9 @@ def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
     Test декодируется только после проверки фиксации, обоих комплектов и их версий данных.
     """
     freeze = load_freeze(freeze_path, root)
+    check_out_dir(out_dir)
     inference = freeze["inference"]
-    models, load_seconds, versions = {}, {}, {}
-    for backend in BACKENDS:
-        entry = freeze["models"][backend]
-        if backend == "rubert":
-            _set_torch_threads(inference["num_threads"])
-        models[backend] = factory(backend, base.resolve_path(root, entry["model_path"]),
-                                  report_path=base.resolve_path(root, entry["report_path"]))
-        load_seconds[backend] = timed_load(models[backend], clock)
-        versions[backend] = model_data_version(backend, models[backend].data_version)
-    check_model_versions(versions, freeze)
+    models, load_seconds, versions = load_models(freeze, root=root, factory=factory, clock=clock)
 
     frame = load_frozen_test(freeze, root)
     record_ids = frame[ID_COLUMN].astype(str).tolist()
@@ -557,27 +902,33 @@ def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
         "final_test_used": True,
         "bot_model": freeze["bot_model"],
         "bot_model_selected_by": freeze["bot_model_selected_by"],
+        "bot_model_changed_by_test": False,
         "labels": dict(zip(CLASS_NAMES, CLASS_IDS)),
         "run": {
-            "command": f"python -m src.evaluate --freeze {base.display_path(freeze_path, root)}",
+            "command": f"python -m src.evaluate --run-final --freeze {base.display_path(freeze_path, root)}",
             "git_commit": git_state(root, freeze["frozen_commit"])["commit"],
             "frozen_commit": freeze["frozen_commit"],
             "freeze_path": base.display_path(freeze_path, root),
             "freeze_sha256": base.sha256_file(freeze_path),
             "freeze_schema": freeze["schema"],
+            "protocol_version": freeze["protocol_version"],
             "approved_by": freeze["approved_by"],
             "approved_at": freeze["approved_at"],
+            "runs": freeze["text_protocol"]["runs"],
         },
-        "test": {**test_version, "path": freeze["test"]["path"], "split_ids_sha256": freeze["data_prep"]["split_ids_sha256"]},
+        "test": {**test_version, "path": freeze["test"]["path"],
+                 "source_parquet_sha256": freeze["test"]["source_parquet_sha256"],
+                 "split_ids_sha256": freeze["data_prep"]["split_ids_sha256"]},
         "data_version": versions[BACKENDS[0]],
         "inference_protocol": {
             "device": inference["device"], "batch_size": inference["batch_size"],
             "num_threads": inference["num_threads"], "max_text_length": None,
+            "order": list(BACKENDS),
             "warmup": f"one predict_batch call on {len(WARMUP_TEXTS)} fixed non-test texts",
             "load": "bundle verification and loading via src.classifier, before the test is read",
             "inference": "whole test in original order, predict_batch per batch_size chunk; time.perf_counter",
         },
-        "environment": environment(),
+        "environment": environment(tuple(freeze["runtime_environment_variables"])),
         "models": {
             backend: {"model_path": freeze["models"][backend]["model_path"],
                       "report_path": freeze["models"][backend]["report_path"],
@@ -589,39 +940,76 @@ def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
         "repeat_sensitivity": {**sensitivity(runs, groups, main),
                                "t03_candidates_sha256": base.sha256_file(candidates),
                                "t03_decisions_sha256": base.sha256_file(decisions)},
+        "outputs": [base.display_path(out_dir / name, root) for name in OUTPUT_FILES],
     }
-    report["outputs"] = [base.display_path(p, root) for p in write_reports(report, runs, out_dir)]
+    write_reports(report, runs, out_dir)
     return report
 
 
-def check_only(freeze_path: Path, root: Path = ROOT) -> dict[str, Any]:
-    """Проверить предусловия финального запуска без моделей и без чтения test."""
-    freeze = load_freeze(freeze_path, root)
-    return {"status": "ready", "freeze_path": base.display_path(freeze_path, root),
-            "freeze_sha256": base.sha256_file(freeze_path), "bot_model": freeze["bot_model"],
-            "test_rows": freeze["test"]["rows"], "final_test_used": False}
+def check_only(freeze_path: Path, root: Path = ROOT, *,
+               factory: Callable[..., Any] = c.create_classifier) -> dict[str, Any]:
+    """Готовность к финальному запуску без декодирования test и без предсказаний на нём.
+
+    Проверки фиксации, git, среды и моделей выполняются независимо, чтобы показать
+    все блокировки сразу; без утверждённой фиксации остальные шаги не выполняются.
+    Test проверяется только по байтовой сумме файла.
+    """
+    freeze = read_freeze(freeze_path, root)
+    checks: list[dict[str, str]] = []
+
+    def stage(name: str, action: Callable[[], Any]) -> bool:
+        try:
+            action()
+        except (c.ClassifierError, OSError, ValueError, KeyError, TypeError) as exc:
+            checks.append({"check": name, "status": "failed", "reason": f"{type(exc).__name__}: {exc}"})
+            return False
+        checks.append({"check": name, "status": "passed"})
+        return True
+
+    static = [("freeze_protocol", (_check_schema, _check_accepted_t12)),
+              ("frozen_files_and_reports", (_check_frozen_files, _check_data_prep, _check_test_entry,
+                                            _check_models, _check_inference)),
+              ("git", (_check_git,)), ("environment", (_check_environment,))]
+    for index, (name, functions) in enumerate(static):
+        if not stage(name, lambda: [check(freeze, root) for check in functions]) and index < 2:
+            break
+    else:
+        stage("models", lambda: load_models(freeze, root=root, factory=factory))
+        path = base.resolve_path(root, freeze["test"]["path"])
+        stage("test_file", lambda: _require(_file_sha256(root, freeze["test"]["path"]) == freeze["test"]["parquet_sha256"],
+                                            f"Prepared test is missing or differs from T12: {base.display_path(path, root)}"))
+    ready = len(checks) == len(static) + 2 and all(item["status"] == "passed" for item in checks)
+    return {"status": "ready" if ready else "not_ready", "freeze_path": base.display_path(freeze_path, root),
+            "freeze_sha256": base.sha256_file(freeze_path), "bot_model": freeze.get("bot_model"),
+            "test_rows": (freeze.get("test") or {}).get("rows"), "checks": checks,
+            "final_test_decoded": False, "final_inference_run": False}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--check", action="store_true",
+                      help="verify freeze, frozen files, git, environment, models and test bytes; no test inference")
+    mode.add_argument("--run-final", action="store_true",
+                      help="run the approved final evaluation on the test (only when it is authorized)")
     parser.add_argument("--freeze", type=Path, default=DEFAULT_FREEZE_PATH,
-                        help="machine-readable T12 freeze (default: reports/freeze.json)")
+                        help="approved T12 freeze (default: reports/freeze.json)")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR,
-                        help="output directory for aggregated reports (default: reports/evaluation)")
-    parser.add_argument("--check", action="store_true",
-                        help="only verify the T12 freeze and frozen files; do not load models or read the test")
+                        help="new output directory, must not exist (default: reports/evaluation)")
     args = parser.parse_args(argv)
     freeze_path = args.freeze if args.freeze.is_absolute() else Path.cwd() / args.freeze
     out_dir = args.out_dir if args.out_dir.is_absolute() else Path.cwd() / args.out_dir
     try:
-        result = check_only(freeze_path) if args.check else evaluate(freeze_path, out_dir)
+        if args.check:
+            result = check_only(freeze_path)
+        else:
+            report = evaluate(freeze_path, out_dir)
+            result = {key: report[key] for key in ("bot_model", "test", "outputs")}
     except (c.ClassifierError, c.InvalidTextError, OSError, ValueError, KeyError) as exc:
         print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
-    if not args.check:
-        result = {key: result[key] for key in ("bot_model", "test", "outputs")}
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0
+    return 0 if not args.check or result["status"] == "ready" else 2
 
 
 if __name__ == "__main__":

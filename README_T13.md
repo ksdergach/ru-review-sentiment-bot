@@ -1,167 +1,178 @@
 # T13: сравнение baseline и RuBERT на одном текстовом test
 
-Issue: #16. Зависит от T12 (#15).
+Issue: #16. Протокол: утверждённая фиксация T12 (#15) — [reports/freeze.md](reports/freeze.md),
+[reports/freeze.json](reports/freeze.json).
 
-**Статус: подготовительная разработка.** Инструмент и его автотесты на искусственных
-данных готовы. Финальный test не открывался, модели на нём не запускались,
-реальных финальных метрик нет. Финальный запуск возможен только после
-утверждённой фиксации T12.
+**Статус: инструмент готов, финальная оценка не проводилась.** Расчёты, проверки
+и отчёты проверены автотестами на искусственных данных. Модели на финальном test
+не запускались, реальных финальных метрик, таблиц и графиков нет. Финальный запуск —
+отдельный согласуемый шаг (`approval_record.final_evaluation_execution_authorized_by_this_step = false`).
 
 ## Назначение
 
 `src/evaluate.py` один раз оценивает обе зафиксированные модели на полном неизменном
-`data/processed/test.parquet` и сохраняет агрегированные отчёты:
+`data/processed/test.parquet` (9 324 записи T03) и сохраняет агрегированные отчёты:
 
-- accuracy, macro-F1, precision/recall/F1/support каждого класса;
-- confusion matrix 3×3 для каждой модели в порядке `negative=0`, `neutral=1`, `positive=2`;
-  класс без предсказаний остаётся в матрице и в macro-F1 (precision = 0);
-- время загрузки, прогрева и основного прохода, batch size и характеристики среды;
-- отдельный расчёт чувствительности к повторам внутри test (основной test не меняется).
+- accuracy, macro-F1, precision/recall/F1/support каждого класса, число ошибок
+  по истинному и по предсказанному классу;
+- confusion matrix 3×3 в порядке `negative=0`, `neutral=1`, `positive=2`
+  (строки — эталон, столбцы — предсказание); класс без предсказаний остаётся
+  в матрице и в macro-F1 (`zero_division=0`);
+- время загрузки, прогрева и основного прохода, batch size, потоки и среда;
+- чувствительность к повторам внутри test без нового инференса (основной test не меняется).
+
+Модель бота выбрана в T12 по validation и ресурсам: **baseline** (validation macro-F1
+0,718015 против 0,667824 у RuBERT). Результат test это решение не меняет; отчёт
+записывает `bot_model_changed_by_test = false`.
 
 Используются существующие компоненты, без второй системы классификации:
 
 | Что | Откуда |
 |---|---|
-| Загрузка и проверка комплектов, предсказания | `src.classifier.create_classifier(...).predict_batch` — тот же путь, что у бота и `tools/evaluate_classifier.py` |
+| Проверка и загрузка комплектов, предсказания | `src.classifier.create_classifier(...).predict_batch` — тот же путь, что у бота |
 | Метрики и матрица ошибок | `src.train_baseline.validation_metrics`, `validation_confusion_matrix` |
-| Чтение и проверка схемы test | `src.train_baseline.load_prepared_split`, `ids_sha256`, `load_t03_audit` |
+| Схема test, ID и метки | `src.train_baseline.load_prepared_split`, `ids_sha256`, `load_t03_audit` |
 | Правило точных повторов | `src.train_baseline.normalize_text_key` (правило T03) |
+| Подготовка test | `tools/restore_frozen_test.py` из T12 (оценщик test не создаёт и не переписывает) |
 
-`tools/evaluate_classifier.py` по-прежнему работает только с validation
-и отказывается от файлов с `test` в имени.
+`tools/evaluate_classifier.py` по-прежнему работает только с validation.
 
-## Входные данные
+## Используемая фиксация T12
 
-| Вход | Источник |
+| Поле `reports/freeze.json` | Значение |
 |---|---|
-| `data/processed/test.parquet` | T03 (`src/prepare_data.py`), колонки `record_id`, `review_text`, `label_id`, `label_name`, `review_language`, `movie_id` |
-| `reports/data_prep/split_ids.csv`, `audit.json` | T03: ID и метки без текстов; размер test и число повторов |
-| `reports/data_prep/near_duplicate_candidates.csv`, `configs/near_duplicate_decisions.csv` | T03: подтверждённые близкие пары |
-| Комплекты моделей и их `run_metadata.json` | T04/N02 (baseline) и T06 (RuBERT); пути задаются фиксацией |
-| Файл фиксации T12 (по умолчанию `reports/freeze.json`) | T12, ещё не создан |
+| `schema` / `protocol_version` / `status` | `t13-final-text-eval-input/draft-1` (версия формата) / `t12/1` / `approved` |
+| `frozen_commit` | `5f22d93a8cff63b30fc129bb68a1cfbd4230995d` — основа приложения; commit оценщика записывается отдельно |
+| `models.baseline` | `models/nlp_baseline/tfidf_logreg_baseline.joblib`, SHA-256 и размер; отчёт `reports/nlp/training/run_metadata.json` |
+| `models.rubert` | `models/transformer/`, SHA-256 всех семи файлов; отчёт `reports/transformer/run_metadata.json` |
+| `test` | 9 324 строки, SHA-256 исходного и подготовленного Parquet, `ids_sha256` |
+| `inference` | CPU, `batch_size=64`, `num_threads=2` |
+| `text_protocol` | обе модели, 1 прогон, `max_text_length=null`, классы `[0, 1, 2]`, `zero_division=0` |
+| `runtime_environment_variables` | `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, `OMP/OPENBLAS/VECLIB_*_NUM_THREADS=1`, `CLASSIFIER_BACKEND=baseline` |
+| `environment` | Apple M1, 8 ядер, 16 GiB, macOS 26.5.2 arm64, Python 3.13.7, версии пакетов |
+| `file_sha256` | 27 закреплённых исходников, конфигов, отчётов и данных T03 |
 
-## Требования к фиксации T12
-
-Формат фиксации T12 ещё не утверждён. `src/evaluate.py` описывает **черновик** —
-минимум, который нужен T13 (`FREEZE_SCHEMA = "t13-final-text-eval-input/draft-1"`).
-T12 может принять его или добавить адаптер и собственные проверки в `FREEZE_CHECKS`.
-Окончательная интеграция зависит от T12. Пример структуры с заглушками
-(это не настоящая фиксация):
-
-```json
-{
-  "schema": "t13-final-text-eval-input/draft-1",
-  "status": "approved",
-  "approved_by": ["<участники>"],
-  "approved_at": "<дата>",
-  "frozen_commit": "<40 hex>",
-  "final_test_used_before_freeze": false,
-  "bot_model": "baseline | rubert",
-  "bot_model_selected_by": "validation_and_resources",
-  "data_prep": {"audit_sha256": "<sha256>", "split_ids_sha256": "<sha256>"},
-  "test": {"path": "data/processed/test.parquet", "parquet_sha256": "<sha256>",
-           "rows": 9324, "ids_sha256": "<sha256 пар record_id\\tlabel_id>"},
-  "models": {
-    "baseline": {"model_path": "<путь>", "report_path": "<run_metadata.json>", "report_sha256": "<sha256>"},
-    "rubert": {"model_path": "<путь>", "report_path": "<run_metadata.json>", "report_sha256": "<sha256>"}
-  },
-  "inference": {"batch_size": 64, "device": "cpu", "num_threads": null}
-}
-```
-
-`test.ids_sha256` считается `src.train_baseline.ids_sha256` по `record_id` и `label_id`
-и может быть получен из `split_ids.csv` без чтения текстов.
+Принятая версия `freeze.json`, `freeze.md`, `freeze_checks.json` и `freeze_review_fix.json`
+записана в `ACCEPTED_T12_SHA256` в `src/evaluate.py`. Любое изменение фиксации
+требует отдельного согласования и правки этих сумм в проверяемом коммите;
+автоматически суммы не обновляются.
 
 ## Проверки до чтения test
 
-Финальный запуск останавливается с кодом 2 и не пишет отчёты, если не выполнено любое условие.
-Порядок важен: тексты test декодируются только после шагов 1–3.
+Финальный запуск останавливается с кодом 2 и не создаёт итоговый каталог при любом
+несовпадении. Тексты test декодируются только после шагов 1–4.
 
-1. **Фиксация:** файл есть, схема поддерживается, `status = approved`, указаны участники и дата,
-   `final_test_used_before_freeze = false`, модель бота выбрана по validation и ресурсам;
-   ровно две модели `baseline` и `rubert`; SHA-256 их отчётов, `audit.json` и `split_ids.csv`
-   совпадают с записанными; batch size положителен, устройство — CPU.
-   Git: код потомок `frozen_commit`, в отслеживаемых файлах нет незакоммиченных изменений.
-2. **Модели:** оба комплекта загружаются и проверяются `src.classifier` (суммы, версия данных,
-   `final_test_used = false`); у обеих моделей совпадают train/validation ID и размеры,
-   а версия T03 совпадает с фиксацией.
-3. **Файл test:** SHA-256 Parquet совпадает с фиксацией.
-4. **Содержимое test:** число строк и `ids_sha256` совпадают с фиксацией, число строк —
-   с `audit.json`, порядок ID и метки — с `split_ids.csv`.
-5. **Сравнение:** обе модели получают одни и те же тексты в одном порядке и одинаковыми партиями;
-   ID, метки, размер и версия test одинаковы для обеих строк таблицы.
+1. **Протокол:** схема и `protocol_version`, `status = approved`, нет `pending_approval`,
+   есть участники и дата, `final_test_used_before_freeze = false`, модель бота выбрана
+   по validation и совпадает с `confirmed_decisions`, порядок классов фиксированный.
+   Файлы фиксации совпадают с принятой версией T12.
+2. **Закреплённые файлы:** каждый файл из `file_sha256` существует и совпадает по SHA-256;
+   все входы T13 (конфиги, `requirements.txt`, `src/classifier.py`, `src/train_*.py`,
+   `src/prepare_data.py`, отчёты моделей, данные T03 и решения о повторах) закреплены.
+   Каждый модуль `src/*.py` либо закреплён, либо является оценщиком (`src/evaluate.py`);
+   добавленный после фиксации модуль — отказ.
+   **Данные T03:** суммы `audit.json` и `split_ids.csv`; в аудите нет пересечений
+   фильмов и текстов между сплитами; размер test совпадает с аудитом; упорядоченные
+   ID/метки test из `split_ids.csv` дают `test.ids_sha256`; исходный test Parquet
+   совпадает по байтовой сумме (не декодируется).
+   **Отчёты моделей:** путь, SHA-256 комплекта и конфига baseline, семь файлов RuBERT,
+   `final_test_used = false`, выбор по validation macro-F1, train/validation ID, размеры
+   и суммы Parquet, версия T03, отсутствие пересечений train/validation;
+   предобработка baseline (`none`, без усечения), модель, revision, `max_length=64`
+   и усечение справа у RuBERT. Протокол инференса совпадает с поддерживаемым.
+3. **Git и среда:** код оценщика — потомок `frozen_commit`, отслеживаемые файлы без
+   изменений; переменные окружения, машина и версии всех пакетов совпадают с T12.
+4. **Модели:** файлы комплектов совпадают с фиксацией; оба комплекта проверяются и
+   загружаются через `src.classifier` (baseline, затем RuBERT с `torch.set_num_threads(2)`);
+   версии данных обеих моделей совпадают между собой и с фиксацией.
+5. **Test:** SHA-256 подготовленного Parquet → схема, отсутствие пропусков и повторов ID,
+   все три класса → 9 324 строки, `ids_sha256`, размер и число записей каждого класса
+   из аудита, порядок ID и метки из `split_ids.csv`.
+6. **Сравнение:** обе модели получают одни и те же тексты в одном порядке
+   одинаковыми партиями; ID, метки и версия test одинаковы для обеих строк таблицы.
 
 ## Методика измерения времени
 
-Для каждой модели отдельно (`time.perf_counter`, CPU, `max_text_length=None` — как на validation):
+Для каждой модели отдельно, `time.perf_counter`, CPU, один прогон, порядок baseline → RuBERT:
 
-- **загрузка** — проверка и загрузка комплекта через `src.classifier` до чтения test;
-- **прогрев** — один вызов `predict_batch` на 3 фиксированных искусственных текстах `WARMUP_TEXTS` (не из test);
-- **инференс** — весь test в исходном порядке, `predict_batch` на партиях по `inference.batch_size`;
-  записываются секунды, мс на текст и тексты в секунду.
+- **загрузка** — проверка и загрузка комплекта через `src.classifier`, до чтения test;
+- **прогрев** — один `predict_batch` на трёх фиксированных `src.train_baseline._smoke_texts()` (не из test);
+- **инференс** — весь test в порядке T03, `predict_batch` партиями по 64, `max_text_length=None`;
+  `ms_per_text = 1000 × inference_seconds / 9324`, а также тексты в секунду.
 
-RuBERT внутри дополнительно делит партию по `batch_size` своего `training_config.json`.
-`inference.num_threads` (если задан) передаётся в `torch.set_num_threads` перед загрузкой RuBERT.
-В отчёт записываются Python, ОС, процессор, число ядер, объём RAM, версии библиотек
-и фактическое число потоков torch. Сравнение времени корректно только для одной машины.
+Время загрузки не входит в скорость инференса. Повторные замеры и выбор лучшего не выполняются.
+Внутреннее усечение RuBERT до 64 токенов сохраняется; число усечённых записей записывается.
+Время одного батча — не задержка ответа в Telegram.
+
+**Машина измерений:** Apple M1, 16 GiB RAM, macOS 26.5.2 arm64, Python 3.13.7,
+версии пакетов из `freeze.json: environment.packages`. На другой машине проверка среды
+отказывает; перенос измерений требует отдельного согласованного изменения протокола.
 
 ## Повторы внутри test
 
-Основной расчёт выполняется на полном test. По аудиту T03 внутри test нет точных повторов
+Основной расчёт — полный test. По аудиту T03 внутри test нет точных повторов
 и есть 7 подтверждённых пар близких повторов (14 строк).
-Правило чувствительности задано заранее: группы — точные повторы по `normalize_text_key`
-плюс пары T03 с решением `duplicate`, обе записи которых в test (компоненты связности).
-В каждой группе остаётся первая запись в порядке test. Число групп сверяется с `audit.json`.
-Новая дедупликация и ручной разбор test не выполняются.
+Группы — точные повторы по `normalize_text_key` и пары с решением `duplicate`
+из `configs/near_duplicate_decisions.csv`, обе записи которых в test (компоненты связности).
+В каждой группе остаётся первая по порядку test запись. Метрики пересчитываются
+по предсказаниям основного прохода, без нового инференса. Число групп и пар сверяется
+с аудитом; новая дедупликация и ручной разбор test не выполняются.
 
 ## Команды
 
-Автотесты на искусственных данных (настоящий test не читается):
+Автотесты на искусственных данных (настоящий test не читается, модели не нужны):
 
 ```bash
 python -m pytest tests/test_evaluate.py -q
 ```
 
-Проверка готовности без загрузки моделей и чтения test. Сейчас она завершается с кодом 2:
-фиксации T12 нет.
+Проверка готовности. Test не декодируется и предсказания на нём не строятся;
+выводятся результаты всех шагов (`freeze_protocol`, `frozen_files_and_reports`, `git`,
+`environment`, `models`, `test_file`) и итог `ready` / `not_ready`. Код выхода 0 только при `ready`.
 
 ```bash
 python -m src.evaluate --check
 ```
 
-Финальный запуск — **только после завершения T12**:
+Финальный запуск — **только после отдельного разрешения**, на машине измерений:
 
 ```bash
-python tools/fetch_transformer.py                 # принятый комплект RuBERT
-# получить зафиксированный комплект baseline по README и протоколу T12
-# получить data/processed/test.parquet способом, записанным в T12 (T03: src/prepare_data.py),
-# и убедиться, что отслеживаемые отчёты T03 не изменились: git status
-python -m src.evaluate --check --freeze reports/freeze.json
-python -m src.evaluate --freeze reports/freeze.json --out-dir reports/evaluation
+python tools/fetch_transformer.py            # принятый комплект RuBERT (SHA-256 сверяются)
+# models/nlp_baseline/tfidf_logreg_baseline.joblib — принятый комплект baseline с суммой из фиксации
+.venv/bin/python tools/restore_frozen_test.py  # подготовленный test из T12; UNCHANGED/RESTORED
+git status                                   # отслеживаемые файлы без изменений
+export CLASSIFIER_BACKEND=baseline HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+       OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+.venv/bin/python -m src.evaluate --check      # должен вернуть ready
+.venv/bin/python -m src.evaluate --run-final  # отчёты в reports/evaluation/
 ```
 
-Повторный запуск с той же фиксацией и тем же commit должен дать те же метрики и матрицы;
-время зависит от машины.
+Без `--check` или `--run-final` команда не выполняется. Повторный запуск с той же
+фиксацией и тем же commit должен дать те же метрики и матрицы; время зависит от загрузки машины.
 
 ## Формат отчётов
 
-`reports/evaluation/` (только агрегаты и ID, без текстов отзывов):
+`reports/evaluation/` — только агрегаты и ID, без текстов отзывов:
 
 | Файл | Содержимое |
 |---|---|
-| `final_metrics.json` | commit, фиксация и её SHA-256, команда, размер и суммы test, версия данных, протокол инференса, среда, метрики, матрицы, время, чувствительность к повторам |
-| `final_table.csv` | строка на модель: accuracy, macro-F1, P/R/F1/support по классам, время, batch size, отметка модели бота |
-| `final_report.md` | итоговая таблица и две confusion matrix в Markdown |
-| `confusion_matrix_baseline.csv`, `confusion_matrix_rubert.csv` | строки — истинный класс, столбцы — предсказанный |
+| `final_metrics.json` | commit оценщика, `frozen_commit`, фиксация и её SHA-256, протокол, команда, размер и суммы test, версия данных, протокол инференса, среда, метрики, ошибки, матрицы, время, повторы, SHA-256 остальных файлов |
+| `final_table.csv` | строка на модель: accuracy, macro-F1, P/R/F1/support по классам, ошибки, время, batch size, отметка модели бота |
+| `final_report.md` | итоговая таблица, ссылки на графики и две матрицы в Markdown |
+| `confusion_matrix_{baseline,rubert}.csv` | матрица: строки — эталон, столбцы — предсказание |
+| `confusion_matrix_{baseline,rubert}.svg` | статическая карта матрицы: число и доля строки в каждой ячейке, цвет — доля строки, ноль — серый |
 | `predictions.csv` | `record_id`, `label_id`, `baseline_label_id`, `rubert_label_id` |
 
-Матрицы сохраняются как таблицы; PNG-графики не строятся (matplotlib не входит в зависимости проекта).
+Запись безопасна: если `reports/evaluation/` уже существует, запуск отказывает до загрузки
+моделей. Файлы пишутся во временный каталог рядом, проверяются на полноту и публикуются
+одним переименованием. При обработанной ошибке временный каталог удаляется и итоговый
+не появляется. Принудительное завершение процесса может оставить скрытый каталог
+`.evaluation.*.tmp`, но не неполный `reports/evaluation/`.
 
-## Оставшиеся блокировки
+## Ограничения и оставшиеся шаги
 
-- T12 (#15) не завершена: нет утверждённой фиксации, комплектов обеих моделей и протокола.
-  Формат фиксации T12 может отличаться от черновика — тогда нужен адаптер.
-- Принятый комплект baseline в репозитории не хранится; штатная команда его получения
-  отсутствует (отмечено в T16, #14).
-- Реальные финальные таблицы, матрицы и время ещё не получены; критерии #16 остаются открытыми.
-- Разбор 30–50 ошибок выбранной модели (team_plan §6) в этот инструмент не входит.
+- Финальный запуск требует отдельного разрешения и машины измерений из T12.
+- В среде без моделей их нужно получить штатно: RuBERT — `tools/fetch_transformer.py`,
+  baseline — принятый файл с суммой `389a768b…`. Штатной команды получения
+  принятого baseline в репозитории нет; другие сериализации его не подменяют.
+- Содержательный разбор ошибок — T15 (#18), итоговый отчёт — T17 (#19).
