@@ -4,10 +4,13 @@
     python -m src.evaluate --run-final    # финальный запуск по утверждённому протоколу T12
 
 Источник истины — утверждённая фиксация T12 (``reports/freeze.json``, протокол
-``reports/freeze.md``). До декодирования текстов test проверяются: принятая версия
-файлов фиксации, суммы всех ``file_sha256``, git, среда измерений, отчёты и комплекты
-обеих моделей, байтовая сумма test. Любое несовпадение останавливает запуск; суммы
-фиксации никогда не обновляются автоматически.
+``reports/freeze.md``). Фиксация читается один раз: SHA-256 считается по прочитанным
+байтам, и разбираются только они. До декодирования текстов test проверяются: принятая
+версия файлов фиксации, суммы всех ``file_sha256``, git (оценщик закоммичен в HEAD),
+среда измерений, назначение результатов, отчёты и комплекты обеих моделей, байтовая
+сумма test. Любое несовпадение останавливает запуск; суммы фиксации никогда не
+обновляются автоматически. Финальный запуск в одном репозитории исключителен:
+второй процесс получает отказ до загрузки моделей.
 
 Предсказания обеих моделей получаются через общий интерфейс ``src.classifier``
 (тот же путь, что у бота и ``tools/evaluate_classifier.py``), метрики — функциями
@@ -20,7 +23,11 @@ Test не меняет модель бота, выбранную в T12 по val
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
+import ctypes
+import errno
+import hashlib
 import importlib.metadata
 import json
 import os
@@ -31,6 +38,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Iterator
 from html import escape
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -72,6 +80,11 @@ REQUIRED_PINNED = (
 )
 # Модули src, добавленные после frozen_commit самим оценщиком; остальные должны быть закреплены.
 EVALUATOR_FILES = ("src/evaluate.py",)
+# Исполняемая версия оценщика (прочитана при импорте) сверяется с версией в Git HEAD.
+_EVALUATOR_SOURCE = Path(__file__).read_bytes()
+# Межпроцессная блокировка финального запуска: flock на канонической фиксации репозитория,
+# не зависит от --freeze и --out-dir; снимается ядром при завершении процесса.
+LOCK_FILE = "reports/freeze.json"
 # Версия данных, которая должна совпадать у обеих моделей.
 SHARED_VERSION_KEYS = ("train_ids_sha256", "train_rows", "validation_ids_sha256", "validation_rows",
                        "t03_split_ids_sha256", "t03_audit_sha256")
@@ -91,16 +104,28 @@ class DataMismatchError(ValueError):
     """Данные, ID, метки или версии данных моделей не совпадают."""
 
 
+class ConcurrentRunError(OSError):
+    """Финальный запуск в этом репозитории уже выполняется другим процессом."""
+
+
 # --------------------------------------------------------------------------- #
 # Метрики
 # --------------------------------------------------------------------------- #
+def _class_ids(values: Sequence[Any], name: str) -> np.ndarray:
+    """Целочисленные ID классов без приведения типа: 1.9, 2.0, True и "1" отклоняются."""
+    items = list(values)
+    if not all(isinstance(v, (int, np.integer)) and not isinstance(v, (bool, np.bool_)) for v in items):
+        raise DataMismatchError(f"{name} must be integer class ids")
+    return np.asarray(items, dtype=int)
+
+
 def compute_metrics(y_true: Sequence[int], y_pred: Sequence[int]) -> dict[str, Any]:
     """Accuracy, macro-F1, метрики классов и матрица 3×3 (строки — истина, столбцы — ответ).
 
     Класс без предсказаний остаётся в отчёте с precision = 0 и входит в macro-F1.
     """
-    truth = np.asarray(y_true, dtype=int)
-    predicted = np.asarray(y_pred, dtype=int)
+    truth = _class_ids(y_true, "labels")
+    predicted = _class_ids(y_pred, "predictions")
     if truth.ndim != 1 or truth.shape != predicted.shape or not len(truth):
         raise DataMismatchError("Labels and predictions must be non-empty and of equal length")
     for name, values in (("labels", truth), ("predictions", predicted)):
@@ -183,8 +208,14 @@ def _check_schema(freeze: Mapping[str, Any], root: Path) -> None:
              "T12 label mapping must be negative=0, neutral=1, positive=2")
 
 
-def _check_accepted_t12(freeze: Mapping[str, Any], root: Path) -> None:
-    """Файлы фиксации совпадают с принятой версией T12: сама фиксация не подменена."""
+def _check_accepted_t12(freeze_sha256: str, root: Path) -> None:
+    """Прочитанная фиксация и файлы T12 в репозитории совпадают с принятой версией.
+
+    ``freeze_sha256`` — сумма именно тех байтов, которые разобраны (в том числе по --freeze),
+    а не повторное чтение канонического файла.
+    """
+    _require(freeze_sha256 == ACCEPTED_T12_SHA256["reports/freeze.json"],
+             "Selected T12 freeze differs from the accepted version of reports/freeze.json")
     changed = [rel for rel, digest in ACCEPTED_T12_SHA256.items() if _file_sha256(root, rel) != digest]
     _require(not changed, f"T12 freeze files differ from the accepted version: {', '.join(changed)}")
 
@@ -347,6 +378,9 @@ def _check_git(freeze: Mapping[str, Any], root: Path) -> None:
     _require(state["commit"] is not None, "Git commit of the evaluation code is unknown")
     _require(state["frozen_commit_is_ancestor"], "Evaluated code does not descend from the T12 frozen commit")
     _require(not state["tracked_changes"], "Tracked files have uncommitted changes; commit before the final run")
+    _require(state["evaluator_in_head"], f"{EVALUATOR_FILES[0]} is not committed in Git HEAD; commit it first")
+    _require(state["evaluator_matches_head"],
+             f"Running {EVALUATOR_FILES[0]} differs from the version committed in Git HEAD")
 
 
 def _sysctl(name: str) -> str | None:
@@ -412,44 +446,96 @@ def _check_environment(freeze: Mapping[str, Any], root: Path) -> None:
     _require(not problems, "; ".join(problems))
 
 
-# Статические проверки фиксации: модели и test здесь не загружаются и не декодируются.
+# Статические проверки разобранной фиксации (после _check_accepted_t12 по её байтам):
+# модели и test здесь не загружаются и не декодируются.
 # Порядок: протокол → файлы → данные → модели → параметры → git → среда.
 FREEZE_CHECKS: list[Callable[[Mapping[str, Any], Path], None]] = [
-    _check_schema, _check_accepted_t12, _check_frozen_files, _check_data_prep, _check_test_entry,
+    _check_schema, _check_frozen_files, _check_data_prep, _check_test_entry,
     _check_models, _check_inference, _check_git, _check_environment,
 ]
 
 
+def _git_blob(root: Path, spec: str) -> bytes | None:
+    try:
+        proc = subprocess.run(["git", "cat-file", "blob", spec], cwd=root, capture_output=True, check=False)
+    except OSError:
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
 def git_state(root: Path, frozen_commit: str) -> dict[str, Any]:
+    """Commit, происхождение от frozen_commit, чистота отслеживаемых файлов и версия оценщика в HEAD."""
     ancestor = base._git(root, "merge-base", "--is-ancestor", frozen_commit, "HEAD")
     status = base._git(root, "status", "--porcelain", "--untracked-files=no")
+    committed = _git_blob(root, f"HEAD:{EVALUATOR_FILES[0]}")
     return {
         "commit": base.git_commit(root),
         "frozen_commit_is_ancestor": ancestor is not None and ancestor.returncode == 0,
         "tracked_changes": status is None or status.returncode != 0 or bool(status.stdout.strip()),
+        "evaluator_in_head": committed is not None,
+        "evaluator_matches_head": committed == _EVALUATOR_SOURCE,
     }
 
 
-def read_freeze(path: Path, root: Path = ROOT) -> dict[str, Any]:
-    if not path.is_file():
-        raise FreezeError(f"T12 freeze not found: {base.display_path(path, root)}; the final test stays closed")
+def read_freeze(path: Path, root: Path = ROOT) -> tuple[dict[str, Any], str]:
+    """Прочитать фиксацию один раз: вернуть разобранные байты и их SHA-256."""
     try:
-        freeze = base.read_json(path)
-    except (OSError, ValueError) as exc:
+        data = path.read_bytes()
+    except (FileNotFoundError, IsADirectoryError, NotADirectoryError) as exc:
+        raise FreezeError(f"T12 freeze not found: {base.display_path(path, root)}; "
+                          "the final test stays closed") from exc
+    except OSError as exc:
+        raise FreezeError(f"T12 freeze cannot be read: {exc}") from exc
+    try:
+        # utf-8-sig, как base.read_json.
+        freeze = json.loads(data.decode("utf-8-sig"))
+    except ValueError as exc:
         raise FreezeError(f"T12 freeze is not valid JSON: {exc}") from exc
     _require(isinstance(freeze, dict), "T12 freeze must be a JSON object")
-    return freeze
+    return freeze, hashlib.sha256(data).hexdigest()
 
 
-def load_freeze(path: Path, root: Path = ROOT) -> dict[str, Any]:
+def load_freeze(path: Path, root: Path = ROOT) -> tuple[dict[str, Any], str]:
     """Прочитать и проверить фиксацию T12. Модели и test при этом не загружаются."""
-    freeze = read_freeze(path, root)
+    freeze, digest = read_freeze(path, root)
+    _check_accepted_t12(digest, root)
     for check in FREEZE_CHECKS:
         try:
             check(freeze, root)
         except (KeyError, TypeError, OSError) as exc:
             raise FreezeError(f"T12 freeze check {check.__name__} failed: {type(exc).__name__}: {exc}") from exc
-    return freeze
+    return freeze, digest
+
+
+@contextlib.contextmanager
+def final_run_lock(root: Path = ROOT) -> Iterator[None]:
+    """Исключительная блокировка финального запуска (flock, Linux и macOS).
+
+    Блокировка снимается при выходе из блока и ядром при аварийном завершении процесса,
+    поэтому зависшей блокировки не остаётся. Она исключает только одновременные запуски
+    в этом репозитории; от последовательного повторного запуска защищает итоговый каталог.
+    """
+    try:
+        import fcntl
+    except ImportError as exc:
+        raise ConcurrentRunError("Exclusive final-run lock requires fcntl (Linux or macOS)") from exc
+    try:
+        fd = os.open(root / LOCK_FILE, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0))
+    except FileNotFoundError as exc:
+        raise FreezeError(f"T12 freeze not found: {LOCK_FILE}; the final test stays closed") from exc
+    except OSError as exc:
+        raise ConcurrentRunError(f"Cannot open the final-run lock {LOCK_FILE}: {exc}") from exc
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK, errno.EACCES):
+                raise ConcurrentRunError("Another final evaluation of this repository is running; "
+                                         "refusing before loading models or reading the test") from exc
+            raise ConcurrentRunError(f"Cannot lock {LOCK_FILE}: {exc}") from exc
+        yield
+    finally:
+        os.close(fd)
 
 
 def check_model_files(freeze: Mapping[str, Any], root: Path = ROOT) -> None:
@@ -486,12 +572,27 @@ def check_test_ids_against_t03(frame: pd.DataFrame, split_ids_path: Path) -> Non
         raise DataMismatchError("Test labels differ from T03 split_ids.csv")
 
 
+def frozen_test_path(freeze: Mapping[str, Any], root: Path = ROOT) -> Path:
+    """Путь подготовленного test: обычный файл внутри репозитория, без символьных ссылок,
+    с SHA-256 из фиксации. Одна и та же проверка в --check и перед декодированием."""
+    rel = freeze["test"]["path"]
+    current = root
+    for part in Path(rel).parts:
+        current = current / part
+        if current.is_symlink():
+            raise DataMismatchError(f"Prepared test path must not contain symbolic links: {rel}")
+    path = base.resolve_path(root, rel)
+    if not path.is_file():
+        raise DataMismatchError(f"Prepared test not found: {rel}; restore it with tools/restore_frozen_test.py")
+    if base.sha256_file(path) != freeze["test"]["parquet_sha256"]:
+        raise DataMismatchError("Test Parquet differs from the T12 freeze")
+    return path
+
+
 def load_frozen_test(freeze: Mapping[str, Any], root: Path = ROOT) -> pd.DataFrame:
     """Открыть test только после совпадения SHA-256 файла с фиксацией T12."""
     entry = freeze["test"]
-    path = base.resolve_path(root, entry["path"])
-    if not path.is_file() or base.sha256_file(path) != entry["parquet_sha256"]:
-        raise DataMismatchError("Test Parquet differs from the T12 freeze")
+    path = frozen_test_path(freeze, root)
     frame = base.load_prepared_split(path, split_name="test", text_column=TEXT_COLUMN,
                                      label_column=LABEL_COLUMN, id_column=ID_COLUMN)
     if len(frame) != entry["rows"]:
@@ -573,7 +674,7 @@ def run_model(model: Any, texts: Sequence[str], *, batch_size: int, load_seconds
         raise DataMismatchError("Model returned a different number of predictions")
     inference = finished - warmed
     return {
-        "predictions": [int(r["label_id"]) for r in results],
+        "predictions": _class_ids([r["label_id"] for r in results], "Model predictions").tolist(),
         "truncated_rows": int(sum(bool(r["truncated"]) for r in results)),
         "timing": {
             "load_seconds": load_seconds,
@@ -801,14 +902,73 @@ def check_out_dir(out_dir: Path) -> None:
         raise FileExistsError(f"Evaluation output already exists; refusing to overwrite: {out_dir.name}")
 
 
+# Флаги атомарного переименования без замещения (Linux renameat2, macOS renamex_np).
+_AT_FDCWD, _RENAME_NOREPLACE, _RENAME_EXCL = -100, 1, 0x4
+_UNSUPPORTED = {errno.EINVAL, errno.ENOSYS, errno.ENOTSUP, errno.EOPNOTSUPP}
+
+
+def _rename_noreplace(source: Path, target: Path) -> None:
+    """Атомарно переименовать ``source`` в ``target``; существующий target, даже пустой каталог,
+    не замещается. Без поддержки операции — ошибка, без небезопасного fallback на os.rename."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform.startswith("linux"):
+        function = getattr(libc, "renameat2", None)
+        argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        args = (_AT_FDCWD, os.fsencode(source), _AT_FDCWD, os.fsencode(target), _RENAME_NOREPLACE)
+    elif sys.platform == "darwin":
+        function = getattr(libc, "renamex_np", None)
+        argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        args = (os.fsencode(source), os.fsencode(target), _RENAME_EXCL)
+    else:
+        function = None
+    if function is None:
+        raise OSError(errno.ENOTSUP, f"Atomic no-replace rename is unavailable on {sys.platform}; refusing to publish")
+    function.argtypes, function.restype = argtypes, ctypes.c_int
+    if function(*args) == 0:
+        return
+    code = ctypes.get_errno()
+    if code in (errno.EEXIST, errno.ENOTEMPTY):
+        raise FileExistsError(code, "Evaluation output already exists; refusing to overwrite", target.name)
+    if code in _UNSUPPORTED:
+        raise OSError(code, "File system does not support atomic no-replace rename; refusing to publish",
+                      target.name)
+    raise OSError(code, os.strerror(code), target.name)
+
+
+def check_output_destination(out_dir: Path) -> None:
+    """Назначение результатов пригодно до затратного инференса.
+
+    Итоговый каталог не существует, родитель — существующий каталог, в нём можно создать
+    временный каталог, а переименование без замещения работает на этой файловой системе
+    (пробные каталоги удаляются). Итоговый каталог при проверке не создаётся.
+    """
+    check_out_dir(out_dir)
+    parent = out_dir.parent
+    if not parent.is_dir():
+        raise NotADirectoryError(f"Output parent is not an existing directory: {parent.name}")
+    probe = Path(tempfile.mkdtemp(dir=parent, prefix=f".{out_dir.name}.", suffix=".probe"))
+    try:
+        (probe / "first").mkdir()
+        (probe / "second").mkdir()
+        _rename_noreplace(probe / "first", probe / "published")
+        try:
+            _rename_noreplace(probe / "second", probe / "published")
+        except FileExistsError:
+            pass
+        else:
+            raise OSError("No-replace rename replaced an existing directory; refusing to publish")
+    finally:
+        shutil.rmtree(probe, ignore_errors=True)
+
+
 def write_reports(report: dict[str, Any], runs: Mapping[str, Mapping[str, Any]], out_dir: Path) -> list[Path]:
     """Записать отчёты во временный каталог рядом и опубликовать его одним переименованием.
 
     Тексты отзывов не записываются. При обработанной ошибке временный каталог удаляется,
-    итоговый каталог не появляется; существующий каталог не заменяется.
+    итоговый каталог не появляется; существующий каталог (в том числе пустой, созданный
+    конкурентно) не заменяется: публикация — переименование без замещения.
     """
     check_out_dir(out_dir)
-    out_dir.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(dir=out_dir.parent, prefix=f".{out_dir.name}.", suffix=".tmp"))
     try:
         _write_csv(staging / "final_table.csv", TABLE_COLUMNS,
@@ -829,8 +989,7 @@ def write_reports(report: dict[str, Any], runs: Mapping[str, Mapping[str, Any]],
         base.write_json(staging / "final_metrics.json", report)
         if sorted(p.name for p in staging.iterdir()) != sorted(OUTPUT_FILES):
             raise OSError("Incomplete evaluation output")
-        check_out_dir(out_dir)
-        os.rename(staging, out_dir)
+        _rename_noreplace(staging, out_dir)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -841,7 +1000,10 @@ def write_reports(report: dict[str, Any], runs: Mapping[str, Mapping[str, Any]],
 # Финальный запуск
 # --------------------------------------------------------------------------- #
 def _set_torch_threads(threads: int) -> int:
-    import torch
+    try:
+        import torch
+    except ImportError as exc:
+        raise c.ModelUnavailableError(f"torch is not installed; RuBERT cannot be loaded ({exc})") from exc
     torch.set_num_threads(threads)
     if torch.get_num_threads() != threads:
         raise FreezeError(f"torch uses {torch.get_num_threads()} threads; T12 requires {threads}")
@@ -865,15 +1027,37 @@ def load_models(freeze: Mapping[str, Any], *, root: Path = ROOT, factory: Callab
     return models, load_seconds, versions
 
 
+def _verified_commit(freeze: Mapping[str, Any], root: Path) -> str:
+    _check_git(freeze, root)
+    return git_state(root, freeze["frozen_commit"])["commit"]
+
+
+def run_command(freeze_path: Path, out_dir: Path, root: Path) -> str:
+    """Команда воспроизведения с фактически использованными --freeze и --out-dir."""
+    command = f"python -m src.evaluate --run-final --freeze {base.display_path(freeze_path, root)}"
+    if out_dir.resolve() != (root / "reports" / "evaluation").resolve():
+        command += f" --out-dir {base.display_path(out_dir, root)}"
+    return command
+
+
 def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
              factory: Callable[..., Any] = c.create_classifier,
              clock: Callable[[], float] = time.perf_counter) -> dict[str, Any]:
-    """Финальная оценка обеих моделей: фиксация → модели → test → предсказания → отчёты.
+    """Финальная оценка обеих моделей под исключительной блокировкой репозитория.
 
-    Test декодируется только после проверки фиксации, обоих комплектов и их версий данных.
+    Порядок: блокировка → фиксация → назначение результатов → модели → test → предсказания →
+    повторная проверка git → отчёты. Test декодируется только после проверки фиксации,
+    обоих комплектов и их версий данных; блокировка удерживается до публикации и очистки.
     """
-    freeze = load_freeze(freeze_path, root)
-    check_out_dir(out_dir)
+    with final_run_lock(root):
+        return _evaluate_locked(freeze_path, out_dir, root=root, factory=factory, clock=clock)
+
+
+def _evaluate_locked(freeze_path: Path, out_dir: Path, *, root: Path, factory: Callable[..., Any],
+                     clock: Callable[[], float]) -> dict[str, Any]:
+    freeze, freeze_sha256 = load_freeze(freeze_path, root)
+    commit = _verified_commit(freeze, root)
+    check_output_destination(out_dir)
     inference = freeze["inference"]
     models, load_seconds, versions = load_models(freeze, root=root, factory=factory, clock=clock)
 
@@ -905,11 +1089,11 @@ def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
         "bot_model_changed_by_test": False,
         "labels": dict(zip(CLASS_NAMES, CLASS_IDS)),
         "run": {
-            "command": f"python -m src.evaluate --run-final --freeze {base.display_path(freeze_path, root)}",
-            "git_commit": git_state(root, freeze["frozen_commit"])["commit"],
+            "command": run_command(freeze_path, out_dir, root),
+            "git_commit": commit,
             "frozen_commit": freeze["frozen_commit"],
             "freeze_path": base.display_path(freeze_path, root),
-            "freeze_sha256": base.sha256_file(freeze_path),
+            "freeze_sha256": freeze_sha256,
             "freeze_schema": freeze["schema"],
             "protocol_version": freeze["protocol_version"],
             "approved_by": freeze["approved_by"],
@@ -942,45 +1126,56 @@ def evaluate(freeze_path: Path, out_dir: Path, *, root: Path = ROOT,
                                "t03_decisions_sha256": base.sha256_file(decisions)},
         "outputs": [base.display_path(out_dir / name, root) for name in OUTPUT_FILES],
     }
+    # Код и commit не менялись во время запуска: отчёт приписывается проверенному коммиту.
+    if _verified_commit(freeze, root) != commit:
+        raise FreezeError("Git HEAD changed during the final run; results are not published")
     write_reports(report, runs, out_dir)
     return report
 
 
-def check_only(freeze_path: Path, root: Path = ROOT, *,
+def _lock_available(root: Path) -> None:
+    with final_run_lock(root):
+        pass
+
+
+def check_only(freeze_path: Path, root: Path = ROOT, *, out_dir: Path | None = None,
                factory: Callable[..., Any] = c.create_classifier) -> dict[str, Any]:
     """Готовность к финальному запуску без декодирования test и без предсказаний на нём.
 
-    Проверки фиксации, git, среды и моделей выполняются независимо, чтобы показать
-    все блокировки сразу; без утверждённой фиксации остальные шаги не выполняются.
-    Test проверяется только по байтовой сумме файла.
+    Те же проверки, что у --run-final до инференса, включая выбранный --out-dir.
+    Проверки фиксации, git, среды, назначения и моделей выполняются независимо, чтобы
+    показать все блокировки сразу; без утверждённой фиксации остальные шаги не выполняются.
+    Test проверяется только по пути и байтовой сумме файла.
     """
-    freeze = read_freeze(freeze_path, root)
+    out_dir = out_dir if out_dir is not None else root / "reports" / "evaluation"
+    freeze, freeze_sha256 = read_freeze(freeze_path, root)
     checks: list[dict[str, str]] = []
 
     def stage(name: str, action: Callable[[], Any]) -> bool:
         try:
             action()
-        except (c.ClassifierError, OSError, ValueError, KeyError, TypeError) as exc:
+        except (c.ClassifierError, OSError, ValueError, KeyError, TypeError, ImportError) as exc:
             checks.append({"check": name, "status": "failed", "reason": f"{type(exc).__name__}: {exc}"})
             return False
         checks.append({"check": name, "status": "passed"})
         return True
 
-    static = [("freeze_protocol", (_check_schema, _check_accepted_t12)),
+    static = [("freeze_protocol", (lambda f, r: _check_accepted_t12(freeze_sha256, r), _check_schema)),
               ("frozen_files_and_reports", (_check_frozen_files, _check_data_prep, _check_test_entry,
                                             _check_models, _check_inference)),
-              ("git", (_check_git,)), ("environment", (_check_environment,))]
+              ("git", (_check_git,)), ("environment", (_check_environment,)),
+              ("output_dir", (lambda f, r: check_output_destination(out_dir),)),
+              ("exclusive_run", (lambda f, r: _lock_available(r),))]
     for index, (name, functions) in enumerate(static):
         if not stage(name, lambda: [check(freeze, root) for check in functions]) and index < 2:
             break
     else:
         stage("models", lambda: load_models(freeze, root=root, factory=factory))
-        path = base.resolve_path(root, freeze["test"]["path"])
-        stage("test_file", lambda: _require(_file_sha256(root, freeze["test"]["path"]) == freeze["test"]["parquet_sha256"],
-                                            f"Prepared test is missing or differs from T12: {base.display_path(path, root)}"))
+        stage("test_file", lambda: frozen_test_path(freeze, root))
     ready = len(checks) == len(static) + 2 and all(item["status"] == "passed" for item in checks)
     return {"status": "ready" if ready else "not_ready", "freeze_path": base.display_path(freeze_path, root),
-            "freeze_sha256": base.sha256_file(freeze_path), "bot_model": freeze.get("bot_model"),
+            "out_dir": base.display_path(out_dir, root),
+            "freeze_sha256": freeze_sha256, "bot_model": freeze.get("bot_model"),
             "test_rows": (freeze.get("test") or {}).get("rows"), "checks": checks,
             "final_test_decoded": False, "final_inference_run": False}
 
@@ -1001,7 +1196,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     out_dir = args.out_dir if args.out_dir.is_absolute() else Path.cwd() / args.out_dir
     try:
         if args.check:
-            result = check_only(freeze_path)
+            result = check_only(freeze_path, out_dir=out_dir)
         else:
             report = evaluate(freeze_path, out_dir)
             result = {key: report[key] for key in ("bot_model", "test", "outputs")}

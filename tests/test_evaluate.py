@@ -5,7 +5,9 @@
 import csv
 import json
 import shutil
+import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pandas as pd
@@ -18,6 +20,9 @@ from src import evaluate as ev, train_baseline as tb  # noqa: E402
 from test_classifier import make_real_bundle, report_of  # noqa: E402
 
 NAMES = {0: "negative", 1: "neutral", 2: "positive"}
+REAL_SET_TORCH_THREADS = ev._set_torch_threads
+CLEAN_GIT = {"commit": "b" * 40, "frozen_commit_is_ancestor": True, "tracked_changes": False,
+             "evaluator_in_head": True, "evaluator_matches_head": True}
 # Последние две пары — повторы: точный (регистр и пробелы) и близкий, подтверждённый в T03.
 TEST_ROWS = [
     ("test.parquet#row=0", "Ужасный фильм, зря потратил вечер", 0),
@@ -208,8 +213,7 @@ def repo(tmp_path, monkeypatch):
     tb.write_json(root / "reports/freeze.json", freeze)
     monkeypatch.setattr(ev, "ACCEPTED_T12_SHA256", {rel: sha(root, rel) for rel in (
         "reports/freeze.json", "reports/freeze.md", "reports/freeze_checks.json", "reports/freeze_review_fix.json")})
-    monkeypatch.setattr(ev, "git_state", lambda root, frozen: {
-        "commit": "b" * 40, "frozen_commit_is_ancestor": True, "tracked_changes": False})
+    monkeypatch.setattr(ev, "git_state", lambda root, frozen: dict(CLEAN_GIT))
     threads = []
     monkeypatch.setattr(ev, "_set_torch_threads", threads.append)
     version = {**VERSION, "t03_split_ids_sha256": freeze["data_prep"]["split_ids_sha256"],
@@ -285,7 +289,9 @@ def test_neutral_without_predictions_stays_in_matrix_and_macro_f1():
     assert ev.compute_metrics([0, 2], [0, 2])["confusion_matrix"] == [[1, 0, 0], [0, 0, 0], [0, 0, 1]]
 
 
-@pytest.mark.parametrize("truth,predicted", [([0, 1], [0]), ([], []), ([0, 3], [0, 1]), ([0, 1], [0, -1])])
+@pytest.mark.parametrize("truth,predicted", [([0, 1], [0]), ([], []), ([0, 3], [0, 1]), ([0, 1], [0, -1]),
+                                             ([0, 1, 2], [0, 1.9, 2]), ([0, 1, 2], [0, 1.0, 2]),
+                                             ([0, 1.5, 2], [0, 1, 2]), ([0, 1], [0, True]), ([0, 1], [0, "1"])])
 def test_metrics_reject_invalid_input(truth, predicted):
     with pytest.raises(ev.DataMismatchError):
         ev.compute_metrics(truth, predicted)
@@ -365,7 +371,8 @@ def test_final_run_writes_aggregated_reports_without_texts(repo):
     assert rubert["confusion_matrix"] == [[2, 0, 0], [0, 1, 0], [0, 1, 4]]
     assert rubert["accuracy"] == pytest.approx(7 / 8)
     assert report["test"]["rows"] == len(TEST_ROWS) and report["bot_model"] == "baseline"
-    assert report["run"]["command"] == "python -m src.evaluate --run-final --freeze reports/freeze.json"
+    assert report["run"]["command"] == "python -m src.evaluate --run-final --freeze reports/freeze.json --out-dir out"
+    assert report["run"]["freeze_sha256"] == sha(root, "reports/freeze.json")
     assert report["run"]["protocol_version"] == "t12/1" and report["run"]["frozen_commit"] == "a" * 40
     # RuBERT is better on this synthetic test, but the bot model chosen on validation stays.
     assert rubert_better(report) and report["bot_model"] == "baseline"
@@ -615,12 +622,13 @@ def sync_t03(root, version):
 def test_accepted_t12_freeze_is_compatible_without_test_or_models(monkeypatch):
     """Настоящая фиксация T12 проходит статические проверки; test и модели не открываются."""
     forbid_test_access(monkeypatch)
-    freeze = ev.read_freeze(ev.DEFAULT_FREEZE_PATH)
-    assert tb.sha256_file(ev.DEFAULT_FREEZE_PATH) == ev.ACCEPTED_T12_SHA256["reports/freeze.json"]
+    freeze, digest = ev.read_freeze(ev.DEFAULT_FREEZE_PATH)
+    assert tb.sha256_file(ev.DEFAULT_FREEZE_PATH) == digest == ev.ACCEPTED_T12_SHA256["reports/freeze.json"]
+    ev._check_accepted_t12(digest, ev.ROOT)
     assert freeze["frozen_commit"] == "5f22d93a8cff63b30fc129bb68a1cfbd4230995d"
     assert freeze["inference"] == {"batch_size": 64, "device": "cpu", "num_threads": 2}
     assert freeze["bot_model"] == "baseline" and freeze["test"]["rows"] == 9324
-    for check in (ev._check_schema, ev._check_accepted_t12, ev._check_frozen_files, ev._check_data_prep,
+    for check in (ev._check_schema, ev._check_frozen_files, ev._check_data_prep,
                   ev._check_test_entry, ev._check_models, ev._check_inference):
         check(freeze, ev.ROOT)
 
@@ -753,9 +761,11 @@ def test_other_environment_is_rejected(repo, monkeypatch, kind, message):
 
 
 @pytest.mark.parametrize("state,message", [
-    ({"commit": None, "frozen_commit_is_ancestor": True, "tracked_changes": False}, "commit"),
-    ({"commit": "b" * 40, "frozen_commit_is_ancestor": False, "tracked_changes": False}, "frozen commit"),
-    ({"commit": "b" * 40, "frozen_commit_is_ancestor": True, "tracked_changes": True}, "uncommitted"),
+    ({**CLEAN_GIT, "commit": None}, "commit"),
+    ({**CLEAN_GIT, "frozen_commit_is_ancestor": False}, "frozen commit"),
+    ({**CLEAN_GIT, "tracked_changes": True}, "uncommitted"),
+    ({**CLEAN_GIT, "evaluator_in_head": False, "evaluator_matches_head": False}, "not committed in Git HEAD"),
+    ({**CLEAN_GIT, "evaluator_matches_head": False}, "differs from the version committed"),
 ])
 def test_git_state_must_match_freeze(repo, monkeypatch, state, message):
     root, _, _ = repo
@@ -843,7 +853,11 @@ def test_check_only_ready_without_reading_test(repo, monkeypatch):
     assert result["status"] == "ready" and result["test_rows"] == 8
     assert result["final_test_decoded"] is False and result["final_inference_run"] is False
     assert [c["check"] for c in result["checks"]] == ["freeze_protocol", "frozen_files_and_reports", "git",
-                                                      "environment", "models", "test_file"]
+                                                      "environment", "output_dir", "exclusive_run",
+                                                      "models", "test_file"]
+    assert result["out_dir"] == "reports/evaluation" and not (root / "reports/evaluation").exists()
+    assert result["freeze_sha256"] == sha(root, "reports/freeze.json")
+    assert not [p for p in (root / "reports").iterdir() if p.name.startswith(".evaluation.")]
 
 
 def test_check_only_lists_all_blockers(repo, monkeypatch):
@@ -856,7 +870,8 @@ def test_check_only_lists_all_blockers(repo, monkeypatch):
     status = {c["check"]: c["status"] for c in result["checks"]}
     assert result["status"] == "not_ready"
     assert status == {"freeze_protocol": "passed", "frozen_files_and_reports": "passed", "git": "passed",
-                      "environment": "failed", "models": "failed", "test_file": "failed"}
+                      "environment": "failed", "output_dir": "passed", "exclusive_run": "passed",
+                      "models": "failed", "test_file": "failed"}
 
 
 def test_check_only_stops_without_approved_protocol(repo, monkeypatch):
@@ -865,3 +880,303 @@ def test_check_only_stops_without_approved_protocol(repo, monkeypatch):
     edit_freeze(root, lambda f: f.update(status="draft"))
     result = ev.check_only(root / "reports/freeze.json", root, factory=forbid_models())
     assert result["status"] == "not_ready" and [c["check"] for c in result["checks"]] == ["freeze_protocol"]
+
+
+# --------------------------------------------------------------------------- #
+# Регрессии независимого ревью: фиксация, блокировка, git, запись, назначение
+# --------------------------------------------------------------------------- #
+def test_alternative_freeze_with_changed_parameters_is_rejected(repo, monkeypatch):
+    """Сумма считается по выбранной фиксации, а не по неизменному reports/freeze.json."""
+    root, _, _ = repo
+    canonical = root / "reports/freeze.json"
+    accepted = canonical.read_bytes()
+    data = json.loads(accepted)
+    data["inference"]["batch_size"] = 2
+    alternative = root / "alt_freeze.json"
+    tb.write_json(alternative, data)
+    with monkeypatch.context() as scoped:
+        forbid_test_access(scoped)
+        with pytest.raises(ev.FreezeError, match="Selected T12 freeze differs from the accepted version"):
+            ev.evaluate(alternative, root / "out", root=root, factory=forbid_models())
+        result = ev.check_only(alternative, root, factory=forbid_models())
+    assert result["status"] == "not_ready" and result["freeze_sha256"] == sha(root, "alt_freeze.json")
+    assert [(c["check"], c["status"]) for c in result["checks"]] == [("freeze_protocol", "failed")]
+    assert canonical.read_bytes() == accepted and not (root / "out").exists()
+
+
+def test_identical_freeze_copy_is_reported_with_accepted_digest(repo):
+    root, _, version = repo
+    copy = root / "copy_freeze.json"
+    copy.write_bytes((root / "reports/freeze.json").read_bytes())
+    report = ev.evaluate(copy, root / "out", root=root, factory=fake_factory(version))
+    assert report["run"]["freeze_sha256"] == ev.ACCEPTED_T12_SHA256["reports/freeze.json"]
+    assert report["run"]["command"] == "python -m src.evaluate --run-final --freeze copy_freeze.json --out-dir out"
+
+
+def test_concurrent_final_runs_only_one_reaches_predictions(repo, monkeypatch):
+    root, _, version = repo
+    inside, release = threading.Event(), threading.Event()
+    created = {}
+    make = fake_factory(version, created)
+
+    def blocking_factory(backend, model_path, *, report_path):
+        model = make(backend, model_path, report_path=report_path)
+        predict = model.predict_batch
+
+        def predict_batch(texts, *, max_text_length):
+            if tuple(texts) != ev.WARMUP_TEXTS and not inside.is_set():
+                inside.set()
+                assert release.wait(30)
+            return predict(texts, max_text_length=max_text_length)
+        model.predict_batch = predict_batch
+        return model
+
+    outcome = {}
+
+    def first_run():
+        try:
+            outcome["report"] = run(root, version, factory=blocking_factory)
+        except BaseException as exc:  # noqa: BLE001 — передать в основной поток
+            outcome["error"] = exc
+
+    thread = threading.Thread(target=first_run)
+    thread.start()
+    try:
+        assert inside.wait(30), "the first run did not reach the test predictions"
+        second = {}
+        with pytest.raises(ev.ConcurrentRunError, match="Another final evaluation"):
+            ev.evaluate(root / "reports/freeze.json", root / "out2", root=root,
+                        factory=fake_factory(version, second))
+        assert second == {}
+        result = ev.check_only(root / "reports/freeze.json", root, out_dir=root / "out3",
+                               factory=fake_factory(version))
+        status = {c["check"]: c["status"] for c in result["checks"]}
+        assert result["status"] == "not_ready" and status["exclusive_run"] == "failed"
+    finally:
+        release.set()
+        thread.join(30)
+    assert "error" not in outcome and (root / "out").is_dir()
+    assert not (root / "out2").exists() and not (root / "out3").exists()
+    assert sum(created["baseline"].calls[1:], []) == TEXTS
+
+
+@pytest.mark.parametrize("ending", ["normal", "killed"])
+def test_lock_held_by_another_process_refuses_before_models(repo, monkeypatch, ending):
+    """Межпроцессная блокировка; после аварийного завершения держателя она снимается ядром."""
+    root, _, version = repo
+    holder = subprocess.Popen(
+        [sys.executable, "-c", "import fcntl, sys; f = open(sys.argv[1], 'rb'); fcntl.flock(f, fcntl.LOCK_EX); "
+         "print('locked', flush=True); sys.stdin.read()", str(root / ev.LOCK_FILE)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    try:
+        assert holder.stdout.readline().strip() == "locked"
+        refuse(root, ev.ConcurrentRunError, "Another final evaluation", monkeypatch, version)
+    finally:
+        holder.kill() if ending == "killed" else holder.stdin.close()
+        holder.wait(30)
+    run(root, version)
+    assert (root / "out/final_metrics.json").is_file()
+
+
+def git(root, *args):
+    return subprocess.run(["git", "-c", "user.name=T13", "-c", "user.email=t13@example.invalid",
+                           "-c", "commit.gpgsign=false", *args], cwd=root, check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+@pytest.fixture
+def git_repo(tmp_path, monkeypatch):
+    """Настоящий Git-репозиторий: frozen_commit и исполняемая версия оценщика."""
+    if shutil.which("git") is None:
+        pytest.skip("git is not installed")
+    root = tmp_path / "git"
+    write_bytes(root / "src/classifier.py", b"frozen classifier\n")
+    git(root, "init", "-q")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "freeze")
+    source = b"evaluator v1\n"
+    monkeypatch.setattr(ev, "_EVALUATOR_SOURCE", source)
+    return root, git(root, "rev-parse", "HEAD"), source
+
+
+def test_untracked_evaluator_is_rejected(git_repo):
+    root, frozen, source = git_repo
+    write_bytes(root / "src/evaluate.py", source)
+    state = ev.git_state(root, frozen)
+    assert state["tracked_changes"] is False and state["evaluator_in_head"] is False
+    with pytest.raises(ev.FreezeError, match="not committed in Git HEAD"):
+        ev._check_git({"frozen_commit": frozen}, root)
+
+
+def test_evaluator_differing_from_head_is_rejected(git_repo, monkeypatch):
+    root, frozen, source = git_repo
+    write_bytes(root / "src/evaluate.py", source)
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "evaluator")
+    # The running evaluator is another version than the committed one; the worktree is clean.
+    monkeypatch.setattr(ev, "_EVALUATOR_SOURCE", b"evaluator v2\n")
+    state = ev.git_state(root, frozen)
+    assert state["evaluator_in_head"] and not state["evaluator_matches_head"] and not state["tracked_changes"]
+    with pytest.raises(ev.FreezeError, match="differs from the version committed in Git HEAD"):
+        ev._check_git({"frozen_commit": frozen}, root)
+    write_bytes(root / "src/evaluate.py", b"evaluator v2\n")
+    with pytest.raises(ev.FreezeError, match="uncommitted"):
+        ev._check_git({"frozen_commit": frozen}, root)
+
+
+def test_committed_evaluator_is_accepted(git_repo):
+    root, frozen, source = git_repo
+    write_bytes(root / "src/evaluate.py", source)
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "evaluator")
+    ev._check_git({"frozen_commit": frozen}, root)
+    assert ev._verified_commit({"frozen_commit": frozen}, root) == git(root, "rev-parse", "HEAD")
+    with pytest.raises(ev.FreezeError, match="frozen commit"):
+        ev._check_git({"frozen_commit": "0" * 40}, root)
+
+
+def test_git_head_change_during_run_blocks_publication(repo, monkeypatch):
+    root, _, version = repo
+    created = {}
+
+    def git_state(root, frozen):
+        # HEAD moves once the models have produced test predictions.
+        moved = "rubert" in created and len(created["rubert"].calls) > 1
+        return {**CLEAN_GIT, "commit": "c" * 40} if moved else dict(CLEAN_GIT)
+    monkeypatch.setattr(ev, "git_state", git_state)
+    with pytest.raises(ev.FreezeError, match="HEAD changed during the final run"):
+        run(root, version, factory=fake_factory(version, created))
+    assert not (root / "out").exists()
+
+
+def test_rename_noreplace_never_replaces_existing_directory(tmp_path):
+    source, target = tmp_path / "staging", tmp_path / "final"
+    write_bytes(source / "a.txt", b"new")
+    target.mkdir()
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        ev._rename_noreplace(source, target)
+    assert (source / "a.txt").read_bytes() == b"new" and list(target.iterdir()) == []
+    target.rmdir()
+    ev._rename_noreplace(source, target)
+    assert (target / "a.txt").read_bytes() == b"new" and not source.exists()
+
+
+@pytest.mark.parametrize("contents", [None, "other_run.json"])
+def test_output_created_concurrently_is_not_replaced(repo, monkeypatch, contents):
+    root, _, version = repo
+    out = root / "out"
+    publish = ev._rename_noreplace
+
+    def racing(source, target):
+        if target == out:  # another process creates the directory just before publication
+            out.mkdir()
+            if contents:
+                (out / contents).write_text("{}", encoding="utf-8")
+        return publish(source, target)
+    monkeypatch.setattr(ev, "_rename_noreplace", racing)
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        run(root, version)
+    assert sorted(p.name for p in out.iterdir()) == ([contents] if contents else [])
+    assert not [p.name for p in root.iterdir() if p.name.startswith(".out.")]
+
+
+class FakeLibc:
+    """libc без операции переименования без замещения или с отказом файловой системы."""
+
+    def __init__(self, code):
+        self.code = code
+
+    def __getattr__(self, name):
+        if self.code is None:
+            raise AttributeError(name)
+
+        def function(*args):
+            ev.ctypes.set_errno(self.code)
+            return -1
+        return function
+
+
+@pytest.mark.parametrize("code,message", [(None, "no-replace rename is unavailable"),
+                                          (ev.errno.EINVAL, "does not support atomic no-replace rename")])
+def test_unsupported_no_replace_rename_refuses_before_inference(repo, monkeypatch, code, message):
+    root, _, version = repo
+    monkeypatch.setattr(ev.ctypes, "CDLL", lambda *args, **kwargs: FakeLibc(code))
+    monkeypatch.setattr(ev.os, "rename", lambda *args: pytest.fail("no unsafe os.rename fallback"))
+    monkeypatch.setattr(ev.os, "replace", lambda *args: pytest.fail("no unsafe os.replace fallback"))
+    refuse(root, OSError, message, monkeypatch, version)
+    result = ev.check_only(root / "reports/freeze.json", root, out_dir=root / "out", factory=fake_factory(version))
+    output = next(c for c in result["checks"] if c["check"] == "output_dir")
+    assert result["status"] == "not_ready" and output["status"] == "failed" and message in output["reason"]
+    assert not [p.name for p in root.iterdir() if p.name.startswith(".out.")]
+
+
+def test_existing_output_dir_fails_check_and_run_before_inference(repo, monkeypatch):
+    root, _, version = repo
+    (root / "out").mkdir()
+    forbid_test_access(monkeypatch)
+    result = ev.check_only(root / "reports/freeze.json", root, out_dir=root / "out", factory=fake_factory(version))
+    output = next(c for c in result["checks"] if c["check"] == "output_dir")
+    assert result["status"] == "not_ready" and "refusing to overwrite" in output["reason"]
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        run(root, version, factory=forbid_models())
+    assert list((root / "out").iterdir()) == []
+
+
+def test_output_parent_that_is_a_file_fails_check_and_run(repo, monkeypatch):
+    root, _, version = repo
+    (root / "plain").write_text("not a directory", encoding="utf-8")
+    out = root / "plain/evaluation"
+    with monkeypatch.context() as scoped:
+        forbid_test_access(scoped)
+        result = ev.check_only(root / "reports/freeze.json", root, out_dir=out, factory=fake_factory(version))
+        with pytest.raises(NotADirectoryError, match="Output parent"):
+            ev.evaluate(root / "reports/freeze.json", out, root=root, factory=forbid_models())
+    output = next(c for c in result["checks"] if c["check"] == "output_dir")
+    assert result["status"] == "not_ready" and output["status"] == "failed" and "Output parent" in output["reason"]
+    assert (root / "plain").read_text(encoding="utf-8") == "not a directory"
+
+
+def test_missing_torch_gives_structured_not_ready(repo, monkeypatch):
+    root, _, version = repo
+    monkeypatch.setattr(ev, "_set_torch_threads", REAL_SET_TORCH_THREADS)
+    monkeypatch.setitem(sys.modules, "torch", None)
+    forbid_test_access(monkeypatch)
+    result = ev.check_only(root / "reports/freeze.json", root, factory=fake_factory(version))
+    models = next(c for c in result["checks"] if c["check"] == "models")
+    assert result["status"] == "not_ready" and models["status"] == "failed"
+    assert "torch is not installed" in models["reason"]
+    with pytest.raises(ev.c.ModelUnavailableError, match="torch is not installed"):
+        run(root, version)
+    assert not (root / "out").exists()
+
+
+class FractionalModel:
+    def predict_batch(self, texts, *, max_text_length):
+        return [{"label_id": 1.9, "truncated": False} for _ in texts]
+
+
+def test_fractional_model_predictions_are_rejected():
+    with pytest.raises(ev.DataMismatchError, match="integer class ids"):
+        ev.run_model(FractionalModel(), ["a", "b"], batch_size=2, load_seconds=0.0)
+
+
+@pytest.mark.parametrize("link", ["file", "directory"])
+def test_symlinked_prepared_test_is_rejected_in_check_and_run(repo, monkeypatch, link):
+    """Ссылка внутри репозитория с тем же содержимым: отказ в обоих режимах до декодирования."""
+    root, _, version = repo
+    processed = root / "data/processed"
+    if link == "file":
+        (processed / "test.parquet").rename(root / "data/real_test.parquet")
+        (processed / "test.parquet").symlink_to(root / "data/real_test.parquet")
+    else:
+        processed.rename(root / "data/real_processed")
+        processed.symlink_to(root / "data/real_processed", target_is_directory=True)
+    forbid = lambda *a, **k: pytest.fail("A symlinked test must not be decoded")  # noqa: E731
+    monkeypatch.setattr(tb, "load_prepared_split", forbid)
+    monkeypatch.setattr(pd, "read_parquet", forbid)
+    result = ev.check_only(root / "reports/freeze.json", root, factory=fake_factory(version))
+    test_file = next(c for c in result["checks"] if c["check"] == "test_file")
+    assert result["status"] == "not_ready" and "symbolic links" in test_file["reason"]
+    with pytest.raises(ev.DataMismatchError, match="symbolic links"):
+        run(root, version)
+    assert not (root / "out").exists()
