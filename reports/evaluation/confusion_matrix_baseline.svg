@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="504" height="500" viewBox="0 0 504 500" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<title id="title">Confusion matrix: baseline, test 9324</title>
+<desc id="desc">Строки — истинный класс, столбцы — предсказанный. Цвет — доля строки.</desc>
+<rect width="504" height="500" fill="#ffffff"/>
+<text x="16" y="28" font-size="16" font-weight="600" fill="#1f1f1d">Confusion matrix: baseline, test 9324</text>
+<text x="315.0" y="58" font-size="13" fill="#5f5e5a" text-anchor="middle">Предсказанный класс</text>
+<text x="22" y="257.0" font-size="13" fill="#5f5e5a" text-anchor="middle" transform="rotate(-90 22 257.0)">Истинный класс</text>
+<text x="205.0" y="82" font-size="13" fill="#1f1f1d" text-anchor="middle">negative</text>
+<text x="315.0" y="82" font-size="13" fill="#1f1f1d" text-anchor="middle">neutral</text>
+<text x="425.0" y="82" font-size="13" fill="#1f1f1d" text-anchor="middle">positive</text>
+<text x="140" y="151.0" font-size="13" fill="#1f1f1d" text-anchor="end">negative</text>
+<g><title>истина negative, ответ negative: 2348 (89.7% строки)</title>
+<rect x="151.0" y="93.0" width="108" height="108" rx="4" fill="#104281"/>
+<text x="205.0" y="145.0" font-size="18" font-weight="600" fill="#ffffff" text-anchor="middle">2348</text>
+<text x="205.0" y="165.0" font-size="12" fill="#ffffff" text-anchor="middle">89.7%</text></g>
+<g><title>истина negative, ответ neutral: 149 (5.7% строки)</title>
+<rect x="261.0" y="93.0" width="108" height="108" rx="4" fill="#b7d3f6"/>
+<text x="315.0" y="145.0" font-size="18" font-weight="600" fill="#1f1f1d" text-anchor="middle">149</text>
+<text x="315.0" y="165.0" font-size="12" fill="#1f1f1d" text-anchor="middle">5.7%</text></g>
+<g><title>истина negative, ответ positive: 122 (4.7% строки)</title>
+<rect x="371.0" y="93.0" width="108" height="108" rx="4" fill="#b7d3f6"/>
+<text x="425.0" y="145.0" font-size="18" font-weight="600" fill="#1f1f1d" text-anchor="middle">122</text>
+<text x="425.0" y="165.0" font-size="12" fill="#1f1f1d" text-anchor="middle">4.7%</text></g>
+<text x="140" y="261.0" font-size="13" fill="#1f1f1d" text-anchor="end">neutral</text>
+<g><title>истина neutral, ответ negative: 110 (26.8% строки)</title>
+<rect x="151.0" y="203.0" width="108" height="108" rx="4" fill="#86b6ef"/>
+<text x="205.0" y="255.0" font-size="18" font-weight="600" fill="#1f1f1d" text-anchor="middle">110</text>
+<text x="205.0" y="275.0" font-size="12" fill="#1f1f1d" text-anchor="middle">26.8%</text></g>
+<g><title>истина neutral, ответ neutral: 182 (44.3% строки)</title>
+<rect x="261.0" y="203.0" width="108" height="108" rx="4" fill="#5598e7"/>
+<text x="315.0" y="255.0" font-size="18" font-weight="600" fill="#1f1f1d" text-anchor="middle">182</text>
+<text x="315.0" y="275.0" font-size="12" fill="#1f1f1d" text-anchor="middle">44.3%</text></g>
+<g><title>истина neutral, ответ positive: 119 (29.0% строки)</title>
+<rect x="371.0" y="203.0" width="108" height="108" rx="4" fill="#86b6ef"/>
+<text x="425.0" y="255.0" font-size="18" font-weight="600" fill="#1f1f1d" text-anchor="middle">119</text>
+<text x="425.0" y="275.0" font-size="12" fill="#1f1f1d" text-anchor="middle">29.0%</text></g>
+<text x="140" y="371.0" font-size="13" fill="#1f1f1d" text-anchor="end">positive</text>
+<g><title>истина positive, ответ negative: 246 (3.9% строки)</title>
+<rect x="151.0" y="313.0" width="108" height="108" rx="4" fill="#cde2fb"/>
+<text x="205.0" y="365.0" font-size="18" font-weight="600" fill="#1f1f1d" text-anchor="middle">246</text>
+<text x="205.0" y="385.0" font-size="12" fill="#1f1f1d" text-anchor="middle">3.9%</text></g>
+<g><title>истина positive, ответ neutral: 273 (4.3% строки)</title>
+<rect x="261.0" y="313.0" width="108" height="108" rx="4" fill="#b7d3f6"/>
+<text x="315.0" y="365.0" font-size="18" font-weight="600" fill="#1f1f1d" text-anchor="middle">273</text>
+<text x="315.0" y="385.0" font-size="12" fill="#1f1f1d" text-anchor="middle">4.3%</text></g>
+<g><title>истина positive, ответ positive: 5775 (91.8% строки)</title>
+<rect x="371.0" y="313.0" width="108" height="108" rx="4" fill="#104281"/>
+<text x="425.0" y="365.0" font-size="18" font-weight="600" fill="#ffffff" text-anchor="middle">5775</text>
+<text x="425.0" y="385.0" font-size="12" fill="#ffffff" text-anchor="middle">91.8%</text></g>
+<text x="16" y="480" font-size="12" fill="#5f5e5a">Число записей и доля строки; серый — 0. Таблица: соседний CSV.</text>
+</svg>
