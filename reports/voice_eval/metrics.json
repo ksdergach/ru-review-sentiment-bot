@@ -1,0 +1,324 @@
+{
+  "schema": "t14-voice-eval-summary/draft-1",
+  "task": "T14",
+  "protocol": {
+    "freeze_path": "reports/freeze.json",
+    "freeze_sha256": "318712255d2b7074d1e03a75f6a2d2792cc61bcc119d9ff74313128149b452cd",
+    "protocol_version": "t12/1",
+    "frozen_commit": "5f22d93a8cff63b30fc129bb68a1cfbd4230995d",
+    "classifier_backend": "baseline",
+    "classifier_model_sha256": "389a768bcd108721c79ebf3a7b9dc5212ec100f5c2e1b06cf519ed076cd9bee3",
+    "classifier_report_path": "reports/nlp/training/run_metadata.json",
+    "classifier_report_sha256": "1499b4f14572ebcbaf864b1e865add01e7472e26d7ae48e745d50ee72f531ad6",
+    "max_text_length": 2000,
+    "batch_size": 1,
+    "speech_config": {
+      "model": "Systran/faster-whisper-small",
+      "revision": "536b0662742c02347bc0e980a01041f333bce120",
+      "device": "cpu",
+      "compute_type": "int8",
+      "cpu_threads": 8,
+      "beam_size": 5,
+      "language": "ru",
+      "vad_filter": true,
+      "temperature": 0.0,
+      "condition_on_previous_text": true,
+      "cache_dir": ".cache/huggingface"
+    },
+    "speech_bundle_files": {
+      "config.json": {
+        "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828",
+        "bytes": 2370
+      },
+      "model.bin": {
+        "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671",
+        "bytes": 483546902
+      },
+      "tokenizer.json": {
+        "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+        "bytes": 2203239
+      },
+      "vocabulary.txt": {
+        "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+        "bytes": 459861
+      }
+    },
+    "t11_report_sha256": "a1fca980550bcd8ae20112b79a08ab2e577a8b47c03308a3df4b04ebf4a6dc63",
+    "t11_content_sha256": "4004319e4f5b728b7edb006a4ca717bfd5a16bfa864709d34ca8f0fe1943c8c6",
+    "normalization": "t12/1",
+    "asr_failure_wer_rule": "empty_hypothesis",
+    "warmup_audio_sha256": "d6a29c51a3e22a08dafcbfdd045769bd4c6481f982e9ec03b7f91f382a0fa530",
+    "runtime_environment_variables": {
+      "CLASSIFIER_BACKEND": "baseline",
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    }
+  },
+  "run": {
+    "git_commit": "a0e7a10e8e962bbb2bb2b437b9693c93234c96e9",
+    "model_setup_seconds": {
+      "classifier_load": 0.309774124994874,
+      "classifier_warmup": 0.005177958999411203,
+      "asr_load": 0.8003531669965014,
+      "asr_warmup": 3.3408151249968796
+    },
+    "asr_warmup_audio_sha256": "d6a29c51a3e22a08dafcbfdd045769bd4c6481f982e9ec03b7f91f382a0fa530",
+    "device": "cpu",
+    "environment": {
+      "versions": {
+        "python": "3.13.7",
+        "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+        "numpy": "2.3.3",
+        "pandas": "2.3.2",
+        "scikit-learn": "1.7.2",
+        "scipy": "1.15.3",
+        "joblib": "1.5.2",
+        "pyarrow": "24.0.0",
+        "faster-whisper": "1.2.1",
+        "ctranslate2": "4.8.2",
+        "av": "18.1.0",
+        "torch": "2.10.0",
+        "transformers": "5.5.0"
+      },
+      "system": "Darwin",
+      "release": "25.5.0",
+      "machine": "arm64",
+      "processor": "arm",
+      "cpu_count": 8
+    }
+  },
+  "results": {
+    "records": 36,
+    "record_ids": [
+      "voice_001",
+      "voice_002",
+      "voice_003",
+      "voice_004",
+      "voice_005",
+      "voice_006",
+      "voice_007",
+      "voice_008",
+      "voice_009",
+      "voice_010",
+      "voice_011",
+      "voice_012",
+      "voice_013",
+      "voice_014",
+      "voice_015",
+      "voice_016",
+      "voice_017",
+      "voice_018",
+      "voice_019",
+      "voice_020",
+      "voice_021",
+      "voice_022",
+      "voice_023",
+      "voice_024",
+      "voice_025",
+      "voice_026",
+      "voice_027",
+      "voice_028",
+      "voice_029",
+      "voice_030",
+      "voice_031",
+      "voice_032",
+      "voice_033",
+      "voice_034",
+      "voice_035",
+      "voice_036"
+    ],
+    "error_prediction": -1,
+    "reference": {
+      "macro_f1": 0.8298931342409603,
+      "accuracy": 0.8333333333333334,
+      "per_class": {
+        "negative": {
+          "precision": 0.8181818181818182,
+          "recall": 0.75,
+          "f1": 0.782608695652174,
+          "support": 12
+        },
+        "neutral": {
+          "precision": 0.9,
+          "recall": 0.75,
+          "f1": 0.8181818181818182,
+          "support": 12
+        },
+        "positive": {
+          "precision": 0.8,
+          "recall": 1.0,
+          "f1": 0.8888888888888888,
+          "support": 12
+        }
+      },
+      "confusion_matrix": {
+        "rows": [
+          "negative",
+          "neutral",
+          "positive"
+        ],
+        "columns": [
+          "negative",
+          "neutral",
+          "positive",
+          "error"
+        ],
+        "values": [
+          [
+            9,
+            1,
+            2,
+            0
+          ],
+          [
+            2,
+            9,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            12,
+            0
+          ]
+        ]
+      },
+      "records": 36,
+      "correct": 30,
+      "incorrect": 6,
+      "wrong_label": 6,
+      "no_prediction": 0
+    },
+    "asr": {
+      "macro_f1": 0.7018518518518518,
+      "accuracy": 0.7222222222222222,
+      "per_class": {
+        "negative": {
+          "precision": 0.75,
+          "recall": 0.75,
+          "f1": 0.75,
+          "support": 12
+        },
+        "neutral": {
+          "precision": 0.8333333333333334,
+          "recall": 0.4166666666666667,
+          "f1": 0.5555555555555556,
+          "support": 12
+        },
+        "positive": {
+          "precision": 0.6666666666666666,
+          "recall": 1.0,
+          "f1": 0.8,
+          "support": 12
+        }
+      },
+      "confusion_matrix": {
+        "rows": [
+          "negative",
+          "neutral",
+          "positive"
+        ],
+        "columns": [
+          "negative",
+          "neutral",
+          "positive",
+          "error"
+        ],
+        "values": [
+          [
+            9,
+            1,
+            2,
+            0
+          ],
+          [
+            3,
+            5,
+            4,
+            0
+          ],
+          [
+            0,
+            0,
+            12,
+            0
+          ]
+        ]
+      },
+      "records": 36,
+      "correct": 26,
+      "incorrect": 10,
+      "wrong_label": 10,
+      "no_prediction": 0
+    },
+    "delta_macro_f1": -0.1280412823891085,
+    "wer": {
+      "wer": 0.1569115815691158,
+      "substitutions": 106,
+      "deletions": 13,
+      "insertions": 7,
+      "reference_words": 803,
+      "word_errors": 126,
+      "records_counted": 36,
+      "asr_failures": 0,
+      "empty_transcripts": 0,
+      "asr_failure_rule": "empty_hypothesis"
+    },
+    "failures": {
+      "asr_status": {
+        "ok": 36,
+        "empty": 0,
+        "error": 0
+      },
+      "asr_error_codes": {},
+      "asr_error_record_ids": [],
+      "asr_empty_record_ids": [],
+      "reference_classifier_errors": 0,
+      "asr_classifier_errors": 0,
+      "classifier_error_kinds": {}
+    },
+    "timing": {
+      "asr_seconds": {
+        "count": 36,
+        "total": 153.2716709620072,
+        "mean": 4.257546415611311,
+        "median": 4.001935374999448,
+        "p95": 6.541643490247225
+      },
+      "reference_classifier_seconds": {
+        "count": 36,
+        "total": 0.048953209014143795,
+        "mean": 0.0013598113615039943,
+        "median": 0.001252812500752043,
+        "p95": 0.0019399689972487977
+      },
+      "asr_classifier_seconds": {
+        "count": 36,
+        "total": 0.0774830009759171,
+        "mean": 0.0021523055826643636,
+        "median": 0.001495145999797387,
+        "p95": 0.0043686455028364435
+      },
+      "total_seconds": {
+        "count": 36,
+        "total": 153.35407124701305,
+        "mean": 4.259835312417029,
+        "median": 4.003585729002225,
+        "p95": 6.549498510254125
+      }
+    }
+  },
+  "limitations": [
+    "Малый размер голосового теста: 36 записей, по 12 на класс.",
+    "Предметная область — только отзывы о фильмах.",
+    "Ограниченное число дикторов (4); записи — чтение подготовленных сценариев, не спонтанная речь.",
+    "Часть записей сделана с умеренным бытовым шумом.",
+    "Интонация и эмоциональные акустические признаки не анализируются: классифицируется только текст.",
+    "Результаты нельзя автоматически распространять на любые сообщения Telegram.",
+    "Время измерено локально, без сетевой задержки Telegram API."
+  ]
+}

@@ -264,6 +264,10 @@ python -m src.speech artifacts/audio/debug.ogg --allow-download --show-text
 после него `--allow-download` можно убрать. Контракт для бота, обработка пустой
 речи, ошибок и временных файлов описаны в [README_T08.md](README_T08.md).
 Состав финальных 36 голосовых отзывов и его проверка — [README_T11.md](README_T11.md).
+Оценка влияния Whisper на этих записях (T14) выполнена одним финальным запуском
+`tools/evaluate_voice.py` по утверждённой фиксации T12: macro-F1 0,8299 на эталонных
+транскрипциях и 0,7019 после Whisper, корпусный WER 0,1569. Результаты —
+[reports/voice_eval/](reports/voice_eval/report.md), методика — [README_T14.md](README_T14.md).
 
 ## Что хранится в Git
 
