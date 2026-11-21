@@ -1,0 +1,410 @@
+{
+  "bot_model": "baseline",
+  "bot_model_changed_by_test": false,
+  "bot_model_selected_by": "validation_and_resources",
+  "data_version": {
+    "t03_audit_sha256": "951b6d75d5de55e08f36e8811a532398247e1122e986ea2aed281df1f15f600d",
+    "t03_split_ids_sha256": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5",
+    "train_ids_sha256": "7736eac8949e4010fc2d80060c980d7e7476ee0f23178f68e99b8226e38e5bbf",
+    "train_rows": 76971,
+    "validation_ids_sha256": "2d251deec92fa7c178ab06e24be0770acd8c7946297c5474b86d540afbbaecb6",
+    "validation_rows": 10396
+  },
+  "environment": {
+    "libraries": {
+      "joblib": "1.5.2",
+      "numpy": "2.3.3",
+      "pandas": "2.3.2",
+      "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+      "pyarrow": "24.0.0",
+      "python": "3.13.7",
+      "scikit-learn": "1.7.2",
+      "scipy": "1.15.3"
+    },
+    "machine": {
+      "architecture": "arm64",
+      "cpu": "Apple M1",
+      "logical_cores": 8,
+      "os": "macOS",
+      "os_version": "26.5.2",
+      "physical_cores": 8,
+      "python": "3.13.7",
+      "ram_bytes": 17179869184
+    },
+    "runtime_environment_variables": {
+      "CLASSIFIER_BACKEND": "baseline",
+      "HF_HUB_OFFLINE": "1",
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "TRANSFORMERS_OFFLINE": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    },
+    "torch": "2.10.0",
+    "torch_num_threads": 2
+  },
+  "final_test_used": true,
+  "inference_protocol": {
+    "batch_size": 64,
+    "device": "cpu",
+    "inference": "whole test in original order, predict_batch per batch_size chunk; time.perf_counter",
+    "load": "bundle verification and loading via src.classifier, before the test is read",
+    "max_text_length": null,
+    "num_threads": 2,
+    "order": [
+      "baseline",
+      "rubert"
+    ],
+    "warmup": "one predict_batch call on 3 fixed non-test texts"
+  },
+  "labels": {
+    "negative": 0,
+    "neutral": 1,
+    "positive": 2
+  },
+  "models": {
+    "baseline": {
+      "metrics": {
+        "accuracy": 0.8907121407121407,
+        "confusion_matrix": [
+          [
+            2348,
+            149,
+            122
+          ],
+          [
+            110,
+            182,
+            119
+          ],
+          [
+            246,
+            273,
+            5775
+          ]
+        ],
+        "errors": {
+          "by_predicted_class": {
+            "negative": 356,
+            "neutral": 422,
+            "positive": 241
+          },
+          "by_true_class": {
+            "negative": 271,
+            "neutral": 229,
+            "positive": 519
+          },
+          "total": 1019
+        },
+        "macro_f1": 0.726363848696871,
+        "per_class": {
+          "negative": {
+            "f1": 0.8822092804809318,
+            "precision": 0.8683431952662722,
+            "recall": 0.8965253913707522,
+            "support": 2619
+          },
+          "neutral": {
+            "f1": 0.3586206896551724,
+            "precision": 0.30132450331125826,
+            "recall": 0.44282238442822386,
+            "support": 411
+          },
+          "positive": {
+            "f1": 0.9382615759545085,
+            "precision": 0.9599401595744681,
+            "recall": 0.9175405147759771,
+            "support": 6294
+          }
+        },
+        "predicted_counts": {
+          "negative": 2704,
+          "neutral": 604,
+          "positive": 6016
+        },
+        "rows": 9324
+      },
+      "model_path": "models/nlp_baseline/tfidf_logreg_baseline.joblib",
+      "report_path": "reports/nlp/training/run_metadata.json",
+      "report_sha256": "1499b4f14572ebcbaf864b1e865add01e7472e26d7ae48e745d50ee72f531ad6",
+      "timing": {
+        "batch_size": 64,
+        "batches": 146,
+        "inference_seconds": 0.5150787909988139,
+        "load_seconds": 0.4737122090009507,
+        "ms_per_text": 0.05524225557687837,
+        "rows": 9324,
+        "texts_per_second": 18102.08489058419,
+        "warmup_seconds": 0.006257291999645531,
+        "warmup_texts": 3
+      },
+      "truncated_rows": 0
+    },
+    "rubert": {
+      "metrics": {
+        "accuracy": 0.823037323037323,
+        "confusion_matrix": [
+          [
+            2169,
+            360,
+            90
+          ],
+          [
+            81,
+            277,
+            53
+          ],
+          [
+            267,
+            799,
+            5228
+          ]
+        ],
+        "errors": {
+          "by_predicted_class": {
+            "negative": 348,
+            "neutral": 1159,
+            "positive": 143
+          },
+          "by_true_class": {
+            "negative": 450,
+            "neutral": 134,
+            "positive": 1066
+          },
+          "total": 1650
+        },
+        "macro_f1": 0.6803095495824243,
+        "per_class": {
+          "negative": {
+            "f1": 0.844626168224299,
+            "precision": 0.8617401668653158,
+            "recall": 0.8281786941580757,
+            "support": 2619
+          },
+          "neutral": {
+            "f1": 0.2999458581483487,
+            "precision": 0.19289693593314763,
+            "recall": 0.6739659367396593,
+            "support": 411
+          },
+          "positive": {
+            "f1": 0.896356622374625,
+            "precision": 0.9733755352820703,
+            "recall": 0.8306323482681919,
+            "support": 6294
+          }
+        },
+        "predicted_counts": {
+          "negative": 2517,
+          "neutral": 1436,
+          "positive": 5371
+        },
+        "rows": 9324
+      },
+      "model_path": "models/transformer",
+      "report_path": "reports/transformer/run_metadata.json",
+      "report_sha256": "d5042a09380a79cb64585445704f55424aac091f0a2ba06d72383ed80cc31584",
+      "timing": {
+        "batch_size": 64,
+        "batches": 146,
+        "inference_seconds": 12.888819250001688,
+        "load_seconds": 1.8787448330003826,
+        "ms_per_text": 1.382327246889928,
+        "rows": 9324,
+        "texts_per_second": 723.4177017416687,
+        "warmup_seconds": 0.020623249998607207,
+        "warmup_texts": 3
+      },
+      "truncated_rows": 3152
+    }
+  },
+  "outputs": [
+    "reports/evaluation/final_metrics.json",
+    "reports/evaluation/final_table.csv",
+    "reports/evaluation/final_report.md",
+    "reports/evaluation/predictions.csv",
+    "reports/evaluation/confusion_matrix_baseline.csv",
+    "reports/evaluation/confusion_matrix_baseline.svg",
+    "reports/evaluation/confusion_matrix_rubert.csv",
+    "reports/evaluation/confusion_matrix_rubert.svg"
+  ],
+  "outputs_sha256": {
+    "confusion_matrix_baseline.csv": "258b487a97014117050c5e79f7cb00e271da1f40dc736081e950b2d65193da34",
+    "confusion_matrix_baseline.svg": "b716865aa46a72c70da7cd0f257ea081e66252310b01171cb953f2daaf772557",
+    "confusion_matrix_rubert.csv": "2f6f3539a229ae640d1bd25b1b1f2b8f033e8139c2f4cb77258d833050f96785",
+    "confusion_matrix_rubert.svg": "7dcbcd0ed381fa7592dc34f283dc28d98166278827818f8dd155ecb81900b022",
+    "final_report.md": "0102b75f58bad507c3a6409419cfad2aee63f0c170f48b9bb80adb8cfd469426",
+    "final_table.csv": "45f54434bd5e2a4860631d21bd30993655741c462980fe54cfc879894b73cf50",
+    "predictions.csv": "5454d40cc0e5869ca44bb3edd2efde7c95bd09fc40784b34b6bb03429d900568"
+  },
+  "repeat_sensitivity": {
+    "applied": true,
+    "groups": 7,
+    "models": {
+      "baseline": {
+        "accuracy": 0.890737361811742,
+        "confusion_matrix": [
+          [
+            2348,
+            149,
+            122
+          ],
+          [
+            110,
+            182,
+            119
+          ],
+          [
+            245,
+            273,
+            5769
+          ]
+        ],
+        "delta_accuracy": 2.5221099601346886e-05,
+        "delta_macro_f1": 6.060640976857101e-05,
+        "errors": {
+          "by_predicted_class": {
+            "negative": 355,
+            "neutral": 422,
+            "positive": 241
+          },
+          "by_true_class": {
+            "negative": 271,
+            "neutral": 229,
+            "positive": 518
+          },
+          "total": 1018
+        },
+        "macro_f1": 0.7264244551066396,
+        "per_class": {
+          "negative": {
+            "f1": 0.8823750469748215,
+            "precision": 0.8686644469108398,
+            "recall": 0.8965253913707522,
+            "support": 2619
+          },
+          "neutral": {
+            "f1": 0.3586206896551724,
+            "precision": 0.30132450331125826,
+            "recall": 0.44282238442822386,
+            "support": 411
+          },
+          "positive": {
+            "f1": 0.9382776286899244,
+            "precision": 0.959900166389351,
+            "recall": 0.9176077620486719,
+            "support": 6287
+          }
+        },
+        "predicted_counts": {
+          "negative": 2703,
+          "neutral": 604,
+          "positive": 6010
+        },
+        "rows": 9317
+      },
+      "rubert": {
+        "accuracy": 0.8231190297306,
+        "confusion_matrix": [
+          [
+            2169,
+            360,
+            90
+          ],
+          [
+            81,
+            277,
+            53
+          ],
+          [
+            267,
+            797,
+            5223
+          ]
+        ],
+        "delta_accuracy": 8.170669327700608e-05,
+        "delta_macro_f1": 0.00013001484727048762,
+        "errors": {
+          "by_predicted_class": {
+            "negative": 348,
+            "neutral": 1157,
+            "positive": 143
+          },
+          "by_true_class": {
+            "negative": 450,
+            "neutral": 134,
+            "positive": 1064
+          },
+          "total": 1648
+        },
+        "macro_f1": 0.6804395644296948,
+        "per_class": {
+          "negative": {
+            "f1": 0.844626168224299,
+            "precision": 0.8617401668653158,
+            "recall": 0.8281786941580757,
+            "support": 2619
+          },
+          "neutral": {
+            "f1": 0.3002710027100271,
+            "precision": 0.19316596931659694,
+            "recall": 0.6739659367396593,
+            "support": 411
+          },
+          "positive": {
+            "f1": 0.8964215223547585,
+            "precision": 0.9733507267983601,
+            "recall": 0.8307618896134882,
+            "support": 6287
+          }
+        },
+        "predicted_counts": {
+          "negative": 2517,
+          "neutral": 1434,
+          "positive": 5366
+        },
+        "rows": 9317
+      }
+    },
+    "rows": 9317,
+    "rows_dropped": 7,
+    "rows_in_groups": 14,
+    "rule": "keep_first_record_of_each_t03_repeat_group_in_test_order",
+    "t03_candidates_sha256": "cdb49c93191e4fb86018641f07c15d1c7e13fdefb2fce29da82881c481c10f34",
+    "t03_decisions_sha256": "0239a977b9d531ffb8f3926294fa94757bf62104ff54a8cd01705fa96aaead70"
+  },
+  "run": {
+    "approved_at": "2026-11-19",
+    "approved_by": [
+      "Координатор проекта — пользователь этой сессии"
+    ],
+    "argv": [
+      "python",
+      "-m",
+      "src.evaluate",
+      "--run-final",
+      "--freeze",
+      "reports/freeze.json",
+      "--out-dir",
+      "reports/evaluation"
+    ],
+    "command": "python -m src.evaluate --run-final --freeze reports/freeze.json --out-dir reports/evaluation",
+    "freeze_path": "reports/freeze.json",
+    "freeze_schema": "t13-final-text-eval-input/draft-1",
+    "freeze_sha256": "318712255d2b7074d1e03a75f6a2d2792cc61bcc119d9ff74313128149b452cd",
+    "frozen_commit": "5f22d93a8cff63b30fc129bb68a1cfbd4230995d",
+    "git_commit": "2b6f7d2d633844d6640ab068576457f08a226038",
+    "out_dir": "reports/evaluation",
+    "protocol_version": "t12/1",
+    "required_local_paths": [],
+    "runs": 1
+  },
+  "task": "T13",
+  "test": {
+    "ids_sha256": "2128997f2edf8ed5ec1b95665edb4062cc47d41da002064f7b7e68bbfbbd73eb",
+    "parquet_sha256": "5854f134883efdfa45987602c0e90b8f777fea7af4ec93b5d566875fa1e14ab1",
+    "path": "data/processed/test.parquet",
+    "rows": 9324,
+    "source_parquet_sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+    "split_ids_sha256": "cf19e14522af4f7621728a399e3d46fb83e6e8e72f9011a17313c6be8818d3f5"
+  }
+}
