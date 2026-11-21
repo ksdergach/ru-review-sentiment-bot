@@ -8,23 +8,29 @@
 Обе классификации идут через ``predict_batch`` общего интерфейса ``src.classifier``
 с одинаковым ``max_text_length``; распознавание — через ``src.speech.SpeechRecognizer``
 с параметрами из фиксации. Метрики классов считает ``validation_metrics`` из
-``src.train_baseline``; служебное предсказание ``error`` кодируется вне трёх классов,
-поэтому оно снижает recall истинного класса, но не входит в среднее F1.
+``src.train_baseline``; служебное предсказание ``error`` (-1 в протоколе T12) кодируется
+вне трёх классов, поэтому оно снижает recall истинного класса, но не входит в среднее F1.
 
-Финальный запуск возможен только по утверждённой фиксации T12. Её формат ещё не
-утверждён, поэтому реестры ``PROTOCOL_ADAPTERS`` и ``APPROVED_NORMALIZATIONS`` пусты
-и любой запуск отказывает до чтения приватных данных T11 и загрузки моделей::
+Источник истины — утверждённая фиксация T12 (``reports/freeze.json``, протокол
+``reports/freeze.md``, раздел «Голосовая оценка T14»). Принимается только её принятая
+версия; WER считается по утверждённой нормализации ``tools.report_nlp_data_quality.words``::
 
-    python -m src.evaluate_voice --freeze <фиксация T12> --check
-    python -m src.evaluate_voice --freeze <фиксация T12>
+    python tools/evaluate_voice.py --warmup-audio <запись T16> --check
+    python tools/evaluate_voice.py --warmup-audio <запись T16>
+
+Модуль лежит в ``tools/``, а не в ``src/``: проверка T13 запрещает в ``src/`` модули,
+не закреплённые фиксацией T12, кроме собственного оценщика T13.
 """
 
 from __future__ import annotations
 
 import argparse
 from collections import Counter
+import csv
 from dataclasses import dataclass, field, fields
+import hashlib
 import importlib.util
+import io
 import json
 import math
 import os
@@ -40,9 +46,13 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
-from src.classifier import ClassifierError, InvalidTextError, create_classifier
-from src.speech import SpeechConfig, SpeechRecognizer
-from src.train_baseline import (
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.classifier import ClassifierError, InvalidTextError, create_classifier  # noqa: E402
+from src.speech import SpeechConfig, SpeechRecognizer  # noqa: E402
+from src.train_baseline import (  # noqa: E402
     CLASS_IDS,
     CLASS_NAMES,
     EXPECTED_LABEL_MAPPING,
@@ -56,13 +66,15 @@ from src.train_baseline import (
     sha256_json,
     validation_metrics,
 )
+from tools.report_nlp_data_quality import words as t12_words  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR_PATH = ROOT / "tools" / "validate_voice_test.py"
+DEFAULT_FREEZE_PATH = ROOT / "reports" / "freeze.json"
 DEFAULT_PRIVATE_DIR = ROOT / "artifacts" / "t14"
 DEFAULT_PUBLIC_DIR = ROOT / "reports" / "voice_eval"
 PRIVATE_RECORDS_NAME = "records.json"
 PUBLIC_METRICS_NAME = "metrics.json"
+PUBLIC_PREDICTIONS_NAME = "predictions.csv"
 PUBLIC_REPORT_NAME = "report.md"
 
 LABELS = tuple(CLASS_NAMES)  # negative=0, neutral=1, positive=2
@@ -73,9 +85,8 @@ BACKENDS = ("baseline", "rubert")
 REFERENCE_STATUSES = ("ok", "classifier_error")
 ASR_STATUSES = ("ok", "empty", "error")  # SpeechResult.status
 ASR_CLASSIFICATION_STATUSES = ("ok", "classifier_error", "not_run")
-# Варианты численного учёта технического сбоя Whisper в WER. Какой из них
-# применяется, решает фиксация T12; значения по умолчанию нет.
-ASR_FAILURE_RULES = ("all_deletions", "excluded")
+# T12: пустой ответ и сбой Whisper — пустая гипотеза, все слова эталона — удаления.
+ASR_FAILURE_WER_RULE = "empty_hypothesis"
 
 RECORD_FIELDS = (
     "record_id", "true_label",
@@ -88,28 +99,57 @@ RECORD_FIELDS = (
 )
 # Только в приватном файле результатов; в публичные отчёты не попадает.
 PRIVATE_RECORD_FIELDS = ("asr_text",)
+# Построчный публичный файл по T12: ID, предсказания (0/1/2, -1), статусы, время.
+PUBLIC_RECORD_FIELDS = (
+    "record_id", "reference_prediction", "reference_status", "reference_error_kind",
+    "asr_status", "asr_error_code", "asr_prediction", "asr_classification_status",
+    "asr_classifier_error_kind", "asr_seconds", "reference_classifier_seconds",
+    "asr_classifier_seconds", "total_seconds",
+)
 TIMING_FIELDS = ("asr_seconds", "reference_classifier_seconds", "asr_classifier_seconds", "total_seconds")
 # Ключи, которые не должны встречаться в публичных отчётах ни в каком виде.
-FORBIDDEN_PUBLIC_KEYS = ("asr_text", "reference_text", "reference_transcript", "true_label",
-                         "reference_prediction", "asr_prediction")
+FORBIDDEN_PUBLIC_KEYS = ("asr_text", "reference_text", "reference_transcript", "true_label")
 MIN_GUARDED_WORDS = 3  # короче — совпадение со служебным текстом отчёта не является утечкой
 
 LIMITATIONS = (
     "Малый размер голосового теста: 36 записей, по 12 на класс.",
     "Предметная область — только отзывы о фильмах.",
-    "Ограниченное число дикторов (4).",
+    "Ограниченное число дикторов (4); записи — чтение подготовленных сценариев, не спонтанная речь.",
     "Часть записей сделана с умеренным бытовым шумом.",
     "Интонация и эмоциональные акустические признаки не анализируются: классифицируется только текст.",
     "Результаты нельзя автоматически распространять на любые сообщения Telegram.",
     "Время измерено локально, без сетевой задержки Telegram API.",
 )
 
-# Заполняются при интеграции с утверждённой фиксацией T12 (этап Б), не раньше.
-# PROTOCOL_ADAPTERS: schema фиксации -> функция, возвращающая поля EvaluationProtocol
-# (кроме freeze_path и freeze_sha256). APPROVED_NORMALIZATIONS: ID утверждённых правил
-# нормализации WER -> функция «текст -> список слов».
+# Утверждённая фиксация T12. Формат: ``draft-1`` — версия формата, не статус.
+FREEZE_SCHEMA = "t13-final-text-eval-input/draft-1"
+PROTOCOL_VERSION = "t12/1"
+# Принятая версия reports/freeze.json (master после PR46), та же, что у T13. Другая
+# фиксация требует нового согласования и правки этой суммы, а не подгонки.
+ACCEPTED_FREEZE_SHA256 = "318712255d2b7074d1e03a75f6a2d2792cc61bcc119d9ff74313128149b452cd"
+SPEECH_CONFIG_PATH = "configs/speech.json"
+VOICE_MODES = ("reference_text", "whisper_text")
+T12_NORMALIZATION = "t12/1"
+# Правила WER из voice_protocol.wer, которые реализует T14. Иные правила не применяются.
+T12_WER_RULES = {
+    "implementation": "tools.report_nlp_data_quality.words / word_error_rate",
+    "normalization": ["Unicode NFC", "casefold", "Unicode punctuation category P → space", "split whitespace"],
+    "yo_equals_ye": False,
+    "numbers": "literal",
+    "may_exceed_one": True,
+}
+# Входы T14, которые обязаны быть закреплены в file_sha256 фиксации.
+T14_PINNED_INPUTS = (
+    "requirements.txt", SPEECH_CONFIG_PATH, "src/speech.py", "src/classifier.py", "src/train_baseline.py",
+    "tools/validate_voice_test.py", "tools/report_nlp_data_quality.py",
+    "reports/voice_test/composition.json", "reports/voice_test/human_confirmation.json",
+)
+
+# schema фиксации -> функция, возвращающая поля EvaluationProtocol (кроме freeze_path и
+# freeze_sha256); ID утверждённой нормализации WER -> функция «текст -> список слов».
+# Заполняются ниже, после определения адаптера.
 PROTOCOL_ADAPTERS: dict[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] = {}
-APPROVED_NORMALIZATIONS: dict[str, Callable[[str], list[str]]] = {}
+APPROVED_NORMALIZATIONS: dict[str, Callable[[str], list[str]]] = {T12_NORMALIZATION: t12_words}
 
 
 class EvaluationError(Exception):
@@ -125,7 +165,7 @@ class DataMismatchError(EvaluationError):
 
 
 # --------------------------------------------------------------------------- #
-# Нормализация и WER
+# WER
 # --------------------------------------------------------------------------- #
 def _validator():
     """Штатный валидатор T11 (tools/ не пакет); загружается один раз и лениво."""
@@ -138,21 +178,12 @@ def _validator():
     return module
 
 
-def provisional_words(text: str) -> list[str]:
-    """Черновая токенизация для разработки: та же, что ``words`` валидатора T11
-    (нижний регистр, ё -> е, последовательности ``\\w+``).
-
-    Это НЕ утверждённая нормализация WER: правила числительных, дефисов и
-    пунктуации утверждает T12, и финальный запуск её не принимает.
-    """
-    return _validator().words(text)
-
-
 def wer_counts(reference: Sequence[str], hypothesis: Sequence[str]) -> tuple[int, int, int]:
     """(S, D, I) минимального выравнивания слов по Левенштейну.
 
-    Сумма S + D + I всегда равна расстоянию редактирования. Среди равноценных
-    выравниваний выбирается совпадение/замена, затем удаление, затем вставка.
+    Сумма S + D + I всегда равна расстоянию редактирования ``word_error_rate``
+    (``tools.report_nlp_data_quality``); здесь оно дополнительно разложено по видам.
+    Среди равноценных выравниваний выбирается совпадение/замена, затем удаление, затем вставка.
     """
     n, m = len(reference), len(hypothesis)
     cost = [[0] * (m + 1) for _ in range(n + 1)]
@@ -179,43 +210,29 @@ def wer_counts(reference: Sequence[str], hypothesis: Sequence[str]) -> tuple[int
     return substitutions, deletions, insertions
 
 
-def corpus_wer(records: Sequence[Mapping[str, Any]], failure_rule: str) -> dict[str, Any]:
-    """WER = (ΣS + ΣD + ΣI) / ΣN по всем учитываемым записям, не среднее по записям.
+def corpus_wer(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """WER = (ΣS + ΣD + ΣI) / ΣN по всем записям, не среднее по записям.
 
-    Пустая транскрипция уже записана как D = N. Для технического сбоя Whisper
-    (S/D/I не измерены) правило ``failure_rule`` из фиксации T12 решает:
-    ``all_deletions`` — D = N, ``excluded`` — запись не входит ни в числитель,
-    ни в знаменатель. В обоих случаях сбои считаются отдельно.
+    Пустой ответ и технический сбой Whisper уже записаны как пустая гипотеза
+    (D = N) и считаются ещё и отдельно. Может превышать 1.
     """
-    if failure_rule not in ASR_FAILURE_RULES:
-        raise ValueError(f"failure_rule must be one of {', '.join(ASR_FAILURE_RULES)}")
     totals = {"substitutions": 0, "deletions": 0, "insertions": 0, "reference_words": 0}
-    counted = failures = 0
     for record in records:
-        words = record["reference_word_count"]
-        if record["asr_status"] == "error":
-            failures += 1
-            if failure_rule == "excluded":
-                continue
-            s, d, i = 0, words, 0
-        else:
-            s, d, i = record["wer_substitutions"], record["wer_deletions"], record["wer_insertions"]
-        totals["substitutions"] += s
-        totals["deletions"] += d
-        totals["insertions"] += i
-        totals["reference_words"] += words
-        counted += 1
+        totals["substitutions"] += record["wer_substitutions"]
+        totals["deletions"] += record["wer_deletions"]
+        totals["insertions"] += record["wer_insertions"]
+        totals["reference_words"] += record["reference_word_count"]
     if totals["reference_words"] == 0:
-        raise DataMismatchError("Corpus WER is undefined: no reference words in counted records")
+        raise DataMismatchError("Corpus WER is undefined: no reference words")
     errors = totals["substitutions"] + totals["deletions"] + totals["insertions"]
     return {
         "wer": errors / totals["reference_words"],
         **totals,
         "word_errors": errors,
-        "records_counted": counted,
-        "asr_failures": failures,
-        "asr_failure_rule": failure_rule,
+        "records_counted": len(records),
+        "asr_failures": sum(r["asr_status"] == "error" for r in records),
         "empty_transcripts": sum(r["asr_status"] == "empty" for r in records),
+        "asr_failure_rule": ASR_FAILURE_WER_RULE,
     }
 
 
@@ -298,15 +315,12 @@ def _record_problem(record: Mapping[str, Any]) -> str | None:
         if not _is_seconds(record[key]):
             return key
     words = record["reference_word_count"]
-    if not _is_count(words):
+    if not _is_count(words) or words == 0:  # пустой эталон — ошибка предусловий T12
         return "reference_word_count"
     counts = [record[f"wer_{key}"] for key in ("substitutions", "deletions", "insertions")]
-    if status == "error":
-        if any(value is not None for value in counts):
-            return "wer_substitutions"
-    elif not all(_is_count(value) for value in counts) or counts[0] + counts[1] > words:
+    if not all(_is_count(value) for value in counts) or counts[0] + counts[1] > words:
         return "wer_substitutions"
-    elif status == "empty" and counts != [0, words, 0]:
+    if status != "ok" and counts != [0, words, 0]:  # пустая гипотеза
         return "wer_deletions"
     return None
 
@@ -365,8 +379,9 @@ def classify_text(classifier: Any, text: str, *, max_text_length: int | None,
                   clock: Callable[[], float] = time.perf_counter) -> ClassifierOutcome:
     """Один текст через общий ``predict_batch``; ошибка контракта -> служебный ``error``.
 
-    Отказ классификатора не превращается в какой-либо класс тональности.
-    Прочие исключения означают дефект и прерывают оценку.
+    Отказ классификатора (в том числе текст длиннее лимита — без скрытого усечения)
+    не превращается в какой-либо класс тональности. Прочие исключения означают
+    дефект и прерывают оценку.
     """
     start = clock()
     try:
@@ -382,9 +397,14 @@ def classify_text(classifier: Any, text: str, *, max_text_length: int | None,
 def evaluate_record(item: VoiceInput, *, recognizer: Any, classifier: Any,
                     tokenize: Callable[[str], list[str]], max_text_length: int | None,
                     clock: Callable[[], float] = time.perf_counter) -> dict[str, Any]:
-    """Оба режима для одной записи одним классификатором и одной предобработкой."""
+    """Оба режима для одной записи одним классификатором и одной предобработкой.
+
+    WER-нормализация ``tokenize`` применяется только к WER, не ко входу классификатора.
+    """
     reference = classify_text(classifier, item.reference_text, max_text_length=max_text_length, clock=clock)
     reference_words = tokenize(item.reference_text)
+    if not reference_words:
+        raise DataMismatchError(f"{item.record_id}: reference has no words after WER normalization")
 
     start = clock()
     speech = recognizer.transcribe(item.audio_path)
@@ -396,12 +416,8 @@ def evaluate_record(item: VoiceInput, *, recognizer: Any, classifier: Any,
         asr = ClassifierOutcome(ERROR, "not_run", None, None)
     total = clock() - start
 
-    if speech.status == "ok":
-        s, d, i = wer_counts(reference_words, tokenize(speech.text))
-    elif speech.status == "empty":
-        s, d, i = 0, len(reference_words), 0  # все слова эталона удалены
-    else:
-        s = d = i = None  # не измерено; учёт задаёт правило фиксации T12
+    # Пустой ответ и сбой Whisper — пустая гипотеза; сбой классификатора расшифровку не обнуляет.
+    s, d, i = wer_counts(reference_words, tokenize(speech.text) if speech.status == "ok" else [])
     return {
         "record_id": item.record_id,
         "true_label": item.true_label,
@@ -441,6 +457,7 @@ def evaluate_records(inputs: Sequence[VoiceInput], **kwargs: Any) -> list[dict[s
 # Агрегаты
 # --------------------------------------------------------------------------- #
 def timing_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Сумма, среднее, медиана и p95 (linear) каждого этапа по записям, где он выполнялся."""
     result = {}
     for key in TIMING_FIELDS:
         values = [float(r[key]) for r in records if r[key] is not None]
@@ -449,11 +466,12 @@ def timing_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "total": sum(values),
             "mean": statistics.fmean(values) if values else None,
             "median": statistics.median(values) if values else None,
+            "p95": float(np.percentile(values, 95, method="linear")) if values else None,
         }
     return result
 
 
-def summarize(records: Sequence[Mapping[str, Any]], *, failure_rule: str,
+def summarize(records: Sequence[Mapping[str, Any]], *,
               expected_ids: Sequence[str] | None = None) -> dict[str, Any]:
     """Метрики обоих режимов, ΔF1, корпусный WER, сбои и время — по всем записям."""
     validate_records(records, expected_ids)
@@ -467,10 +485,11 @@ def summarize(records: Sequence[Mapping[str, Any]], *, failure_rule: str,
     return {
         "records": len(records),
         "record_ids": [r["record_id"] for r in records],
+        "error_prediction": ERROR_ID,
         "reference": reference,
         "asr": asr,
         "delta_macro_f1": asr["macro_f1"] - reference["macro_f1"],
-        "wer": corpus_wer(records, failure_rule),
+        "wer": corpus_wer(records),
         "failures": {
             "asr_status": {status: sum(r["asr_status"] == status for r in records) for status in ASR_STATUSES},
             "asr_error_codes": dict(sorted(Counter(r["asr_error_code"] for r in records
@@ -487,16 +506,31 @@ def summarize(records: Sequence[Mapping[str, Any]], *, failure_rule: str,
     }
 
 
+def _public_label(value: str) -> int:
+    return ERROR_ID if value == ERROR else EXPECTED_LABEL_MAPPING[value]
+
+
+def public_predictions_csv(records: Sequence[Mapping[str, Any]]) -> str:
+    """Построчные ID, предсказания (0/1/2, -1), статусы и время — без текстов и эталонных меток."""
+    stream = io.StringIO()
+    writer = csv.writer(stream, lineterminator="\n")
+    writer.writerow(PUBLIC_RECORD_FIELDS)
+    for record in records:
+        writer.writerow([_public_label(record[key]) if key.endswith("_prediction")
+                         else "" if record[key] is None else record[key] for key in PUBLIC_RECORD_FIELDS])
+    return stream.getvalue()
+
+
 def assert_no_private_text(payloads: Iterable[str], private_texts: Iterable[str]) -> None:
-    """Публичные отчёты не содержат приватных текстов и полей отдельных записей.
+    """Публичные отчёты не содержат приватных текстов, эталонных меток и полей с текстами.
 
     Проверяются тексты от MIN_GUARDED_WORDS слов: одно-два слова могут совпасть
     со служебным текстом отчёта без утечки.
     """
     payloads = list(payloads)
-    for payload in payloads:
-        if any(f'"{key}"' in payload for key in FORBIDDEN_PUBLIC_KEYS):
-            raise EvaluationError("Public report contains a per-record private field; nothing written")
+    forbidden = re.compile(r"(?<!\w)(?:" + "|".join(FORBIDDEN_PUBLIC_KEYS) + r")(?!\w)")
+    if any(forbidden.search(payload) for payload in payloads):
+        raise EvaluationError("Public report contains a per-record private field; nothing written")
     for text in private_texts:
         text = " ".join(text.split())
         if len(text.split()) >= MIN_GUARDED_WORDS and any(text in " ".join(p.split()) for p in payloads):
@@ -512,18 +546,25 @@ def build_public_summary(records: Sequence[Mapping[str, Any]], *, protocol: Eval
         "protocol": {
             "freeze_path": protocol.freeze_path,
             "freeze_sha256": protocol.freeze_sha256,
+            "protocol_version": PROTOCOL_VERSION,
+            "frozen_commit": protocol.frozen_commit,
             "classifier_backend": protocol.classifier_backend,
+            "classifier_model_sha256": protocol.classifier_model_sha256,
             "classifier_report_path": protocol.classifier_report_path,
             "classifier_report_sha256": protocol.classifier_report_sha256,
             "max_text_length": protocol.max_text_length,
+            "batch_size": 1,
             "speech_config": dict(protocol.speech_config),
+            "speech_bundle_files": {name: dict(entry) for name, entry in protocol.speech_bundle_files.items()},
             "t11_report_sha256": protocol.t11_report_sha256,
             "t11_content_sha256": protocol.t11_content_sha256,
             "normalization": protocol.normalization,
-            "asr_failure_wer_rule": protocol.asr_failure_wer_rule,
+            "asr_failure_wer_rule": ASR_FAILURE_WER_RULE,
+            "warmup_audio_sha256": protocol.warmup_audio_sha256,
+            "runtime_environment_variables": dict(protocol.runtime_environment),
         },
         "run": dict(run),
-        "results": summarize(records, failure_rule=protocol.asr_failure_wer_rule, expected_ids=expected_ids),
+        "results": summarize(records, expected_ids=expected_ids),
         "limitations": list(LIMITATIONS),
     }
 
@@ -569,17 +610,17 @@ def render_report(summary: Mapping[str, Any]) -> str:
         "", "## Распознавание", "",
         f"Корпусный WER = (ΣS + ΣD + ΣI) / ΣN = ({wer['substitutions']} + {wer['deletions']} + "
         f"{wer['insertions']}) / {wer['reference_words']} = {_fmt(wer['wer'])}; "
-        f"нормализация `{protocol['normalization']}`, учёт сбоев `{wer['asr_failure_rule']}`.",
+        f"нормализация `{protocol['normalization']}`; пустой ответ и сбой Whisper — пустая гипотеза.",
         "",
         f"Whisper: ok {failures['asr_status']['ok']}, пустых {failures['asr_status']['empty']}, "
         f"технических сбоев {failures['asr_status']['error']}. Ошибок классификатора: "
         f"эталон {failures['reference_classifier_errors']}, Whisper {failures['asr_classifier_errors']}.",
         "", "## Время", "",
-        "| Этап | n | всего, s | среднее, s | медиана, s |", "|---|---|---|---|---|",
+        "| Этап | n | всего, s | среднее, s | медиана, s | p95, s |", "|---|---|---|---|---|---|",
     ]
     for key, stats in results["timing"].items():
         lines.append(f"| {key} | {stats['count']} | {_fmt(stats['total'], 3)} | {_fmt(stats['mean'], 3)} | "
-                     f"{_fmt(stats['median'], 3)} |")
+                     f"{_fmt(stats['median'], 3)} | {_fmt(stats['p95'], 3)} |")
     lines += ["", "Загрузка и прогрев моделей (вне основного прохода), s: "
               + ", ".join(f"{k} {_fmt(v, 3)}" for k, v in run.get("model_setup_seconds", {}).items()), "",
               "## Ограничения", ""]
@@ -591,6 +632,7 @@ def render_report(summary: Mapping[str, Any]) -> str:
 # Фиксация T12 и предусловия финального запуска
 # --------------------------------------------------------------------------- #
 _SHA256 = re.compile(r"[0-9a-f]{64}")
+_COMMIT = re.compile(r"[0-9a-f]{40}")
 
 
 @dataclass(frozen=True)
@@ -598,16 +640,27 @@ class EvaluationProtocol:
     """То, что T14 берёт из утверждённой фиксации T12 (через адаптер её формата)."""
     approved: bool
     classifier_backend: str
+    classifier_model_path: str
+    classifier_model_sha256: str
+    classifier_model_bytes: int
     classifier_report_path: str
     classifier_report_sha256: str
-    classifier_model_path: str | None
-    max_text_length: int | None
+    max_text_length: int
     speech_config_path: str
     speech_config: Mapping[str, Any]
+    speech_bundle_files: Mapping[str, Mapping[str, Any]]
     t11_report_sha256: str
     t11_content_sha256: str
+    t11_xlsx_sha256: str
+    record_ids: tuple[str, ...]
     normalization: str
-    asr_failure_wer_rule: str
+    warmup_audio_sha256: str
+    warmup_audio_bytes: int
+    frozen_commit: str
+    pinned_files: Mapping[str, str]
+    runtime_environment: Mapping[str, str]
+    packages: Mapping[str, str]
+    python_version: str
     freeze_path: str = ""
     freeze_sha256: str = ""
 
@@ -630,6 +683,75 @@ def _require(condition: bool, message: str) -> None:
         raise PreconditionError(message)
 
 
+def _section(data: Mapping[str, Any], key: str, name: str | None = None) -> Mapping[str, Any]:
+    value = data.get(key)
+    _require(isinstance(value, dict), f"T12 freeze has no {name or key} section")
+    return value
+
+
+def _expect(name: str, section: Mapping[str, Any], expected: Mapping[str, Any]) -> None:
+    differing = sorted(key for key, value in expected.items() if section.get(key) != value)
+    _require(not differing, f"T12 freeze {name} is not supported by T14: {', '.join(differing)}")
+
+
+def t12_protocol(data: Mapping[str, Any]) -> dict[str, Any]:
+    """Адаптер схемы ``t13-final-text-eval-input/draft-1``: поля голосовой оценки T14.
+
+    Отказывает, если правила фиксации отличаются от реализованных здесь.
+    """
+    backend = data.get("bot_model")
+    _expect("header", data, {"protocol_version": PROTOCOL_VERSION, "label_mapping": EXPECTED_LABEL_MAPPING})
+    _expect("confirmed_decisions", _section(data, "confirmed_decisions"), {"bot_model": backend})
+    voice = _section(data, "voice_protocol")
+    _expect("voice_protocol", voice, {"backend": backend, "modes": list(VOICE_MODES), "batch_size": 1,
+                                      "target_labels": list(CLASS_IDS), "error_prediction": ERROR_ID,
+                                      "zero_division": 0})
+    _expect("voice_protocol.wer", _section(voice, "wer", "voice_protocol.wer"), T12_WER_RULES)
+    warmup = _section(voice, "warmup", "voice_protocol.warmup")
+    _expect("voice_protocol.warmup", warmup, {"include_in_metrics": False})
+    _require(isinstance(backend, str), "T12 freeze has no bot_model")
+    model = _section(_section(data, "models"), backend, f"models.{backend}")
+    test = _section(data, "voice_test")
+    vt = _validator()
+    _expect("voice_test", test, {"rows": voice.get("records"),
+                                 "class_counts": {label: vt.EXPECTED_PER_CLASS for label in LABELS}})
+    _require(isinstance(test.get("record_ids"), list) and len(test["record_ids"]) == voice.get("records"),
+             "T12 freeze voice_test.record_ids must list every voice_protocol record")
+    _require(test.get("composition_path") == "reports/voice_test/composition.json",
+             "T12 freeze voice_test.composition_path must be the T11 composition report")
+    speech = _section(data, "speech")
+    environment = _section(data, "environment")
+    machine = environment.get("machine") if isinstance(environment.get("machine"), dict) else {}
+    return {
+        "approved": data.get("status") == "approved" and data.get("pending_approval") == [],
+        "classifier_backend": backend,
+        "classifier_model_path": model.get("model_path"),
+        "classifier_model_sha256": model.get("model_sha256"),
+        "classifier_model_bytes": model.get("bytes"),
+        "classifier_report_path": model.get("report_path"),
+        "classifier_report_sha256": model.get("report_sha256"),
+        "max_text_length": voice.get("max_text_length"),
+        "speech_config_path": SPEECH_CONFIG_PATH,
+        "speech_config": speech.get("config"),
+        "speech_bundle_files": speech.get("bundle_files"),
+        "t11_report_sha256": test.get("composition_sha256"),
+        "t11_content_sha256": test.get("content_sha256"),
+        "t11_xlsx_sha256": test.get("xlsx_sha256"),
+        "record_ids": tuple(test.get("record_ids") or ()),
+        "normalization": T12_NORMALIZATION,
+        "warmup_audio_sha256": warmup.get("audio_sha256"),
+        "warmup_audio_bytes": warmup.get("audio_bytes"),
+        "frozen_commit": data.get("frozen_commit"),
+        "pinned_files": data.get("file_sha256"),
+        "runtime_environment": data.get("runtime_environment_variables"),
+        "packages": environment.get("packages"),
+        "python_version": machine.get("python"),
+    }
+
+
+PROTOCOL_ADAPTERS[FREEZE_SCHEMA] = t12_protocol
+
+
 def _repo_path(root: Path, value: Any, name: str) -> Path:
     _require(isinstance(value, str) and bool(value.strip()), f"T12 protocol {name} must be a path")
     _require(not (PurePosixPath(value).is_absolute() or PureWindowsPath(value).drive
@@ -638,72 +760,180 @@ def _repo_path(root: Path, value: Any, name: str) -> Path:
     return root / value
 
 
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and bool(_SHA256.fullmatch(value))
+
+
+def _is_positive_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _is_str_map(value: Any) -> bool:
+    return isinstance(value, dict) and bool(value) and all(
+        isinstance(k, str) and isinstance(v, str) for k, v in value.items())
+
+
 def validate_protocol(protocol: EvaluationProtocol, root: Path,
                       normalizations: Mapping[str, Callable[[str], list[str]]]) -> None:
     _require(protocol.approved is True, "T12 freeze is not approved; the final voice test stays closed")
     _require(protocol.classifier_backend in BACKENDS, f"T12 protocol classifier_backend must be one of {BACKENDS}")
-    _repo_path(root, protocol.classifier_report_path, "classifier_report_path")
-    if protocol.classifier_model_path is not None:
-        _repo_path(root, protocol.classifier_model_path, "classifier_model_path")
-    _repo_path(root, protocol.speech_config_path, "speech_config_path")
-    limit = protocol.max_text_length
-    _require(limit is None or (isinstance(limit, int) and not isinstance(limit, bool) and limit > 0),
-             "T12 protocol max_text_length must be a positive integer or null")
-    for key in ("classifier_report_sha256", "t11_report_sha256", "t11_content_sha256"):
-        _require(isinstance(getattr(protocol, key), str) and bool(_SHA256.fullmatch(getattr(protocol, key))),
-                 f"T12 protocol {key} must be SHA-256")
+    for key in ("classifier_model_path", "classifier_report_path", "speech_config_path"):
+        _repo_path(root, getattr(protocol, key), key)
+    _require(_is_positive_int(protocol.max_text_length), "T12 protocol max_text_length must be a positive integer")
+    for key in ("classifier_model_sha256", "classifier_report_sha256", "t11_report_sha256",
+                "t11_content_sha256", "t11_xlsx_sha256", "warmup_audio_sha256"):
+        _require(_is_sha256(getattr(protocol, key)), f"T12 protocol {key} must be SHA-256")
+    for key in ("classifier_model_bytes", "warmup_audio_bytes"):
+        _require(_is_positive_int(getattr(protocol, key)), f"T12 protocol {key} must be a positive integer")
     try:
         SpeechConfig(**protocol.speech_config)
     except (TypeError, ValueError) as exc:
         raise PreconditionError(f"T12 protocol speech_config is invalid: {exc}") from None
+    bundle = protocol.speech_bundle_files
+    _require(isinstance(bundle, dict) and bool(bundle) and all(
+        isinstance(name, str) and "/" not in name and isinstance(entry, dict)
+        and _is_sha256(entry.get("sha256")) and _is_positive_int(entry.get("bytes"))
+        for name, entry in bundle.items()), "T12 protocol speech_bundle_files must list SHA-256 and bytes")
+    ids = protocol.record_ids
+    _require(bool(ids) and all(isinstance(i, str) and i for i in ids) and len(set(ids)) == len(ids),
+             "T12 protocol record_ids must be unique non-empty IDs")
     _require(protocol.normalization in normalizations,
              f"WER normalization {protocol.normalization!r} is not an approved T12 rule set")
-    _require(protocol.asr_failure_wer_rule in ASR_FAILURE_RULES,
-             f"T12 protocol asr_failure_wer_rule must be one of {ASR_FAILURE_RULES}")
+    _require(isinstance(protocol.frozen_commit, str) and bool(_COMMIT.fullmatch(protocol.frozen_commit)),
+             "T12 protocol frozen_commit must be a full commit SHA")
+    pinned = protocol.pinned_files
+    _require(_is_str_map(pinned) and all(_is_sha256(v) for v in pinned.values()),
+             "T12 protocol file_sha256 must map paths to SHA-256")
+    for rel in pinned:
+        _repo_path(root, rel, f"file_sha256[{rel!r}]")
+    required = (*T14_PINNED_INPUTS, protocol.classifier_report_path, protocol.speech_config_path)
+    missing = sorted({rel for rel in required if rel not in pinned})
+    _require(not missing, f"T14 inputs are not pinned in T12 file_sha256: {', '.join(missing)}")
+    _require(pinned[protocol.classifier_report_path] == protocol.classifier_report_sha256
+             and pinned["reports/voice_test/composition.json"] == protocol.t11_report_sha256,
+             "T12 protocol checksums are inconsistent within the freeze")
+    _require(_is_str_map(protocol.runtime_environment), "T12 protocol runtime_environment_variables are missing")
+    _require(_is_str_map(protocol.packages), "T12 protocol environment.packages are missing")
+    _require(isinstance(protocol.python_version, str) and bool(protocol.python_version),
+             "T12 protocol environment.machine.python is missing")
 
 
 def load_protocol(path: Path, *, root: Path = ROOT,
                   adapters: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] | None = None,
-                  normalizations: Mapping[str, Callable[[str], list[str]]] | None = None) -> EvaluationProtocol:
-    """Прочитать фиксацию T12 через адаптер её схемы; ничего больше не читается."""
+                  normalizations: Mapping[str, Callable[[str], list[str]]] | None = None,
+                  accepted_sha256: str = ACCEPTED_FREEZE_SHA256) -> EvaluationProtocol:
+    """Прочитать фиксацию T12 один раз через адаптер её схемы; ничего больше не читается."""
     adapters = PROTOCOL_ADAPTERS if adapters is None else adapters
     normalizations = APPROVED_NORMALIZATIONS if normalizations is None else normalizations
     shown = display_path(path, root)
     _require(path.is_file(), f"T12 freeze not found: {shown}; the final voice test stays closed")
     try:
-        data = read_json(path)
+        raw = path.read_bytes()
+        data = json.loads(raw.decode("utf-8-sig"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise PreconditionError(f"T12 freeze is not readable JSON ({type(exc).__name__})") from None
     schema = data.get("schema") if isinstance(data, dict) else None
     adapter = adapters.get(schema) if isinstance(schema, str) else None
-    _require(adapter is not None, f"No approved T12 protocol adapter for schema {schema!r}; "
-                                  "integration with the T12 freeze is pending")
+    _require(adapter is not None, f"No approved T12 protocol adapter for schema {schema!r}")
+    digest = hashlib.sha256(raw).hexdigest()  # сумма именно разобранных байтов
+    _require(digest == accepted_sha256, "T12 freeze differs from the accepted version of reports/freeze.json")
     try:
-        protocol = EvaluationProtocol(**dict(adapter(data)), freeze_path=shown, freeze_sha256=sha256_file(path))
-    except (TypeError, KeyError, ValueError) as exc:
+        protocol = EvaluationProtocol(**dict(adapter(data)), freeze_path=shown, freeze_sha256=digest)
+    except (TypeError, KeyError, ValueError, AttributeError) as exc:
         raise PreconditionError(f"T12 freeze does not provide the T14 protocol ({type(exc).__name__})") from None
     validate_protocol(protocol, root, normalizations)
     return protocol
 
 
-def git_state(root: Path) -> dict[str, Any]:
-    """Commit и наличие незакоммиченных изменений отслеживаемых файлов."""
-    def run(*args: str) -> str | None:
+def git_state(root: Path, frozen_commit: str) -> dict[str, Any]:
+    """Commit, незакоммиченные изменения отслеживаемых файлов, происхождение от frozen_commit
+    и наличие этого оценщика в Git: записанный commit должен содержать исполняемый код."""
+    def run(*args: str) -> subprocess.CompletedProcess[str] | None:
         try:
-            proc = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False)
+            return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False)
         except OSError:
             return None
-        return proc.stdout if proc.returncode == 0 else None
 
     commit = run("rev-parse", "HEAD")
     status = run("status", "--porcelain", "--untracked-files=no")
-    return {"commit": commit.strip() if commit else None, "dirty": None if status is None else bool(status.strip())}
+    ancestor = run("merge-base", "--is-ancestor", frozen_commit, "HEAD")
+    evaluator, base = Path(__file__).resolve(), root.resolve()
+    tracked = (run("ls-files", "--error-unmatch", "--", evaluator.relative_to(base).as_posix())
+               if evaluator.is_relative_to(base) else None)
+    ok = lambda proc: proc is not None and proc.returncode == 0  # noqa: E731
+    return {"commit": commit.stdout.strip() if ok(commit) else None,
+            "dirty": bool(status.stdout.strip()) or not ok(tracked) if ok(status) else None,
+            "frozen_commit_is_ancestor": ok(ancestor)}
+
+
+def check_environment(protocol: EvaluationProtocol, *, environ: Mapping[str, str] = os.environ,
+                      version: Callable[[str], str | None] = package_version,
+                      python: str | None = None) -> None:
+    """Переменные запуска, Python и версии пакетов совпадают с зафиксированной средой T12."""
+    python = platform.python_version() if python is None else python
+    problems = []
+    variables = sorted(name for name, value in protocol.runtime_environment.items() if environ.get(name) != value)
+    if variables:
+        problems.append(f"environment variables {', '.join(variables)}")
+    if python != protocol.python_version:
+        problems.append(f"Python {python} instead of {protocol.python_version}")
+    packages = sorted(name for name, value in protocol.packages.items() if version(name) != value)
+    if packages:
+        problems.append(f"package versions {', '.join(packages)}")
+    _require(not problems, "Measurement environment differs from the T12 freeze: " + "; ".join(problems))
+
+
+def check_pinned_files(protocol: EvaluationProtocol, root: Path) -> None:
+    """Все файлы file_sha256 фиксации T12 совпадают с рабочей копией."""
+    changed = sorted(rel for rel, digest in protocol.pinned_files.items()
+                     if not (root / rel).is_file() or sha256_file(root / rel) != digest)
+    _require(not changed, f"Frozen files differ from T12 or are missing: {', '.join(changed)}")
+
+
+def whisper_snapshot_dir(config: Mapping[str, Any], root: Path) -> Path:
+    """Каталог закреплённой revision в кэше Hugging Face, откуда грузит faster-whisper."""
+    return (root / config["cache_dir"] / f"models--{config['model'].replace('/', '--')}"
+            / "snapshots" / config["revision"])
+
+
+def check_model_bundles(protocol: EvaluationProtocol, root: Path) -> None:
+    """Файл baseline и все файлы Whisper совпадают с суммами фиксации до загрузки моделей."""
+    model = root / protocol.classifier_model_path
+    _require(model.is_file() and not model.is_symlink(),
+             f"Frozen classifier bundle not found: {protocol.classifier_model_path}")
+    _require(model.stat().st_size == protocol.classifier_model_bytes
+             and sha256_file(model) == protocol.classifier_model_sha256,
+             "Classifier bundle differs from the T12 freeze")
+    snapshot = whisper_snapshot_dir(protocol.speech_config, root)
+    _require(snapshot.is_dir(), "Frozen Whisper bundle not found in the local cache")
+    expected = protocol.speech_bundle_files
+    _require({p.name for p in snapshot.iterdir()} == set(expected), "Whisper bundle files differ from the T12 freeze")
+    changed = sorted(name for name, entry in expected.items()
+                     if not (snapshot / name).is_file() or (snapshot / name).stat().st_size != entry["bytes"]
+                     or sha256_file(snapshot / name) != entry["sha256"])
+    _require(not changed, f"Whisper bundle checksum differs from the T12 freeze: {', '.join(changed)}")
+
+
+def check_warmup_audio(protocol: EvaluationProtocol, path: Path | None,
+                       composition: Mapping[str, Any]) -> str:
+    """Обязательная отладочная запись T16 для прогрева Whisper; не из T11."""
+    _require(path is not None, "The T16 warm-up recording is required (--warmup-audio)")
+    _require(path.is_file(), "T16 warm-up recording not found")
+    digest = sha256_file(path)
+    _require(path.stat().st_size == protocol.warmup_audio_bytes and digest == protocol.warmup_audio_sha256,
+             "Warm-up audio differs from the T16 recording in the T12 freeze")
+    _require(digest not in {r.get("audio_sha256") for r in composition.get("records", [])},
+             "Warm-up audio must be outside the T11 set")
+    return digest
 
 
 def check_frozen_inputs(protocol: EvaluationProtocol, root: Path, *, composition_path: Path,
-                        private_dir: Path, git: Callable[[Path], Mapping[str, Any]] = git_state,
-                        is_ignored: Callable[[Path, Path], bool | None] = git_ignore_status) -> dict[str, Any]:
-    """Сверить публичные входы с фиксацией. Приватные данные T11 и модели не трогаются."""
+                        private_dir: Path, git: Callable[[Path, str], Mapping[str, Any]] = git_state,
+                        is_ignored: Callable[[Path, Path], bool | None] = git_ignore_status,
+                        environment_check: Callable[[EvaluationProtocol], None] = check_environment,
+                        ) -> dict[str, Any]:
+    """Сверить публичные входы и среду с фиксацией. Приватные данные T11 и модели не трогаются."""
+    check_pinned_files(protocol, root)
     report = _repo_path(root, protocol.classifier_report_path, "classifier_report_path")
     _require(report.is_file() and sha256_file(report) == protocol.classifier_report_sha256,
              "Classifier run report differs from the T12 freeze")
@@ -719,30 +949,37 @@ def check_frozen_inputs(protocol: EvaluationProtocol, root: Path, *, composition
     composition = read_json(composition_path)
     _require(isinstance(composition, dict) and composition.get("content_sha256") == protocol.t11_content_sha256,
              "T11 content_sha256 differs from the T12 freeze")
-    state = dict(git(root))
+    environment_check(protocol)
+    state = dict(git(root, protocol.frozen_commit))
     _require(isinstance(state.get("commit"), str) and state.get("dirty") is False,
-             "Final evaluation requires a git checkout without uncommitted changes to tracked files")
+             "Final evaluation requires a git checkout without uncommitted changes, "
+             "with this evaluator committed")
+    _require(state.get("frozen_commit_is_ancestor") is True,
+             "Evaluated code does not descend from the T12 frozen commit")
     _require(is_ignored(private_dir, root) is True,
              f"Private results directory {display_path(private_dir, root)} must be ignored by Git")
     return {"composition": composition, "git_commit": state["commit"]}
 
 
 def voice_inputs(manifest: Mapping[str, Any], composition: Mapping[str, Any], *,
-                 protocol: EvaluationProtocol, audio_dir: Path) -> list[VoiceInput]:
-    """Входы оценки из проверенного манифеста T11: все 36 ID, 12/12/12, суммы аудио."""
+                 protocol: EvaluationProtocol, audio_dir: Path,
+                 tokenize: Callable[[str], list[str]]) -> list[VoiceInput]:
+    """Входы оценки из проверенного манифеста T11: ID и порядок из T12, 12/12/12, суммы аудио."""
     vt = _validator()
-    expected_ids = [f"voice_{n:03d}" for n in range(1, vt.EXPECTED_RECORDS + 1)]
+    expected_ids = list(protocol.record_ids)
     if manifest.get("label_ids") != EXPECTED_LABEL_MAPPING:
         raise DataMismatchError("T11 label order differs from negative=0, neutral=1, positive=2")
     if not (manifest.get("content_sha256") == composition.get("content_sha256") == protocol.t11_content_sha256):
         raise DataMismatchError("T11 manifest content_sha256 differs from the frozen report")
+    if manifest.get("source_xlsx_sha256") != protocol.t11_xlsx_sha256:
+        raise DataMismatchError("T11 table SHA-256 differs from the T12 freeze")
     records = manifest.get("records")
     public = composition.get("records")
     if not isinstance(records, list) or not isinstance(public, list):
         raise DataMismatchError("T11 manifest or report has no record list")
     ids = [r.get("record_id") for r in records]
     if ids != expected_ids or [r.get("record_id") for r in public] != expected_ids:
-        raise DataMismatchError(f"T11 records must be exactly {expected_ids[0]}–{expected_ids[-1]} in order; "
+        raise DataMismatchError(f"T11 records must be exactly the {len(expected_ids)} T12 IDs in order; "
                                 f"manifest {len(ids)}, report {len(public)}")
     inputs = []
     for record, frozen in zip(records, public):
@@ -754,6 +991,8 @@ def voice_inputs(manifest: Mapping[str, Any], composition: Mapping[str, Any], *,
         text = record.get("reference_transcript")
         if not isinstance(text, str) or not text.strip():
             raise DataMismatchError(f"{record_id}: missing reference transcript")
+        if not tokenize(text):
+            raise DataMismatchError(f"{record_id}: reference has no words after WER normalization")
         inputs.append(VoiceInput(record_id, record["final_label"], text, audio_dir / f"{record_id}.ogg",
                                  record["audio_sha256"]))
     counts = Counter(item.true_label for item in inputs)
@@ -783,7 +1022,8 @@ def environment() -> dict[str, Any]:
     versions = library_versions()
     for name in ("faster-whisper", "ctranslate2", "av", "torch", "transformers"):
         versions[name] = package_version(name)
-    return {"versions": versions, "machine": platform.machine(), "processor": platform.processor() or None,
+    return {"versions": versions, "system": platform.system(), "release": platform.release(),
+            "machine": platform.machine(), "processor": platform.processor() or None,
             "cpu_count": os.cpu_count()}
 
 
@@ -794,8 +1034,8 @@ def _timed(clock: Callable[[], float], func: Callable[[], Any]) -> tuple[Any, fl
 
 
 def _default_classifier(protocol: EvaluationProtocol, root: Path) -> Any:
-    model = None if protocol.classifier_model_path is None else root / protocol.classifier_model_path
-    return create_classifier(protocol.classifier_backend, model, report_path=root / protocol.classifier_report_path)
+    return create_classifier(protocol.classifier_backend, root / protocol.classifier_model_path,
+                             report_path=root / protocol.classifier_report_path)
 
 
 def _default_recognizer(protocol: EvaluationProtocol, root: Path) -> Any:
@@ -813,46 +1053,55 @@ def _dump(value: Any) -> str:
 
 
 def run_final_evaluation(
-    freeze_path: Path, *, root: Path = ROOT, t11_paths: T11Paths | None = None,
+    freeze_path: Path = DEFAULT_FREEZE_PATH, *, root: Path = ROOT, t11_paths: T11Paths | None = None,
     private_dir: Path = DEFAULT_PRIVATE_DIR, public_dir: Path = DEFAULT_PUBLIC_DIR,
     warmup_audio: Path | None = None, check_only: bool = False,
     adapters: Mapping[str, Callable[[Mapping[str, Any]], Mapping[str, Any]]] | None = None,
     normalizations: Mapping[str, Callable[[str], list[str]]] | None = None,
+    accepted_freeze_sha256: str = ACCEPTED_FREEZE_SHA256,
     t11_verifier: Callable[[T11Paths], Mapping[str, Any]] = verify_t11,
     make_classifier: Callable[[EvaluationProtocol, Path], Any] = _default_classifier,
     make_recognizer: Callable[[EvaluationProtocol, Path], Any] = _default_recognizer,
-    git: Callable[[Path], Mapping[str, Any]] = git_state,
+    git: Callable[[Path, str], Mapping[str, Any]] = git_state,
     is_ignored: Callable[[Path, Path], bool | None] = git_ignore_status,
+    environment_check: Callable[[EvaluationProtocol], None] = check_environment,
     clock: Callable[[], float] = time.perf_counter,
 ) -> dict[str, Any]:
     """Финальная оценка T14. Порядок шагов обязателен:
 
-    1. фиксация T12 и публичные входы (без приватных данных и моделей);
+    1. фиксация T12, закреплённые файлы, среда, git, комплекты моделей и запись
+       прогрева T16 (без приватных данных T11 и без загрузки моделей);
     2. штатная проверка T11 и сверка 36 записей;
     3. загрузка и прогрев моделей отдельно от основного прохода;
     4. оба режима для всех записей, повторная проверка T11;
-    5. приватные построчные результаты и публичные агрегаты, без перезаписи.
+    5. приватные построчные результаты и публичные файлы, без перезаписи.
     """
     normalizations = APPROVED_NORMALIZATIONS if normalizations is None else normalizations
-    protocol = load_protocol(freeze_path, root=root, adapters=adapters, normalizations=normalizations)
+    protocol = load_protocol(freeze_path, root=root, adapters=adapters, normalizations=normalizations,
+                             accepted_sha256=accepted_freeze_sha256)
+    tokenize = normalizations[protocol.normalization]
     paths = t11_paths or T11Paths.defaults()
     frozen = check_frozen_inputs(protocol, root, composition_path=paths.report, private_dir=private_dir,
-                                 git=git, is_ignored=is_ignored)
-    targets = [private_dir / PRIVATE_RECORDS_NAME, public_dir / PUBLIC_METRICS_NAME, public_dir / PUBLIC_REPORT_NAME]
+                                 git=git, is_ignored=is_ignored, environment_check=environment_check)
+    check_model_bundles(protocol, root)
+    warmup_sha256 = check_warmup_audio(protocol, warmup_audio, frozen["composition"])
+    targets = [private_dir / PRIVATE_RECORDS_NAME, public_dir / PUBLIC_METRICS_NAME,
+               public_dir / PUBLIC_PREDICTIONS_NAME, public_dir / PUBLIC_REPORT_NAME]
     _require(not any(p.exists() for p in targets), "Final T14 results already exist; they are never replaced")
-    if warmup_audio is not None:
-        frozen_hashes = {r.get("audio_sha256") for r in frozen["composition"].get("records", [])}
-        _require(warmup_audio.is_file() and sha256_file(warmup_audio) not in frozen_hashes,
-                 "Warm-up audio must be an existing file outside the T11 set")
 
-    inputs = voice_inputs(t11_verifier(paths), frozen["composition"], protocol=protocol, audio_dir=paths.audio_dir)
+    def load_inputs() -> list[VoiceInput]:
+        return voice_inputs(t11_verifier(paths), frozen["composition"], protocol=protocol,
+                            audio_dir=paths.audio_dir, tokenize=tokenize)
+
+    inputs = load_inputs()
     expected_ids = [item.record_id for item in inputs]
     if check_only:
-        return {"status": "READY", "records": len(inputs), "freeze_sha256": protocol.freeze_sha256}
+        return {"status": "READY", "records": len(inputs), "freeze_sha256": protocol.freeze_sha256,
+                "warmup_audio_sha256": warmup_sha256}
 
     classifier = make_classifier(protocol, root)
     recognizer = make_recognizer(protocol, root)
-    setup: dict[str, float | None] = {}
+    setup: dict[str, float] = {}
     try:
         # Same eager load as the bot (src/bot.py::load_models).
         _, setup["classifier_load"] = _timed(clock, classifier._get_bundle)
@@ -861,44 +1110,40 @@ def run_final_evaluation(
         _, setup["asr_load"] = _timed(clock, recognizer.load)
     except Exception as exc:
         raise EvaluationError(f"Model setup failed: {_error_kind(exc)}") from exc
-    setup["asr_warmup"] = None
-    if warmup_audio is not None:
-        warm, setup["asr_warmup"] = _timed(clock, lambda: recognizer.transcribe(warmup_audio))
-        if warm.status == "error":
-            raise EvaluationError(f"Whisper warm-up failed: {warm.error_code}")
+    warm, setup["asr_warmup"] = _timed(clock, lambda: recognizer.transcribe(warmup_audio))
+    if warm.status != "ok":
+        raise EvaluationError(f"Whisper warm-up on the T16 recording failed: {warm.status} {warm.error_code}; "
+                              "no T11 record was processed")
 
-    records = evaluate_records(inputs, recognizer=recognizer, classifier=classifier,
-                               tokenize=normalizations[protocol.normalization],
+    records = evaluate_records(inputs, recognizer=recognizer, classifier=classifier, tokenize=tokenize,
                                max_text_length=protocol.max_text_length, clock=clock)
     # The set must be unchanged after predictions as well.
-    after = voice_inputs(t11_verifier(paths), frozen["composition"], protocol=protocol, audio_dir=paths.audio_dir)
-    if after != inputs:
+    if load_inputs() != inputs:
         raise DataMismatchError("T11 inputs changed during the evaluation; nothing written")
 
     run = {"git_commit": frozen["git_commit"], "model_setup_seconds": setup,
-           "asr_warmup_audio_sha256": None if warmup_audio is None else sha256_file(warmup_audio),
-           "device": protocol.speech_config["device"], "environment": environment()}
+           "asr_warmup_audio_sha256": warmup_sha256, "device": protocol.speech_config["device"],
+           "environment": environment()}
     summary = build_public_summary(records, protocol=protocol, run=run, expected_ids=expected_ids)
-    public_json, report = _dump(summary), render_report(summary)
-    assert_no_private_text([public_json, report],
+    public_json, predictions, report = _dump(summary), public_predictions_csv(records), render_report(summary)
+    assert_no_private_text([public_json, predictions, report],
                            [item.reference_text for item in inputs] + [r["asr_text"] for r in records])
     private = {"schema": "t14-voice-eval-records/draft-1", "freeze_sha256": protocol.freeze_sha256,
                "git_commit": frozen["git_commit"],
                "fields": [*RECORD_FIELDS, *PRIVATE_RECORD_FIELDS], "records": records}
-    _write_new(targets[0], _dump(private))
-    _write_new(targets[1], public_json)
-    _write_new(targets[2], report)
+    for target, text in zip(targets, (_dump(private), public_json, predictions, report)):
+        _write_new(target, text)
     return summary
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="T14: final Whisper impact evaluation on the T11 voice test")
-    parser.add_argument("--freeze", type=Path, required=True, help="approved T12 freeze")
+    parser.add_argument("--freeze", type=Path, default=DEFAULT_FREEZE_PATH, help="approved T12 freeze")
     parser.add_argument("--check", action="store_true",
                         help="verify preconditions and T11 only; no models are loaded")
     parser.add_argument("--private-dir", type=Path, default=DEFAULT_PRIVATE_DIR)
     parser.add_argument("--public-dir", type=Path, default=DEFAULT_PUBLIC_DIR)
-    parser.add_argument("--warmup-audio", type=Path, help="Whisper warm-up file outside T11")
+    parser.add_argument("--warmup-audio", type=Path, help="T16 debug recording pinned in the T12 freeze")
     parser.add_argument("--xlsx", type=Path)
     parser.add_argument("--audio-dir", type=Path)
     parser.add_argument("--manifest", type=Path)
