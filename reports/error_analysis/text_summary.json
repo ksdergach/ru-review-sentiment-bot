@@ -1,0 +1,146 @@
+{
+  "annotation": {
+    "analysis_date": "2026-11-21",
+    "annotations_sha256": "5bbcfe05e750daa6a45b88220cf4ba5188bd2309b2d36b14af07d04395bce7e2",
+    "author": "AI agent (draft for participant review)",
+    "cases_with_several_categories": 27,
+    "categories_by_direction": {
+      "negative->neutral": {
+        "cases": 7,
+        "context": 3,
+        "mixed": 3,
+        "neutral_confusion": 2,
+        "short": 1,
+        "unclear_label": 1
+      },
+      "negative->positive": {
+        "cases": 6,
+        "context": 2,
+        "mixed": 2,
+        "negation": 2,
+        "sarcasm": 2,
+        "short": 1,
+        "unclear_label": 2
+      },
+      "neutral->negative": {
+        "cases": 7,
+        "context": 3,
+        "mixed": 5,
+        "negation": 1,
+        "neutral_confusion": 4
+      },
+      "neutral->positive": {
+        "cases": 7,
+        "context": 4,
+        "mixed": 4,
+        "negation": 2,
+        "neutral_confusion": 4,
+        "unclear_label": 1
+      },
+      "positive->negative": {
+        "cases": 6,
+        "context": 1,
+        "mixed": 5,
+        "negation": 2,
+        "unclear_label": 3,
+        "unknown": 1
+      },
+      "positive->neutral": {
+        "cases": 7,
+        "context": 3,
+        "mixed": 2,
+        "sarcasm": 1,
+        "short": 1,
+        "unclear_label": 4
+      }
+    },
+    "category_counts": {
+      "context": 16,
+      "mixed": 21,
+      "negation": 7,
+      "neutral_confusion": 10,
+      "sarcasm": 3,
+      "short": 3,
+      "unclear_label": 11,
+      "unknown": 1
+    },
+    "confidence_counts": {
+      "high": 5,
+      "low": 3,
+      "medium": 32
+    },
+    "human_review_status": "pending"
+  },
+  "errors": {
+    "by_direction": {
+      "negative->neutral": 149,
+      "negative->positive": 122,
+      "neutral->negative": 110,
+      "neutral->positive": 119,
+      "positive->negative": 246,
+      "positive->neutral": 273
+    },
+    "by_predicted_class": {
+      "negative": 356,
+      "neutral": 422,
+      "positive": 241
+    },
+    "by_true_class": {
+      "negative": 271,
+      "neutral": 229,
+      "positive": 519
+    },
+    "involving_neutral": 651,
+    "total": 1019
+  },
+  "final_test_used_for_tuning": false,
+  "inference_run": false,
+  "model": "baseline",
+  "selection": {
+    "direction_order": [
+      "negative->neutral",
+      "positive->neutral",
+      "neutral->negative",
+      "neutral->positive",
+      "negative->positive",
+      "positive->negative"
+    ],
+    "representative_of_error_causes": false,
+    "requested_size": 40,
+    "rule": "round-robin over six confusion directions in the listed order; inside a direction ascending SHA-256('<seed>:<record_id>'), ties by record_id; all errors if fewer than size",
+    "seed": 42,
+    "selected": {
+      "by_direction": {
+        "negative->neutral": 7,
+        "negative->positive": 6,
+        "neutral->negative": 7,
+        "neutral->positive": 7,
+        "positive->negative": 6,
+        "positive->neutral": 7
+      },
+      "by_predicted_class": {
+        "negative": 13,
+        "neutral": 14,
+        "positive": 13
+      },
+      "by_true_class": {
+        "negative": 13,
+        "neutral": 14,
+        "positive": 13
+      },
+      "involving_neutral": 28,
+      "total": 40
+    },
+    "selected_ids_sha256": "4b20f4619c878faaed1721c863ae043ae6da431739092cf8b7d166bbbcad0ca8",
+    "selected_size": 40
+  },
+  "source": {
+    "final_metrics": "reports/evaluation/final_metrics.json",
+    "predictions": "reports/evaluation/predictions.csv",
+    "predictions_sha256": "5454d40cc0e5869ca44bb3edd2efde7c95bd09fc40784b34b6bb03429d900568",
+    "source_parquet_sha256": "c5ca9a8ddf21995cc33bab64b4d8467af632a86dcda95f26a4557548ae03bf1f",
+    "test_ids_sha256": "2128997f2edf8ed5ec1b95665edb4062cc47d41da002064f7b7e68bbfbbd73eb",
+    "test_rows": 9324
+  },
+  "task": "T15"
+}
