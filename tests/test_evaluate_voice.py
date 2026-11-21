@@ -343,9 +343,93 @@ def test_timing_is_per_stage_and_excludes_model_loading(five_cases):
     # [1, 2, 4, 1.5, 1.5]: p95 linear = 2 + 0.8 * (4 - 2) = 3.6
     assert timing["asr_seconds"] == {"count": 5, "total": 10.0, "mean": 2.0, "median": 1.5,
                                      "p95": pytest.approx(3.6)}
-    assert timing["asr_classifier_seconds"]["count"] == 3
     assert timing["total_seconds"]["total"] == pytest.approx(10.0 + 3 * 0.25)
     assert five_cases["classifier"].loads == 0 and five_cases["recognizer"].loads == 0
+
+
+def test_timing_main_aggregates_cover_all_records_in_mixed_set(five_cases):
+    timing = ev.timing_summary(five_cases["records"])
+    # Все этапы — по всем 5 записям; r2 (пустой ASR) и r3 (сбой) дают 0 классификации ASR:
+    # [0.25, 0, 0, 0.25, 0.25] -> median 0.25, p95 linear 0.25.
+    assert {key: stats["count"] for key, stats in timing.items()} == dict.fromkeys(ev.TIMING_FIELDS, 5)
+    assert timing["asr_classifier_seconds"] == {
+        "count": 5, "total": pytest.approx(0.75), "mean": pytest.approx(0.15), "median": 0.25,
+        "p95": pytest.approx(0.25),
+        "executed_calls": {"count": 3, "total": pytest.approx(0.75), "mean": pytest.approx(0.25),
+                           "median": 0.25, "p95": pytest.approx(0.25)}}
+    # Сбой классификатора (r4, r5) — время до отказа, этап выполнен; прочие этапы выполнены везде.
+    assert all("executed_calls" not in timing[key] for key in ev.TIMING_FIELDS if key != "asr_classifier_seconds")
+    # Построчно невыполненный этап остаётся пустым со статусом not_run.
+    by_id = {r["record_id"]: r for r in five_cases["records"]}
+    assert [(by_id[rid]["asr_classification_status"], by_id[rid]["asr_classifier_seconds"])
+            for rid in ("r2", "r3")] == [("not_run", None), ("not_run", None)]
+
+
+def render_for(results):
+    """Отчёт по синтетической сводке с минимальными сведениями о фиксации и запуске."""
+    protocol = {"classifier_backend": "baseline", "speech_config": {"model": "m", "revision": "r"},
+                "freeze_path": "reports/freeze.json", "freeze_sha256": "0" * 64,
+                "t11_content_sha256": "1" * 64, "normalization": "t12/1"}
+    return ev.render_report({"results": results, "protocol": protocol, "limitations": [],
+                             "run": {"git_commit": "c", "model_setup_seconds": {}}})
+
+
+def timing_record(record_id, asr_status, asr_seconds, asr_classifier_seconds):
+    failed = asr_status != "ok"
+    return valid_record(
+        record_id=record_id, asr_status=asr_status, asr_error_code="decode_failed" if asr_status == "error" else None,
+        asr_prediction="error" if failed else "positive",
+        asr_classification_status="not_run" if failed else "ok",
+        wer_substitutions=0 if failed else 1, wer_deletions=3 if failed else 0,
+        asr_seconds=asr_seconds, reference_classifier_seconds=0.1,
+        asr_classifier_seconds=asr_classifier_seconds,
+        total_seconds=asr_seconds + (asr_classifier_seconds or 0.0))
+
+
+@pytest.mark.parametrize("asr_status", ["empty", "error"])
+def test_timing_with_only_unexecuted_asr_classification(asr_status):
+    # Все записи — пустой ASR или технический сбой: классификация ASR не выполнялась ни разу.
+    records = [timing_record(f"syn_{n}", asr_status, seconds, None) for n, seconds in enumerate((2.0, 3.0, 7.0))]
+    timing = ev.timing_summary(records)
+    assert timing["asr_classifier_seconds"] == {
+        "count": 3, "total": 0.0, "mean": 0.0, "median": 0.0, "p95": 0.0,
+        "executed_calls": {"count": 0, "total": 0, "mean": None, "median": None, "p95": None}}
+    # Время ASR до пустого ответа или отказа учитывается: [2, 3, 7] -> p95 = 3 + 0.9 * 4 = 6.6
+    assert timing["asr_seconds"] == {"count": 3, "total": 12.0, "mean": 4.0, "median": 3.0,
+                                     "p95": pytest.approx(6.6)}
+    assert timing["total_seconds"]["count"] == 3 and timing["total_seconds"]["total"] == 12.0
+    assert "executed_calls" not in timing["asr_seconds"]
+
+
+def test_timing_mixed_set_zero_contributions_and_report_rows():
+    records = [timing_record("ok_1", "ok", 1.0, 0.2), timing_record("empty_1", "empty", 2.0, None),
+               timing_record("error_1", "error", 4.0, None), timing_record("ok_2", "ok", 3.0, 0.4)]
+    timing = ev.timing_summary(records)
+    # [0.2, 0, 0, 0.4]: median 0.1, p95 linear = 0.2 + 0.85 * 0.2 = 0.37
+    main = timing["asr_classifier_seconds"]
+    assert (main["count"], main["total"], main["mean"], main["median"], main["p95"]) == (
+        4, pytest.approx(0.6), pytest.approx(0.15), pytest.approx(0.1), pytest.approx(0.37))
+    executed = main["executed_calls"]
+    assert (executed["count"], executed["median"], executed["p95"]) == (
+        2, pytest.approx(0.3), pytest.approx(0.39))
+    assert timing["total_seconds"]["total"] == pytest.approx(10.6)
+
+    summary = ev.summarize(records)
+    assert summary["timing"] == timing
+    lines = render_for(summary).splitlines()
+    assert "| asr_classifier_seconds | 4 | 0.600 | 0.150 | 0.100 | 0.370 |" in lines
+    assert "| asr_classifier_seconds, только выполненные вызовы | 2 | 0.600 | 0.300 | 0.300 | 0.390 |" in lines
+    assert any("нулевым временем" in line for line in lines)
+
+
+def test_timing_all_successful_keeps_previous_shape():
+    records = [timing_record(f"syn_{n}", "ok", 1.0 + n, 0.1 * (n + 1)) for n in range(3)]
+    timing = ev.timing_summary(records)
+    assert all(set(stats) == {"count", "total", "mean", "median", "p95"} for stats in timing.values())
+    assert timing["asr_classifier_seconds"]["count"] == 3
+    assert timing["asr_classifier_seconds"]["median"] == pytest.approx(0.2)
+    report = render_for(ev.summarize(records))
+    assert "только выполненные вызовы" not in report and "нулевым временем" not in report
 
 
 def test_unexpected_classifier_exception_is_not_masked(tmp_path):
@@ -432,7 +516,7 @@ def test_validate_records_requires_complete_matching_ids():
 
 def test_public_guard_rejects_private_text_and_record_fields():
     texts = ["отличный фильм с хорошим финалом"]
-    ev.assert_no_private_text(['{"wer": 0.1}', "Фильм", "record_id,reference_prediction,asr_prediction\n"], texts)
+    ev.assert_no_private_text(['{"wer": 0.1}', "Фильм", "record_id,reference_status,asr_status\n"], texts)
     with pytest.raises(ev.EvaluationError, match="private transcript"):
         ev.assert_no_private_text(["примечание: отличный  фильм с\nхорошим финалом"], texts)
     with pytest.raises(ev.EvaluationError, match="per-record"):
@@ -444,14 +528,41 @@ def test_public_guard_rejects_private_text_and_record_fields():
 def test_public_predictions_use_t12_ids_and_no_texts(five_cases):
     rows = list(csv.DictReader(io.StringIO(ev.public_predictions_csv(five_cases["records"]))))
     assert list(rows[0]) == list(ev.PUBLIC_RECORD_FIELDS)
-    assert "true_label" not in rows[0] and "asr_text" not in rows[0]
+    # Вариант В1: ни эталонных меток, ни текстов, ни индивидуальных предсказаний.
+    assert not {"true_label", "asr_text", "reference_prediction", "asr_prediction"} & set(rows[0])
+    assert [row["record_id"] for row in rows] == ["r1", "r2", "r3", "r4", "r5"]
     by_id = {row["record_id"]: row for row in rows}
-    # positive = 2, negative = 0, служебная ошибка = -1
-    assert (by_id["r1"]["reference_prediction"], by_id["r1"]["asr_prediction"]) == ("2", "2")
-    assert (by_id["r3"]["asr_status"], by_id["r3"]["asr_error_code"], by_id["r3"]["asr_prediction"]) == (
-        "error", "decode_failed", "-1")
-    assert (by_id["r4"]["reference_prediction"], by_id["r4"]["reference_error_kind"]) == ("-1", "ClassifierError")
-    assert by_id["r3"]["asr_classifier_seconds"] == ""
+    # Статусы, коды ошибок и время сохраняются.
+    assert (by_id["r2"]["asr_status"], by_id["r2"]["asr_classification_status"]) == ("empty", "not_run")
+    assert (by_id["r3"]["asr_status"], by_id["r3"]["asr_error_code"]) == ("error", "decode_failed")
+    assert (by_id["r4"]["reference_status"], by_id["r4"]["reference_error_kind"]) == (
+        "classifier_error", "ClassifierError")
+    assert by_id["r5"]["asr_classifier_error_kind"] == "TextTooLongError"
+    assert by_id["r3"]["asr_classifier_seconds"] == "" and float(by_id["r1"]["total_seconds"]) == 1.25
+
+
+def test_public_guard_rejects_withheld_prediction_columns():
+    with pytest.raises(ev.EvaluationError, match="per-record"):
+        ev.assert_no_private_text(["record_id,reference_prediction\nvoice_001,1\n"], [])
+    with pytest.raises(ev.EvaluationError, match="per-record"):
+        ev.assert_no_private_text(["record_id,asr_status,asr_prediction\n"], [])
+
+
+ORIGINAL_HEADER = ",".join(ev.ORIGINAL_PUBLIC_RECORD_FIELDS)
+
+
+def test_redaction_only_drops_prediction_columns():
+    original = (ORIGINAL_HEADER + "\n"
+                "a,2,ok,,ok,,2,ok,,1.5,0.001,0.002,1.502\n"
+                "b,-1,classifier_error,ClassifierError,error,decode_failed,-1,not_run,,4.0,0.003,,4.0\n")
+    assert ev.redact_public_predictions_csv(original) == (
+        ",".join(ev.PUBLIC_RECORD_FIELDS) + "\n"
+        "a,ok,,ok,,ok,,1.5,0.001,0.002,1.502\n"
+        "b,classifier_error,ClassifierError,error,decode_failed,not_run,,4.0,0.003,,4.0\n")
+    with pytest.raises(ev.DataMismatchError, match="original T14 format"):
+        ev.redact_public_predictions_csv(",".join(ev.PUBLIC_RECORD_FIELDS) + "\n")
+    with pytest.raises(ev.DataMismatchError, match="width"):
+        ev.redact_public_predictions_csv(ORIGINAL_HEADER + "\na,2\n")
 
 
 # --------------------------------------------------------------------------- #
@@ -697,14 +808,111 @@ def test_final_run_produces_private_records_and_public_results(repo):
     for key in ("true_label", "asr_text", "reference_prediction", "asr_prediction"):
         assert key not in public
     rows = list(csv.DictReader(io.StringIO(predictions)))
-    assert [row["record_id"] for row in rows] == IDS and "true_label" not in rows[0]
-    assert (rows[4]["asr_status"], rows[4]["asr_prediction"]) == ("error", "-1")
+    assert [row["record_id"] for row in rows] == IDS and list(rows[0]) == list(ev.PUBLIC_RECORD_FIELDS)
+    assert (rows[4]["asr_status"], rows[4]["asr_classification_status"]) == ("error", "not_run")
+    # Приватные результаты по-прежнему полны: метки и предсказания обоих режимов.
+    assert {"true_label", "reference_prediction", "asr_prediction", "asr_text"} <= set(private["fields"])
+    assert private["records"][4]["asr_prediction"] == "error"
     assert "Малый размер голосового теста" in report and "ΔF1" in report and "p95" in report
     assert json.loads(public)["protocol"]["normalization"] == "t12/1"
 
     # Повторный запуск не заменяет результаты.
     with pytest.raises(ev.PreconditionError, match="never replaced"):
         ev.run_final_evaluation(repo["freeze"], **repo["kwargs"])
+
+
+def test_final_run_blocks_public_files_when_a_failure_reveals_a_label(repo):
+    # Единственный сбой Whisper (voice_005, positive): столбец error матрицы ASR занят одной
+    # строкой, поэтому публичный статус сбоя раскрыл бы эталонную метку этой записи.
+    repo["recognizer"].results["voice_006.ogg"] = ("ok", "искусственный отзыв номер 6 для проверка", None, 1.0)
+    with pytest.raises(ev.PublicationBlockedError, match=r"label of 1 record\(s\)") as caught:
+        ev.run_final_evaluation(repo["freeze"], **repo["kwargs"])
+    assert "voice_" not in str(caught.value)  # без ID и меток
+    public_dir = repo["root"] / "reports/voice_eval"
+    assert not any((public_dir / name).exists() for name in (
+        ev.PUBLIC_METRICS_NAME, ev.PUBLIC_PREDICTIONS_NAME, ev.PUBLIC_REPORT_NAME))
+    # Приватные результаты единственного прогона сохранены целиком; сбой не скрыт и запись не исключена.
+    private = json.loads((repo["root"] / "artifacts/t14/records.json").read_text(encoding="utf-8"))
+    assert [r["record_id"] for r in private["records"]] == IDS
+    assert (private["records"][4]["asr_status"], private["records"][4]["asr_prediction"]) == ("error", "error")
+    # Повторный запуск не обходит блокировку.
+    with pytest.raises(ev.PreconditionError, match="never replaced"):
+        ev.run_final_evaluation(repo["freeze"], **repo["kwargs"])
+
+
+def test_cli_reports_blocked_publication(monkeypatch, capsys):
+    def blocked(*args, **kwargs):
+        raise ev.PublicationBlockedError("Public results would reveal the reference label of 1 record(s)")
+
+    monkeypatch.setattr(ev, "run_final_evaluation", blocked)
+    assert ev.main([]) == 3
+    assert "BLOCKED: Public results would reveal" in capsys.readouterr().err
+
+
+def public_results(ref_values, asr_values, failures=None):
+    columns = [*ev.LABELS, ev.ERROR]
+    return {mode: {"confusion_matrix": {"rows": list(ev.LABELS), "columns": columns, "values": values}}
+            for mode, values in (("reference", ref_values), ("asr", asr_values))} | {
+        "failures": {"asr_error_record_ids": [], "asr_empty_record_ids": [], **(failures or {})}}
+
+
+def public_row(record_id, reference_status="ok", asr_status="ok", asr_classification_status="ok"):
+    return {"record_id": record_id, "reference_status": reference_status, "asr_status": asr_status,
+            "asr_classification_status": asr_classification_status}
+
+
+def public_csv(rows, fields=ev.PUBLIC_RECORD_FIELDS):
+    stream = io.StringIO()
+    writer = csv.DictWriter(stream, fields, restval="", lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    return stream.getvalue()
+
+
+def test_disclosure_check_detects_original_format_mechanism():
+    # a — negative, b — neutral; эталон верно даёт negative обоим, ASR путает b с positive.
+    # Пара предсказаний по ID плюс две матрицы однозначно дают обе метки.
+    rows = [{**public_row("a"), "reference_prediction": "0", "asr_prediction": "0"},
+            {**public_row("b"), "reference_prediction": "0", "asr_prediction": "2"}]
+    results = public_results([[1, 0, 0, 0], [1, 0, 0, 0], [0, 0, 0, 0]],
+                             [[1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 0]])
+    assert ev.disclosed_record_ids(results, public_csv(rows, ev.ORIGINAL_PUBLIC_RECORD_FIELDS)) == ["a", "b"]
+    # Те же агрегаты в варианте В1: обе записи неразличимы.
+    assert ev.disclosed_record_ids(results, public_csv([public_row("a"), public_row("b")])) == []
+
+
+@pytest.mark.parametrize("rows, failures, ref, asr, expected", [
+    # технический сбой Whisper, столбец error занят одной строкой
+    ([public_row("a"), public_row("b", asr_status="error", asr_classification_status="not_run")],
+     {"asr_error_record_ids": ["b"]},
+     [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0]], [[1, 0, 0, 0], [0, 0, 0, 1], [0, 0, 0, 0]], ["a", "b"]),
+    # пустой ответ Whisper известен только из списка ID в metrics.json
+    ([public_row("a"), public_row("b"), public_row("c")], {"asr_empty_record_ids": ["c"]},
+     [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]], ["c"]),
+    # сбой классификатора на эталоне
+    ([public_row("a", reference_status="classifier_error"), public_row("b"), public_row("c")], {},
+     [[0, 0, 0, 1], [0, 1, 0, 0], [0, 0, 1, 0]], [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], ["a"]),
+    # два сбоя в разных классах и два успеха в тех же классах: ни одна метка не однозначна
+    ([public_row("a"), public_row("b", asr_status="error", asr_classification_status="not_run"),
+      public_row("c", asr_status="empty", asr_classification_status="not_run"), public_row("d")], {},
+     [[2, 0, 0, 0], [0, 0, 0, 0], [0, 0, 2, 0]], [[1, 0, 0, 1], [0, 0, 0, 0], [0, 0, 1, 1]], []),
+])
+def test_disclosure_check_on_failure_statuses(rows, failures, ref, asr, expected):
+    predictions = public_csv(rows)
+    results = public_results(ref, asr, failures)
+    assert ev.disclosed_record_ids(results, predictions) == expected
+    if expected:
+        with pytest.raises(ev.PublicationBlockedError, match=f"label of {len(expected)} record"):
+            ev.assert_no_label_disclosure(results, predictions)
+    else:
+        ev.assert_no_label_disclosure(results, predictions)
+
+
+def test_disclosure_check_rejects_files_inconsistent_with_matrices():
+    rows = [public_row("a", asr_status="error", asr_classification_status="not_run")]
+    with pytest.raises(ev.DataMismatchError, match="contradict"):
+        ev.disclosed_record_ids(public_results([[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+                                               [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]), public_csv(rows))
 
 
 def test_check_mode_stops_before_models(repo):

@@ -44,6 +44,7 @@ import time
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 import numpy as np
+from scipy.optimize import Bounds, LinearConstraint, milp
 from sklearn.metrics import confusion_matrix
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,16 +100,21 @@ RECORD_FIELDS = (
 )
 # Только в приватном файле результатов; в публичные отчёты не попадает.
 PRIVATE_RECORD_FIELDS = ("asr_text",)
-# Построчный публичный файл по T12: ID, предсказания (0/1/2, -1), статусы, время.
-PUBLIC_RECORD_FIELDS = (
+# Первоначальный построчный публичный формат T12, п. 8: ID, предсказания (0/1/2, -1), статусы, время.
+# Вместе с двумя точными матрицами ошибок он раскрывал эталонные метки части записей.
+ORIGINAL_PUBLIC_RECORD_FIELDS = (
     "record_id", "reference_prediction", "reference_status", "reference_error_kind",
     "asr_status", "asr_error_code", "asr_prediction", "asr_classification_status",
     "asr_classifier_error_kind", "asr_seconds", "reference_classifier_seconds",
     "asr_classifier_seconds", "total_seconds",
 )
+# Утверждённое исключение В1 из T12, п. 8: индивидуальные предсказания только в приватных результатах.
+WITHHELD_PUBLIC_FIELDS = ("reference_prediction", "asr_prediction")
+PUBLIC_RECORD_FIELDS = tuple(key for key in ORIGINAL_PUBLIC_RECORD_FIELDS if key not in WITHHELD_PUBLIC_FIELDS)
 TIMING_FIELDS = ("asr_seconds", "reference_classifier_seconds", "asr_classifier_seconds", "total_seconds")
 # Ключи, которые не должны встречаться в публичных отчётах ни в каком виде.
-FORBIDDEN_PUBLIC_KEYS = ("asr_text", "reference_text", "reference_transcript", "true_label")
+FORBIDDEN_PUBLIC_KEYS = ("asr_text", "reference_text", "reference_transcript", "true_label",
+                         *WITHHELD_PUBLIC_FIELDS)
 MIN_GUARDED_WORDS = 3  # короче — совпадение со служебным текстом отчёта не является утечкой
 
 LIMITATIONS = (
@@ -162,6 +168,10 @@ class PreconditionError(EvaluationError):
 
 class DataMismatchError(EvaluationError):
     """Входные данные или результаты неполны или противоречивы."""
+
+
+class PublicationBlockedError(EvaluationError):
+    """Публичное представление раскрыло бы эталонную метку записи; нужно решение координатора."""
 
 
 # --------------------------------------------------------------------------- #
@@ -456,18 +466,29 @@ def evaluate_records(inputs: Sequence[VoiceInput], **kwargs: Any) -> list[dict[s
 # --------------------------------------------------------------------------- #
 # Агрегаты
 # --------------------------------------------------------------------------- #
+def _timing_stats(values: Sequence[float]) -> dict[str, Any]:
+    return {
+        "count": len(values),
+        "total": sum(values),
+        "mean": statistics.fmean(values) if values else None,
+        "median": statistics.median(values) if values else None,
+        "p95": float(np.percentile(values, 95, method="linear")) if values else None,
+    }
+
+
 def timing_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Сумма, среднее, медиана и p95 (linear) каждого этапа по записям, где он выполнялся."""
+    """Сумма, среднее, медиана и p95 (linear) каждого этапа по всем записям (T12, п. 7).
+
+    Невыполненный этап (``None``, статус записи ``not_run``) входит в основную сводку
+    с нулевым временем. Если такие записи есть, этап дополнительно описывается
+    отдельной подписанной статистикой ``executed_calls`` — только по выполненным вызовам.
+    """
     result = {}
     for key in TIMING_FIELDS:
-        values = [float(r[key]) for r in records if r[key] is not None]
-        result[key] = {
-            "count": len(values),
-            "total": sum(values),
-            "mean": statistics.fmean(values) if values else None,
-            "median": statistics.median(values) if values else None,
-            "p95": float(np.percentile(values, 95, method="linear")) if values else None,
-        }
+        executed = [float(r[key]) for r in records if r[key] is not None]
+        result[key] = _timing_stats([0.0 if r[key] is None else float(r[key]) for r in records])
+        if len(executed) != len(records):
+            result[key]["executed_calls"] = _timing_stats(executed)
     return result
 
 
@@ -506,19 +527,136 @@ def summarize(records: Sequence[Mapping[str, Any]], *,
     }
 
 
-def _public_label(value: str) -> int:
-    return ERROR_ID if value == ERROR else EXPECTED_LABEL_MAPPING[value]
-
-
 def public_predictions_csv(records: Sequence[Mapping[str, Any]]) -> str:
-    """Построчные ID, предсказания (0/1/2, -1), статусы и время — без текстов и эталонных меток."""
+    """Построчные ID, статусы, коды ошибок и время (вариант В1).
+
+    Имя ``predictions.csv`` сохранено для совместимости; индивидуальные предсказания,
+    тексты и эталонные метки остаются только в приватных результатах.
+    """
     stream = io.StringIO()
     writer = csv.writer(stream, lineterminator="\n")
     writer.writerow(PUBLIC_RECORD_FIELDS)
     for record in records:
-        writer.writerow([_public_label(record[key]) if key.endswith("_prediction")
-                         else "" if record[key] is None else record[key] for key in PUBLIC_RECORD_FIELDS])
+        writer.writerow(["" if record[key] is None else record[key] for key in PUBLIC_RECORD_FIELDS])
     return stream.getvalue()
+
+
+def redact_public_predictions_csv(original: str) -> str:
+    """Публичный CSV первоначального формата -> вариант В1: только удаление столбцов предсказаний.
+
+    Остальные значения, порядок строк и столбцов переносятся без изменений; инференса нет.
+    """
+    rows = list(csv.reader(io.StringIO(original)))
+    if not rows or tuple(rows[0]) != ORIGINAL_PUBLIC_RECORD_FIELDS:
+        raise DataMismatchError("Not a public predictions CSV in the original T14 format")
+    if any(len(row) != len(ORIGINAL_PUBLIC_RECORD_FIELDS) for row in rows):
+        raise DataMismatchError("Public predictions CSV has rows of unexpected width")
+    keep = [index for index, key in enumerate(rows[0]) if key not in WITHHELD_PUBLIC_FIELDS]
+    stream = io.StringIO()
+    csv.writer(stream, lineterminator="\n").writerows([row[i] for i in keep] for row in rows)
+    return stream.getvalue()
+
+
+# --------------------------------------------------------------------------- #
+# Защита от восстановления эталонных меток по публичным файлам
+# --------------------------------------------------------------------------- #
+_PUBLIC_PREDICTION_IDS = {str(value): label for label, value in EXPECTED_LABEL_MAPPING.items()} | {
+    str(ERROR_ID): ERROR}
+_UNKNOWN_CLASS = None  # вызов успешен, класс не опубликован
+
+
+def _public_observation(row: Mapping[str, str], mode: str, failed_asr: set[str]) -> str | None:
+    """Что публично известно о предсказании режима для записи: класс, ``error`` или неизвестный класс."""
+    value = row.get(f"{mode}_prediction")
+    if value not in (None, ""):
+        if value not in _PUBLIC_PREDICTION_IDS:
+            raise DataMismatchError(f"Unexpected public {mode}_prediction")
+        return _PUBLIC_PREDICTION_IDS[value]
+    ok = (row["reference_status"] == "ok" if mode == "reference" else
+          row["asr_classification_status"] == "ok" and row["record_id"] not in failed_asr)
+    return _UNKNOWN_CLASS if ok else ERROR
+
+
+def public_label_candidates(results: Mapping[str, Any],
+                            rows: Sequence[Mapping[str, str]]) -> dict[str, set[str]]:
+    """Эталонные метки каждой записи, совместимые со всеми публичными данными.
+
+    Противник знает обе матрицы ошибок 3×4 (с ними согласованы классовые метрики
+    и численность классов), построчные поля публичного CSV и списки ID сбоев.
+    Каждая запись рассматривается отдельно: построчное время делает записи
+    различимыми, но ни один публичный агрегат времени не разбит по классам.
+    Совместимость проверяется целочисленной программой (``scipy.optimize.milp``).
+    """
+    failures = results["failures"]
+    failed_asr = set(failures["asr_error_record_ids"]) | set(failures["asr_empty_record_ids"])
+    ids = [row["record_id"] for row in rows]
+    observed = {mode: [_public_observation(row, mode, failed_asr) for row in rows] for mode in ("reference", "asr")}
+    n_vars = len(rows) * len(LABELS)
+
+    def var(i: int, t: int) -> int:
+        return i * len(LABELS) + t
+
+    matrix_rows, lower, upper = [], [], []
+
+    def constrain(indices: Iterable[int], low: float, high: float) -> None:
+        coefficients = np.zeros(n_vars)
+        coefficients[list(indices)] = 1
+        matrix_rows.append(coefficients), lower.append(low), upper.append(high)
+
+    for i in range(len(rows)):
+        constrain([var(i, t) for t in range(len(LABELS))], 1, 1)
+    for mode in ("reference", "asr"):
+        cm = results[mode]["confusion_matrix"]
+        if list(cm["rows"]) != list(LABELS) or list(cm["columns"]) != [*LABELS, ERROR]:
+            raise DataMismatchError(f"Unexpected {mode} confusion matrix layout")
+        for t, values in enumerate(cm["values"]):
+            cells = dict(zip(cm["columns"], values))
+            for column in cm["columns"]:
+                members = [var(i, t) for i, o in enumerate(observed[mode]) if o == column]
+                # Ошибка всегда видна по статусу; класс успешного вызова может быть скрыт.
+                constrain(members, cells[column] if column == ERROR else 0, cells[column])
+            constrain([var(i, t) for i, o in enumerate(observed[mode]) if o != ERROR],
+                      sum(values) - cells[ERROR], sum(values) - cells[ERROR])
+    constraints = LinearConstraint(np.array(matrix_rows), lower, upper)
+
+    def solve(i: int | None = None, t: int | None = None) -> np.ndarray | None:
+        low = np.zeros(n_vars)
+        if i is not None:
+            low[var(i, t)] = 1
+        result = milp(np.zeros(n_vars), constraints=constraints, integrality=np.ones(n_vars),
+                      bounds=Bounds(low, np.ones(n_vars)))
+        return np.rint(result.x).astype(int) if result.status == 0 else None
+
+    possible: set[tuple[int, int]] = set()
+
+    def add(solution: np.ndarray) -> None:
+        possible.update((i, t) for i in range(len(rows)) for t in range(len(LABELS)) if solution[var(i, t)])
+
+    if (base := solve()) is None:
+        raise DataMismatchError("Public per-record fields contradict the published confusion matrices")
+    add(base)
+    for i in range(len(rows)):
+        for t in range(len(LABELS)):
+            if (i, t) not in possible and (solution := solve(i, t)) is not None:
+                add(solution)
+    return {rid: {LABELS[t] for t in range(len(LABELS)) if (i, t) in possible} for i, rid in enumerate(ids)}
+
+
+def disclosed_record_ids(results: Mapping[str, Any], predictions_csv: str) -> list[str]:
+    """ID, эталонная метка которых однозначно следует из публичной сводки и CSV."""
+    rows = list(csv.DictReader(io.StringIO(predictions_csv)))
+    return [rid for rid, labels in public_label_candidates(results, rows).items() if len(labels) == 1]
+
+
+def assert_no_label_disclosure(results: Mapping[str, Any], predictions_csv: str) -> None:
+    """Публикация блокируется, если сочетание публичных файлов раскрывает метку хотя бы одной записи.
+
+    Сообщение содержит только число записей, без ID и меток.
+    """
+    if disclosed := disclosed_record_ids(results, predictions_csv):
+        raise PublicationBlockedError(
+            f"Public results would reveal the reference label of {len(disclosed)} record(s); public files "
+            "not written, private records kept; a separate coordinator decision is required")
 
 
 def assert_no_private_text(payloads: Iterable[str], private_texts: Iterable[str]) -> None:
@@ -619,8 +757,14 @@ def render_report(summary: Mapping[str, Any]) -> str:
         "| Этап | n | всего, s | среднее, s | медиана, s | p95, s |", "|---|---|---|---|---|---|",
     ]
     for key, stats in results["timing"].items():
-        lines.append(f"| {key} | {stats['count']} | {_fmt(stats['total'], 3)} | {_fmt(stats['mean'], 3)} | "
-                     f"{_fmt(stats['median'], 3)} | {_fmt(stats['p95'], 3)} |")
+        rows = [(key, stats)]
+        if "executed_calls" in stats:
+            rows.append((f"{key}, только выполненные вызовы", stats["executed_calls"]))
+        lines += [f"| {name} | {s['count']} | {_fmt(s['total'], 3)} | {_fmt(s['mean'], 3)} | "
+                  f"{_fmt(s['median'], 3)} | {_fmt(s['p95'], 3)} |" for name, s in rows]
+    if any("executed_calls" in stats for stats in results["timing"].values()):
+        lines += ["", "Основные строки — по всем записям; невыполненный этап (`not_run`) учтён с нулевым "
+                  "временем. Строки «только выполненные вызовы» — отдельная статистика."]
     lines += ["", "Загрузка и прогрев моделей (вне основного прохода), s: "
               + ", ".join(f"{k} {_fmt(v, 3)}" for k, v in run.get("model_setup_seconds", {}).items()), "",
               "## Ограничения", ""]
@@ -1074,7 +1218,9 @@ def run_final_evaluation(
     2. штатная проверка T11 и сверка 36 записей;
     3. загрузка и прогрев моделей отдельно от основного прохода;
     4. оба режима для всех записей, повторная проверка T11;
-    5. приватные построчные результаты и публичные файлы, без перезаписи.
+    5. приватные построчные результаты, затем публичные файлы, без перезаписи; если
+       публичное представление раскрывает эталонную метку записи, публичные файлы
+       не пишутся (``PublicationBlockedError``, код 3).
     """
     normalizations = APPROVED_NORMALIZATIONS if normalizations is None else normalizations
     protocol = load_protocol(freeze_path, root=root, adapters=adapters, normalizations=normalizations,
@@ -1131,7 +1277,10 @@ def run_final_evaluation(
     private = {"schema": "t14-voice-eval-records/draft-1", "freeze_sha256": protocol.freeze_sha256,
                "git_commit": frozen["git_commit"],
                "fields": [*RECORD_FIELDS, *PRIVATE_RECORD_FIELDS], "records": records}
-    for target, text in zip(targets, (_dump(private), public_json, predictions, report)):
+    # Сначала приватные результаты единственного прогона: блокировка публикации их не теряет.
+    _write_new(targets[0], _dump(private))
+    assert_no_label_disclosure(summary["results"], predictions)
+    for target, text in zip(targets[1:], (public_json, predictions, report)):
         _write_new(target, text)
     return summary
 
@@ -1162,6 +1311,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (PreconditionError, DataMismatchError) as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return 2
+    except PublicationBlockedError as exc:
+        print(f"BLOCKED: {exc}", file=sys.stderr)
+        return 3
     except EvaluationError as exc:
         print(f"FAILED: {exc}", file=sys.stderr)
         return 1
