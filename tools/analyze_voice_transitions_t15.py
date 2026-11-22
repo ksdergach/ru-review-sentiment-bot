@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 import hashlib
+import itertools
 import json
 import math
 import re
@@ -46,7 +47,7 @@ TRANSITIONS = ("stayed_correct", "worsened", "improved", "stayed_wrong_same", "s
 LABELS = ev.LABELS
 # Первоначальный публичный CSV T14 (история PR #45) содержит предсказания по каждому ID, поэтому
 # состав групп по смене ответа и по переходам частично известен. Любой групповой WER тогда говорит
-# что-то о конкретных записях (например, «у каждой есть ошибки слов»), поэтому публично его нет.
+# что-то о конкретных записях, поэтому публично его нет.
 _WER_WITHHELD = ("withheld: with the original T14 CSV of PR #45 group membership is known, so group WER "
                  f"would describe individual records. Full aggregates stay private in {PRIVATE_FULL_AGGREGATES}")
 PUBLIC_WITHHELD = {"wer_by_transition": _WER_WITHHELD, "wer_by_prediction_change": _WER_WITHHELD}
@@ -55,6 +56,9 @@ AGGREGATE_KEYS = frozenset({"task", "source", "t14_control", "public_bounds", "r
                             "failures", "wer_by_transition", "wer_by_prediction_change", "by_true_class"})
 FAILURE_KEYS = ("asr_empty", "asr_error", "reference_classifier_errors", "asr_classifier_errors",
                 "worsened_with_asr_failure")
+# Единственная допустимая служебная строка вместо разбивки по классу при технических сбоях.
+BY_CLASS_WITHHELD = "withheld: failures present, their record IDs are public in T14"
+JOINT_CHECK_LIMIT = 1_000_000  # предел перебора совместной таблицы; для T14 — около сотни вариантов
 WER_GROUP_KEYS = frozenset({"records", "substitutions", "deletions", "insertions", "reference_words", "wer",
                             "records_without_word_errors"})
 
@@ -112,7 +116,7 @@ def aggregate(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         },
     }
     if has_failures(records):
-        result["by_true_class"] = "withheld: failures present, their record IDs are public in T14"
+        result["by_true_class"] = BY_CLASS_WITHHELD
     else:
         result["by_true_class"] = {label: {t: sum(r["true_label"] == label for r in groups[t]) for t in TRANSITIONS}
                                    for label in LABELS}
@@ -189,6 +193,52 @@ def _is_count(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
+def _ints_only(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        return all(_ints_only(v) for v in value.values())
+    if isinstance(value, list):
+        return all(_ints_only(v) for v in value)
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _joint_table_exists(results: Mapping[str, Any], directions: Mapping[str, int],
+                        by_class: Mapping[str, Mapping[str, int]] | None) -> bool:
+    """Есть ли неотрицательная целая таблица «истина × эталон × Whisper» под все публичные ограничения.
+
+    Перебираются только смены ответа (вне диагонали «эталон = Whisper»), разложенные по истинным
+    классам; диагональ тогда однозначно следует из строк обеих матриц T14.
+    """
+    columns = results["reference"]["confusion_matrix"]["columns"]
+    ref, asr = (results[m]["confusion_matrix"]["values"] for m in ("reference", "asr"))
+    need = {(a, b): directions.get(f"{a}->{b}", 0) for a in columns for b in columns if a != b}
+    active = [cell for cell, n in need.items() if n]
+    if math.prod(need[c] + 1 for c in active) > JOINT_CHECK_LIMIT:
+        raise ev.DataMismatchError("Joint transition table check is too large for this data")
+    options = []
+    for i, label in enumerate(LABELS):
+        feasible = set()
+        for counts in itertools.product(*(range(need[c] + 1) for c in active)):
+            moved = dict(zip(active, counts))
+            diag = {}
+            for j, a in enumerate(columns):
+                stay = ref[i][j] - sum(n for (p, _), n in moved.items() if p == a)
+                if stay < 0 or stay != asr[i][j] - sum(n for (_, q), n in moved.items() if q == a):
+                    break
+                diag[a] = stay
+            else:
+                kinds = {"stayed_correct": diag[label],
+                         "worsened": sum(n for (p, _), n in moved.items() if p == label),
+                         "improved": sum(n for (_, q), n in moved.items() if q == label),
+                         "stayed_wrong_same": sum(n for a, n in diag.items() if a != label),
+                         "stayed_wrong_changed": sum(n for (p, q), n in moved.items() if label not in (p, q))}
+                if by_class is None or kinds == dict(by_class[label]):
+                    feasible.add(counts)
+        options.append(feasible)
+    target = tuple(need[c] for c in active)
+    return any(tuple(n - x - y for n, x, y in zip(target, a, b)) in options[2]
+               for a in options[0] for b in options[1])
+
+
 def _check_wer_groups(groups: Mapping[str, Any], sizes: Mapping[str, int], totals: Mapping[str, Any]) -> bool:
     if set(groups) != set(sizes) or any(set(g) != WER_GROUP_KEYS for g in groups.values()):
         return False
@@ -223,7 +273,8 @@ def validate_aggregates(agg: Mapping[str, Any], public: Mapping[str, Any], *,
         fail("source")
     if agg["t14_control"] != _observed_control(results, control):
         fail("t14_control")
-    if agg["public_bounds"] != public_transition_bounds(results) or agg["records"] != results["records"]:
+    if (agg["public_bounds"] != public_transition_bounds(results) or not _ints_only(agg["public_bounds"])
+            or not _is_count(agg["records"]) or agg["records"] != results["records"]):
         fail("public_bounds/records")
     t = agg["transitions"]
     if set(t) != set(TRANSITIONS) or not all(_is_count(n) for n in t.values()):
@@ -258,7 +309,7 @@ def validate_aggregates(agg: Mapping[str, Any], public: Mapping[str, Any], *,
         fail("failures")
     by_class, failures_present = agg["by_true_class"], any(f[k] for k in f if k != "worsened_with_asr_failure")
     if failures_present or isinstance(by_class, str):
-        if not (failures_present and isinstance(by_class, str) and by_class.startswith("withheld")):
+        if not (failures_present and by_class == BY_CLASS_WITHHELD):
             fail("by_true_class")
     else:
         if set(by_class) != set(LABELS) or any(set(row) != set(TRANSITIONS) or not all(map(_is_count, row.values()))
@@ -272,6 +323,8 @@ def validate_aggregates(agg: Mapping[str, Any], public: Mapping[str, Any], *,
                 fail(f"by_true_class: {label}")
         if any(sum(by_class[label][k] for label in LABELS) != t[k] for k in TRANSITIONS):
             fail("by_true_class totals")
+    if not _joint_table_exists(results, directions, by_class if isinstance(by_class, dict) else None):
+        fail("no joint table matches classes, directions and T14 matrices")
     if full and not _check_wer_groups(agg["wer_by_prediction_change"],
                                       {"changed": changed, "unchanged": agg["records"] - changed}, results["wer"]):
         fail("wer_by_prediction_change")
@@ -297,7 +350,7 @@ def public_view(summary: Mapping[str, Any]) -> dict[str, Any]:
         "prediction_changed": summary["prediction_changed"],
         "prediction_change_directions": {str(k): n for k, n in summary["prediction_change_directions"].items()},
         "failures": {k: summary["failures"][k] for k in FAILURE_KEYS},
-        "by_true_class": by_class if isinstance(by_class, str) else
+        "by_true_class": BY_CLASS_WITHHELD if isinstance(by_class, str) else
         {label: {k: by_class[label][k] for k in TRANSITIONS} for label in LABELS},
         "withheld": dict(PUBLIC_WITHHELD),
     }

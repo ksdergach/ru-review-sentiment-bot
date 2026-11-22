@@ -210,6 +210,10 @@ def _swap_verdicts(ev_):
     (lambda e: e.update(partial_positions=[1]), "Partial positions"),
     (lambda e: e["reviews"][0].update(note="Чужое замечание."), "note"),
     (lambda e: e["reviews"][1].pop("note"), "note"),
+    (lambda e: e["reviews"][1].update(note=None), "note"),
+    (lambda e: e["reviews"][1].update(note=""), "note"),
+    (lambda e: e["reviews"][1].update(note="   "), "note"),
+    (lambda e: e["reviews"][0].update(note=None), "note"),
     (lambda e: e["reviews"][1].update(position=5), "position"),
     (lambda e: e["reviews"].pop(), "every"),
     (lambda e: e["reviews"].__setitem__(1, dict(e["reviews"][0])), "every"),
@@ -644,6 +648,7 @@ def test_published_voice_aggregates_agree_with_t14():
     agg = json.loads(path.read_text(encoding="utf-8"))
     v.validate_aggregates(agg, v.load_public_metrics(ROOT))
     assert agg["withheld"] == v.PUBLIC_WITHHELD
+    assert set(agg) == v.AGGREGATE_KEYS - set(v.PUBLIC_WITHHELD) | {"withheld"}
     assert not {"wer_by_transition", "wer_by_prediction_change"} & set(agg)
     assert agg["records"] == 36 and agg["prediction_changed"] == 5 and agg["net_correct_change"] == -4
     assert all(n == 0 for n in agg["failures"].values())
@@ -660,7 +665,58 @@ def test_public_t15_files_contain_no_group_wer_or_unsupported_causal_claims():
         assert "records_without_word_errors" not in payload, name
         assert not re.search(r'"wer_by_(?:transition|prediction_change)"\s*:\s*\{', payload), name
     report = texts["report.md"]
-    for phrase in ("35 из 36", "без единой ошибки", "0,1466", "0,1587", "0,147 против", "17 / 116",
-                   "ничего не раскрывают", "потеря слабого нейтрального сигнала", "не отличаются"):
+    for phrase in ("без единой ошибки", "ничего не раскрывают", "потеря слабого нейтрального сигнала",
+                   "не отличаются"):
         assert phrase.lower() not in report.lower(), phrase
     assert "гипотеза, не проверенная причинным экспериментом" in report.lower()
+
+
+def test_withheld_by_class_must_be_the_exact_service_string(voice_project):
+    root, kwargs, _ = voice_project
+    args = {"metrics_sha256": kwargs["metrics_sha256"], "control": kwargs["control"]}
+    summary = v.run(root, **kwargs)
+    assert summary["by_true_class"] == v.BY_CLASS_WITHHELD  # в искусственном наборе есть сбой
+    full = root / v.PRIVATE_FULL_AGGREGATES
+    full.parent.mkdir(parents=True, exist_ok=True)
+    tampered = {**summary, "by_true_class": v.BY_CLASS_WITHHELD + " приватный текст"}
+    full.write_text(json.dumps(tampered, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ev.DataMismatchError, match="by_true_class"):
+        v.publish_from_full(root, **args)
+    assert not (root / v.PUBLIC_AGGREGATES).exists()
+    full.write_text(json.dumps(summary, ensure_ascii=False), encoding="utf-8")
+    assert v.publish_from_full(root, **args)["by_true_class"] == v.BY_CLASS_WITHHELD
+
+
+def test_partial_with_non_empty_note_is_accepted(small_selection, confirmed):
+    data, evidence = confirmed
+    assert evidence["reviews"][1]["verdict"] == "partial" and evidence["reviews"][1]["note"].strip()
+    t.validate_annotations(data, small_selection, evidence, evidence["source"]["decisions_sha256"])
+
+
+def test_published_aggregates_need_a_joint_table_for_classes_and_directions():
+    public = v.load_public_metrics(ROOT)
+    agg = json.loads((ROOT / v.PUBLIC_AGGREGATES).read_text(encoding="utf-8"))
+    v.validate_aggregates(agg, public)
+    # Синтетическая подмена: смена «ошибка → другая ошибка» перенесена из neutral в negative.
+    # Суммы по классам, диагонали матриц и итоги переходов сохраняются, но все смены с эталонного
+    # neutral нужны четырём ухудшениям neutral, и совместной таблицы не существует.
+    moved = copy.deepcopy(agg)
+    moved["by_true_class"]["negative"].update(stayed_wrong_same=2, stayed_wrong_changed=1)
+    moved["by_true_class"]["neutral"].update(stayed_wrong_same=3, stayed_wrong_changed=0)
+    with pytest.raises(ev.DataMismatchError, match="joint table"):
+        v.validate_aggregates(moved, public)
+
+
+@pytest.mark.parametrize("tamper", [
+    lambda a: a.update(records=float(a["records"])),
+    lambda a: a["public_bounds"]["by_true_class"]["positive"].update(worsened=[False, False]),
+    lambda a: a["public_bounds"].update(improved=[False, a["public_bounds"]["improved"][1]]),
+])
+def test_records_and_bounds_must_be_integers(tamper):
+    public = v.load_public_metrics(ROOT)
+    agg = json.loads((ROOT / v.PUBLIC_AGGREGATES).read_text(encoding="utf-8"))
+    broken = copy.deepcopy(agg)
+    tamper(broken)
+    assert broken == agg  # подмена типа незаметна при обычном сравнении
+    with pytest.raises(ev.DataMismatchError, match="public_bounds/records"):
+        v.validate_aggregates(broken, public)

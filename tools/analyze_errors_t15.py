@@ -252,8 +252,11 @@ def validate_annotations(data: dict, selected: list[dict], evidence: dict | None
     partial = [i for i, v in enumerate(reviews, 1) if v["verdict"] == "partial"]
     if evidence.get("partial_positions") != partial:
         raise ValueError("Partial positions do not match the reviews")
-    for i, v in enumerate(reviews, 1):  # замечание — ровно у частичного согласия своей позиции
-        if v.get("position") != i or bool(str(v.get("note", "")).strip()) != (v["verdict"] == "partial"):
+    for i, v in enumerate(reviews, 1):  # замечание — непустая строка ровно у частичного согласия
+        note = v.get("note")
+        noted = isinstance(note, str) and bool(note.strip())
+        if (v.get("position") != i or (v["verdict"] == "partial" and not noted)
+                or (v["verdict"] != "partial" and "note" in v)):
             raise ValueError(f"Review note/position mismatch at position {i}")
     for flag in evidence.get("recorder_flags", []):
         pos = flag.get("position")
