@@ -1,6 +1,6 @@
 {
   "task": "T17 / #19",
-  "status": "final_results_integrated_team_review_pending",
+  "status": "final_results_integrated_team_review_completed",
   "updated_on": "2026-11-22",
   "repository_base": {
     "pr": 47,
@@ -54,7 +54,30 @@
     "new_inference_or_asr_run": false,
     "telegram_run": false,
     "t11_audio_transcripts_or_private_artifacts_opened": false,
-    "team_review_completed": false
+    "team_review_completed": true
+  },
+  "team_review": {
+    "date": "2026-11-22",
+    "reviewed_commit": "bccff1972e1397e664b9bbfbb00a9a035b527c06",
+    "reviewed_file": "reports/final/report.md",
+    "scope": "completeness, clarity and correctness of the main conclusions",
+    "result": "accepted, no blocking remarks",
+    "confirmed_by": "team member (personal confirmation given in the VDS2 agent session on 2026-11-22)",
+    "agent_precheck": "AI agent re-verified key report values against final_metrics.json, voice_eval/metrics.json, voice_transitions.json, text_summary.json, text_error_annotations.json, data_prep/audit.json, freeze.json, freeze_checks.json, voice_test/composition.json, the T16 protocol and src/bot.py limits; no discrepancies; pytest and commands not run",
+    "minor_fixes_after_review": [
+      "review status updated in report.md, README.md and this file",
+      "separate CSV and SVG links for the T13 confusion matrices",
+      "RuBERT validation link labelled as run metadata",
+      "T15 sample described as nearly uniform by direction (6-7 cases each)",
+      "timing caveat added to the RuBERT speed ratio in the summary",
+      "voice and text limits shown separately in the section 4 diagram"
+    ],
+    "numbers_or_conclusions_changed_by_fixes": false,
+    "post_fix_checks": {
+      "local_markdown_links_and_anchors": {"files": ["README.md", "reports/final/report.md"], "links": 113, "failures": 0},
+      "git_diff_check": "passed",
+      "pytest_or_commands_run": false
+    }
   },
   "source_files_sha256": {
     "configs/dataset_source.json": "0f1a975ffb44d9c616b1722815d5a5ce0184073dbf3919630529ee2bee2e2071",
@@ -116,7 +139,7 @@
     "C2": "verified: real T13 tables for both models, T14 reference/ASR tables, WER, failures, timings and limitations from accepted JSON",
     "C3": "verified: source, revision, license, configs, freeze and result checksums and artifact paths listed",
     "C4": "verified_for_diff: documentation-only changes; no secrets, audio, models or text exports; no pending fields presented as done",
-    "team_review": "pending: not confirmed by a team member"
+    "team_review": "confirmed: 2026-11-22, team member accepted report.md at commit bccff1972e1397e664b9bbfbb00a9a035b527c06; minor non-blocking remarks fixed afterwards without changing numbers or conclusions"
   },
-  "publication": "Draft PR #47, Refs #19; Closes #19 only after the team review is confirmed"
+  "publication": "Draft PR #47, Closes #19 on merge; team review confirmed"
 }
