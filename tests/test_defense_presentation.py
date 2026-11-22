@@ -84,6 +84,12 @@ def test_key_results_match_accepted_sources(deck, reference):
     for value in expected:
         assert value in deck["all"], value
         assert value in reference or value.startswith("Все "), value
+    # Слайд 10: распределение четырёх состояний «эталон → Whisper» — из публичных агрегатов T15.
+    tr = t15["transitions"]
+    states = [tr[k] for k in ("stayed_correct", "worsened", "stayed_wrong_same", "stayed_wrong_changed")]
+    assert states == [26, 4, 5, 1]
+    for value in states:
+        assert f"({value})" in deck["all"], value
     assert t15["records"] == t14["records"] == 36
     assert t15["prediction_changed"] == 5
     assert sum(t15["by_true_class"][c]["stayed_wrong_changed"] + t15["by_true_class"][c]["worsened"]
@@ -96,3 +102,4 @@ def test_honest_scope_statements(deck):
     assert "Значимость разницы не проверялась" in text
     assert "T09 и T16 выполнены с RuBERT" in text
     assert re.search(r"\b(lorem|ipsum|TODO)\b", text, re.IGNORECASE) is None
+    assert re.search(r"#\d+", text) is None  # без внутренних номеров задач на слайдах

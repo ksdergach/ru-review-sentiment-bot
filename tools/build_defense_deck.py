@@ -25,6 +25,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
+from pptx.oxml.xmlchemy import OxmlElement
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
@@ -60,6 +61,8 @@ NEU_TINT = RGBColor(0xFB, 0xF1, 0xDC)
 SERIES_MAIN = INK
 SERIES_ALT = RGBColor(0x9A, 0xA5, 0xC0)
 WORSE = RGBColor(0xE4, 0x57, 0x2E)
+WORSE_DARK = RGBColor(0x9E, 0x3A, 0x1C)
+PLACEHOLDER = RGBColor(0x8C, 0x95, 0xAD)
 STEEL_MID = RGBColor(0x6F, 0x7B, 0x9C)
 
 FONT = "Calibri"
@@ -70,6 +73,9 @@ CW = SLIDE_W - 2 * MX
 BASELINE_NAME = "TF-IDF + LR"
 RUBERT_NAME = "RuBERT-tiny2"
 DECK_TITLE = "Анализ тональности голосовых киноотзывов"
+# Титульный слайд: заполнить по официальным данным перед защитой; None — приглушённый заполнитель.
+TEAM_MEMBERS: str | None = None
+PROGRAM_AND_ORGANIZATION: str | None = None
 
 
 # ---------- данные ----------
@@ -212,6 +218,20 @@ def chip(slide, x, y, w, label: str, fill=INK, color=WHITE, size=12, h=0.34, lin
     return shape
 
 
+def field(slide, x, y, w, label: str, value: str, placeholder=False, name=None):
+    """Подписанное поле титульного слайда; заполнитель — приглушённым курсивом."""
+    text(slide, x, y, w, 0.3, [label.upper()], size=11, bold=True, color=PLACEHOLDER, margin=0)
+    box = card(slide, x, y + 0.36, w, 0.66, fill=INK_SOFT, radius=0.18, name=name)
+    tf = box.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf.margin_left = tf.margin_right = Inches(0.2)
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.LEFT
+    _run(p, value, 15, PLACEHOLDER if placeholder else WHITE, italic=placeholder)
+    return box
+
+
 def legend_key(slide, x, y, color: RGBColor, label: str, size=13):
     """Ключ легенды: цветной квадрат-фигура и подпись (без символов, зависящих от шрифта)."""
     key = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(x), Inches(y + 0.07), Inches(0.18), Inches(0.18))
@@ -306,6 +326,24 @@ def style_chart(chart, legend=True, size=13):
     ca.tick_labels.font.color.rgb = TEXT
     ca.format.line.color.rgb = LINE
     ca.has_major_gridlines = False
+    _no_chart_border(chart)
+
+
+def _no_chart_border(chart):
+    """Явно без заливки и рамки области диаграммы (по умолчанию приложения рисуют её по-разному)."""
+    space = chart._chartSpace
+    if space.find(qn("c:spPr")) is not None:
+        return
+    sppr = OxmlElement("c:spPr")
+    sppr.append(OxmlElement("a:noFill"))
+    line = OxmlElement("a:ln")
+    line.append(OxmlElement("a:noFill"))
+    sppr.append(line)
+    tx_pr = space.find(qn("c:txPr"))
+    if tx_pr is not None:
+        tx_pr.addprevious(sppr)
+    else:
+        space.find(qn("c:chart")).addnext(sppr)
 
 
 def label_points(series, labels: Sequence[str | None], position=XL_LABEL_POSITION.OUTSIDE_END, size=12,
@@ -393,28 +431,32 @@ def build(facts: dict[str, Any], out: Path) -> Path:
 
 def s_title(slide, f, n, total):
     dark_background(slide)
-    wave(slide, MX, 0.85, [0.35, 0.7, 1.1, 0.55, 0.9, 1.25, 0.6, 0.95, 0.4, 0.75, 0.3],
+    wave(slide, MX, 0.7, [0.3, 0.6, 0.95, 0.48, 0.78, 1.08, 0.52, 0.82, 0.35, 0.65, 0.26],
          [NEG, NEU, POS])
+    text(slide, MX, 2.0, CW, 0.4, ["ИТОГОВАЯ ЗАЩИТА УЧЕБНОГО ПРОЕКТА"], size=14, bold=True, color=NEU, margin=0)
     set_title(slide, DECK_TITLE, dark=True, size=44)
     slide.shapes.title.top = Inches(2.35)
-    slide.shapes.title.height = Inches(1.5)
-    text(slide, MX, 3.95, CW, 0.6,
+    slide.shapes.title.height = Inches(0.95)
+    text(slide, MX, 3.45, CW, 0.55,
          ["Голосовой отзыв в Telegram → Whisper → классификатор текста → тональность"],
-         size=22, color=ON_DARK)
-    text(slide, MX, 4.75, 7.4, 1.1, [
+         size=22, color=ON_DARK, margin=0)
+    text(slide, MX, 4.15, CW, 0.45, [
         [("Классы: ", {"color": ON_DARK}), ("negative = 0", {"color": RGBColor(0xF0, 0x8A, 0x92), "bold": True}),
          ("  ·  ", {"color": ON_DARK}), ("neutral = 1", {"color": RGBColor(0xF2, 0xC2, 0x5C), "bold": True}),
          ("  ·  ", {"color": ON_DARK}), ("positive = 2", {"color": RGBColor(0x6F, 0xD3, 0xA3), "bold": True})],
-        "Учебный проект курса «Обработка естественного языка» (Нетология)",
-    ], size=16, color=ON_DARK, space_after=8)
-    text(slide, MX, 6.0, 7.6, 0.45, [[("Команда: ", {"color": ON_DARK, "bold": True}),
-                                      ("впишите участников перед защитой", {"color": NEU, "italic": True})]],
-         size=16, name="Команда — заполнить")
-    text(slide, 8.4, 5.55, 4.33, 0.9, ["Итоговая защита · материалы T18", "Результаты — по итоговому отчёту T17"],
-         size=12, color=ON_DARK, align=PP_ALIGN.RIGHT, space_after=2)
+    ], size=16, color=ON_DARK, margin=0)
+    fw = (CW - 2 * 0.3) / 3
+    field(slide, MX, 5.15, fw, "Команда", TEAM_MEMBERS or "Участники команды", placeholder=TEAM_MEMBERS is None,
+          name="Команда — заполнить")
+    field(slide, MX + fw + 0.3, 5.15, fw, "Курс", "«Обработка естественного языка»")
+    field(slide, MX + 2 * (fw + 0.3), 5.15, fw, "Программа и организация",
+          PROGRAM_AND_ORGANIZATION or "Указать по официальным данным",
+          placeholder=PROGRAM_AND_ORGANIZATION is None, name="Программа — заполнить")
+    text(slide, MX, 6.42, CW, 0.32, ["Курс проходит на учебной платформе Нетологии · результаты — по итоговому отчёту T17"],
+         size=11, color=PLACEHOLDER, margin=0)
     return ("Представить тему, команду и цель. Система принимает голосовой киноотзыв, распознаёт речь "
-            "Whisper и определяет тональность текста: negative, neutral, positive. Перед защитой вписать "
-            "участников на этом слайде.")
+            "Whisper и определяет тональность текста: negative, neutral, positive. До защиты заполнить поля "
+            "«Команда» и «Программа и организация» по официальным данным.")
 
 
 def s_task(slide, f, n, total):
@@ -780,59 +822,57 @@ def s_t15_text(slide, f, n, total):
     data.categories = [k.replace("->", " → ") for k, _ in order]
     data.add_series("Ошибок", [v for _, v in order])
     total_err = f["text_err"]["errors"]["total"]
-    cw = 5.75
-    text(slide, MX, 1.55, cw, 0.4, [f"Все {num(total_err)} ошибок baseline на test: эталон → ответ"], size=15,
+    cw = 5.85
+    text(slide, MX, 1.55, cw, 0.4, [f"Все {num(total_err)} ошибок baseline: эталон → ответ"], size=17,
          bold=True, color=INK)
-    frame = slide.shapes.add_chart(XL_CHART_TYPE.BAR_CLUSTERED, Inches(MX), Inches(1.95), Inches(cw),
-                                   Inches(3.55), data)
+    frame = slide.shapes.add_chart(XL_CHART_TYPE.BAR_CLUSTERED, Inches(MX), Inches(2.0), Inches(cw),
+                                   Inches(3.75), data)
     frame.name = "Направления ошибок"
     alt_text(frame, "Число ошибок baseline на test по шести направлениям; направления с neutral выделены")
     chart = frame.chart
-    style_chart(chart, legend=False, size=13)
+    style_chart(chart, legend=False, size=15)
     chart.category_axis.reverse_order = True
     plot = chart.plots[0]
-    plot.gap_width = 45
+    plot.gap_width = 40
     series = plot.series[0]
     fill_series(series, SERIES_ALT)
     for point, (key, _) in zip(series.points, order):
         point.format.fill.solid()
         point.format.fill.fore_color.rgb = NEU if "neutral" in key else SERIES_ALT
-    label_points(series, [num(v) for _, v in order], size=13, bold=True)
-    legend_key(slide, MX, 5.6, NEU, "направления с участием neutral")
+    label_points(series, [num(v) for _, v in order], size=15, bold=True)
+    legend_key(slide, MX, 5.95, NEU, "с участием neutral", size=15)
 
     ann = f["text_err"]["annotation"]["category_counts"]
-    names = {"mixed": "Смешанная оценка", "context": "Оценка не фильма / не отзыв",
-             "unclear_label": "Спорная исходная метка", "neutral_confusion": "Размытая граница с neutral",
+    names = {"mixed": "Смешанная оценка", "context": "Не о фильме / не отзыв",
+             "unclear_label": "Спорная метка", "neutral_confusion": "Граница с neutral",
              "negation": "Отрицание", "sarcasm": "Сарказм", "short": "Короткий текст", "unknown": "Не определено"}
     cats = sorted(ann.items(), key=lambda kv: (-kv[1], list(names).index(kv[0])))
     data2 = CategoryChartData()
     data2.categories = [names[k] for k, _ in cats]
     data2.add_series("Случаев из 40", [v for _, v in cats])
-    x = MX + cw + 0.5
+    x = MX + cw + 0.45
     w = SLIDE_W - MX - x
     sample = f["text_err"]["selection"]["selected_size"]
-    text(slide, x, 1.55, w, 0.4, [f"Категории в выборке из {sample} ошибок (пересекаются)"], size=15, bold=True,
-         color=INK)
-    frame2 = slide.shapes.add_chart(XL_CHART_TYPE.BAR_CLUSTERED, Inches(x), Inches(1.95), Inches(w),
-                                    Inches(3.55), data2)
+    text(slide, x, 1.55, w, 0.4, [f"{sample} проверенных ошибок: категории"], size=17, bold=True, color=INK)
+    frame2 = slide.shapes.add_chart(XL_CHART_TYPE.BAR_CLUSTERED, Inches(x), Inches(2.0), Inches(w),
+                                    Inches(3.75), data2)
     frame2.name = "Категории ошибок"
-    alt_text(frame2, "Категории ручного разбора 40 ошибок baseline, T15")
+    alt_text(frame2, "Категории ручного разбора 40 ошибок baseline, T15; категории пересекаются")
     chart2 = frame2.chart
-    style_chart(chart2, legend=False, size=13)
+    style_chart(chart2, legend=False, size=15)
     chart2.category_axis.reverse_order = True
     plot2 = chart2.plots[0]
     plot2.gap_width = 40
     fill_series(plot2.series[0], SERIES_MAIN)
-    label_points(plot2.series[0], [str(v) for _, v in cats], size=13, bold=True)
-
-    card(slide, MX, 6.08, CW, 0.64, fill=NEU_TINT)
-    text(slide, MX + 0.25, 6.1, CW - 0.5, 0.6, [
-        "Выборка почти равномерна по направлениям; черновик категорий — ИИ, проверил один участник "
-        "(31 согласие, 9 частичных, 0 несогласий). Причинность не проверялась."],
-        size=13, anchor=MSO_ANCHOR.MIDDLE)
+    label_points(plot2.series[0], [str(v) for _, v in cats], size=15, bold=True)
+    text(slide, x, 5.9, w, 0.85, [
+        [("Категории пересекаются; ", {"bold": True}),
+         ("причинность не установлена. Выборка почти равномерна по направлениям.", {})]],
+        size=15, color=TEXT, anchor=MSO_ANCHOR.MIDDLE)
     footer(slide, n, total, "Источник: reports/error_analysis/text_summary.json, human_review_evidence.json (T15)")
     return ("Слева — все ошибки, справа — разобранная выборка. Категории — гипотезы о причинах, не доказанная "
-            "причинность. Доли выборки не переносятся на все 1 019 ошибок.")
+            "причинность. Черновик категорий подготовил ИИ, проверил один участник: 31 согласие, 9 частичных, "
+            "0 несогласий. Доли выборки не переносятся на все 1 019 ошибок.")
 
 
 def s_t15_voice(slide, f, n, total):
@@ -841,34 +881,37 @@ def s_t15_voice(slide, f, n, total):
     set_title(slide, f"Все {t['prediction_changed']} смен ответа после Whisper — у истинного neutral")
     classes = ("negative", "neutral", "positive")
     by = t["by_true_class"]
-    statuses = [("stayed_correct", "Верно в обоих режимах", SERIES_MAIN, WHITE),
-                ("worsened", "Ухудшение после Whisper", WORSE, WHITE),
-                ("stayed_wrong_same", "Неверно в обоих, тот же ответ", SERIES_ALT, INK),
-                ("stayed_wrong_changed", "Неверно в обоих, ответ сменился", STEEL_MID, WHITE)]
+    tr = t["transitions"]
+    # Состояние записи = ответ модели на эталонной транскрипции → ответ после Whisper.
+    statuses = [("stayed_correct", "верно → верно", SERIES_MAIN, WHITE),
+                ("stayed_wrong_same", "неверно → тот же неверный", SERIES_ALT, INK),
+                ("worsened", "верно → неверно", WORSE, WHITE),
+                ("stayed_wrong_changed", "неверно → другой неверный", WORSE_DARK, WHITE)]
     data = CategoryChartData()
-    data.categories = [f"{c} (12)" for c in classes]
+    data.categories = [f"истинный {c}" for c in classes]
     for key, label, _, _ in statuses:
         data.add_series(label, [by[c][key] for c in classes])
-    cw = 6.6
-    text(slide, MX, 1.55, cw, 0.4, ["36 записей по истинному классу: эталон → Whisper"], size=15, bold=True,
+    cw = 6.75
+    text(slide, MX, 1.55, cw, 0.4, ["Ответ модели: эталонный текст → текст Whisper"], size=16, bold=True,
          color=INK)
-    for i, (_, label, color, _) in enumerate(statuses):
-        legend_key(slide, MX + (i % 2) * 3.3, 2.0 + (i // 2) * 0.36, color, label)
-    frame = slide.shapes.add_chart(XL_CHART_TYPE.BAR_STACKED, Inches(MX), Inches(2.75), Inches(cw),
-                                   Inches(3.95), data)
+    for i, (key, label, color, _) in enumerate(statuses):
+        legend_key(slide, MX + (i % 2) * 3.45, 2.0 + (i // 2) * 0.38, color, f"{label} ({tr[key]})", size=14)
+    frame = slide.shapes.add_chart(XL_CHART_TYPE.BAR_STACKED, Inches(MX), Inches(2.85), Inches(cw),
+                                   Inches(3.85), data)
     frame.name = "Переходы T15"
-    alt_text(frame, "Публичные агрегаты T15: переходы классификации эталон → Whisper по истинному классу")
+    alt_text(frame, "Публичные агрегаты T15: ответ модели на эталоне и после Whisper по истинному классу, "
+                    "по 12 записей на класс")
     chart = frame.chart
-    style_chart(chart, legend=False, size=13)
+    style_chart(chart, legend=False, size=15)
     chart.category_axis.reverse_order = True
     chart.value_axis.maximum_scale = 12
     plot = chart.plots[0]
-    plot.gap_width = 55
+    plot.gap_width = 50
     plot.overlap = 100
     for series, (key, _, color, on) in zip(plot.series, statuses):
         fill_series(series, color)
         label_points(series, [str(by[c][key]) if by[c][key] else None for c in classes],
-                     position=XL_LABEL_POSITION.CENTER, size=14, color=on, bold=True)
+                     position=XL_LABEL_POSITION.CENTER, size=15, color=on, bold=True)
 
     x = MX + cw + 0.45
     w = SLIDE_W - MX - x
@@ -876,43 +919,47 @@ def s_t15_voice(slide, f, n, total):
     v = f["voice"]
     rec_ref = dec(v["reference"]["per_class"]["neutral"]["recall"], 2)
     rec_asr = dec(v["asr"]["per_class"]["neutral"]["recall"], 2)
-    text(slide, x, 1.6, w, 3.1, [
-        [("Смены ответа: ", {"bold": True}),
+    changed = t["prediction_changed"]
+    card(slide, x, 1.6, w, 1.35, fill=INK)
+    text(slide, x + 0.25, 1.68, 1.5, 1.2, [f"{changed} из {t['records']}"], size=28, bold=True, color=WHITE,
+         anchor=MSO_ANCHOR.MIDDLE)
+    text(slide, x + 1.8, 1.68, w - 2.0, 1.2, ["ответов изменились после Whisper; у всех пяти истинный класс — neutral"],
+         size=15, color=ON_DARK, anchor=MSO_ANCHOR.MIDDLE)
+    text(slide, x, 3.15, w, 2.0, [
+        [("Ответы ", {"bold": True}), ("(эталон → Whisper): ", {}),
          (f"neutral → negative {d['neutral->negative']}, neutral → positive {d['neutral->positive']}, "
-          f"negative → positive {d['negative->positive']} (неверно в обоих режимах)", {})],
-        "Единого сдвига в одну полярность нет",
+          f"negative → positive {d['negative->positive']}", {})],
         [("Recall neutral: ", {"bold": True}), (f"{rec_ref} → {rec_asr}", {}),
          ("; у negative и positive ответы не изменились", {})],
-        "Precision negative и positive снизилась: часть нейтральных записей ушла в полярные классы",
-    ], size=15, bullets=True, bullet_color=NEU, space_after=9)
-    card(slide, x, 4.85, w, 1.85, fill=NEU_TINT)
-    text(slide, x + 0.25, 4.92, w - 0.5, 1.72, [
+    ], size=15, bullets=True, bullet_color=WORSE, space_after=9)
+    card(slide, x, 5.3, w, 1.4, fill=NEU_TINT)
+    text(slide, x + 0.25, 5.35, w - 0.5, 1.3, [
         [("WER ≠ причина. ", {"bold": True}),
-         ("Ошибки слов частые (около 16 на 100 слов), смена класса редкая. Какие отличия текста "
-          "повлияли на ответ, не установлено.", {})],
-        "Построчные ответы и транскрипции не публикуются (решения T14/T15).",
-    ], size=13, space_after=4, anchor=MSO_ANCHOR.MIDDLE)
+         ("Ошибки слов частые (около 16 на 100 слов), смена ответа редкая; что именно её вызвало, "
+          "не установлено. Построчные данные не публикуются.", {})]],
+        size=14, anchor=MSO_ANCHOR.MIDDLE)
     footer(slide, n, total, "Источник: reports/error_analysis/voice_transitions.json (T15), reports/voice_eval/metrics.json (T14)")
-    return ("Только публичные агрегаты. Все изменения — у истинного neutral; это наблюдение, а не доказанная "
-            "причина. Гипотеза о слабых сигналах neutral не проверялась.")
+    return ("Строки — истинный класс записи, цвета — что стало с ответом модели при замене эталонного текста "
+            "текстом Whisper. Оранжевые сегменты — пять изменившихся ответов, все в строке neutral. Это "
+            "наблюдение, а не доказанная причина; гипотеза о слабых сигналах neutral не проверялась.")
 
 
 def s_bot(slide, f, n, total):
     white_background(slide)
     set_title(slide, "Telegram-бот: голос и текст в одном сценарии")
     w1 = 5.2
-    card(slide, MX, 1.6, w1, 3.15, fill=INK)
-    text(slide, MX + 0.3, 1.72, w1 - 0.6, 0.4, ["Формат ответа на голосовой отзыв"], size=15, bold=True,
-         color=WHITE)
-    text(slide, MX + 0.3, 2.2, w1 - 0.6, 2.75, [
+    card(slide, MX, 1.6, w1, 3.55, fill=INK)
+    chip(slide, MX + 0.3, 1.82, 2.95, "Шаблон ответа, не снимок экрана", fill=NEU, color=INK, size=12)
+    text(slide, MX + 0.3, 2.38, w1 - 0.6, 2.7, [
         [("Распознанный текст:", {"bold": True, "color": WHITE})],
         [("<транскрипция Whisper>", {"italic": True, "color": ON_DARK})],
-        [("Тональность: ", {"bold": True, "color": WHITE}), ("положительная (positive)", {"color": RGBColor(0x6F, 0xD3, 0xA3)})],
+        [("Тональность: ", {"bold": True, "color": WHITE}), ("<отрицательная | нейтральная | положительная>",
+                                                             {"italic": True, "color": ON_DARK})],
         [("Уверенность модели: ", {"bold": True, "color": WHITE}), ("<процент>", {"italic": True, "color": ON_DARK})],
         [("Уверенность модели не является гарантией правильности ответа.", {"color": ON_DARK, "size": 13})],
-    ], size=15, space_after=7)
-    text(slide, MX, 4.85, w1, 0.4, ["Шаблон ответа из src/bot.py; угловые скобки и метка — пример"],
-         size=11, color=MUTED)
+    ], size=15, space_after=8)
+    text(slide, MX, 5.25, w1, 0.32, ["Текст ответа — из src/bot.py; фактический ответ — в живом показе"],
+         size=12, color=MUTED)
 
     x = MX + w1 + 0.45
     w = SLIDE_W - MX - x
@@ -923,18 +970,18 @@ def s_bot(slide, f, n, total):
             ["Бот занят другим отзывом", "«Повторите запрос чуть позже»"],
             [f"Ответ не готов за 60{NBSP}с", "Одно уведомление о задержке"],
             ["Файл, стикер, кружок", "Поддерживаются голос и текст"]]
-    table(slide, x, 1.6, w, rows, [w * 0.45, w * 0.55], row_h=0.49, size=13, name="Ограничения бота",
+    table(slide, x, 1.6, w, rows, [w * 0.45, w * 0.55], row_h=0.5, size=14, name="Ограничения бота",
           align_left=True)
-    card(slide, MX, 5.6, CW, 1.1)
-    text(slide, MX + 0.3, 5.66, CW - 0.6, 1.0, [
+    card(slide, MX, 5.75, CW, 0.95)
+    text(slide, MX + 0.3, 5.8, CW - 0.6, 0.85, [
         [("Проверено: ", {"bold": True}),
-         ("T09 — ручной голосовой прогон; T16 — независимый участник на Mac: голос, текст, лимиты, занятость, "
-          "825 passed / 1 skipped. T09 и T16 выполнены с RuBERT; сквозной показ с выбранным baseline — "
-          "отдельная проверка T18.", {})]],
+         ("T09 и T16 (независимый участник, Mac) — голос, текст, лимиты, занятость; 825 passed / 1 skipped. "
+          "Оба ручных прогона — с RuBERT; показ с выбранным baseline — проверка T18.", {})]],
         size=14, anchor=MSO_ANCHOR.MIDDLE)
     footer(slide, n, total, "Источник: src/bot.py, README (T09, T10), reports/bot/t16_independent_check_macos_2026-11-19.md")
-    return ("Перед живым показом: что умеет бот и как отказывает. Не обещать конкретную метку. Показ: /start, "
-            "голосовой отзыв, тот же текст сообщением, голос длиннее 30 с.")
+    return ("Перед живым показом: что умеет бот и как отказывает. Слева — шаблон, не снимок экрана; реальный "
+            "ответ покажем вживую. Не обещать конкретную метку. Показ: /start, голосовой отзыв, тот же текст "
+            "сообщением, голос длиннее 30 с.")
 
 
 def s_readiness(slide, f, n, total):
@@ -942,32 +989,33 @@ def s_readiness(slide, f, n, total):
     set_title(slide, "Пять критериев готовности проекта и их подтверждение")
     rows = [
         ("Источник и подготовка датасета документированы, независимые сплиты сохранены",
-         "NLP_dataset/README.md, аудит T03: 0 общих фильмов и текстов", "Выполнено"),
+         "Аудит T03: 0 общих фильмов и текстов", "Выполнено"),
         ("TF-IDF и RuBERT сравнены на одном test по трём классам без настройки по нему",
-         f"Фиксация T12, финальный запуск T13 на {num(f['test_rows'])} ID", "Выполнено"),
+         f"Фиксация T12, test T13: {num(f['test_rows'])}{NBSP}записи", "Выполнено"),
         ("Бот принимает голосовое сообщение и возвращает транскрипцию и тональность",
-         "Ручные прогоны T09 и T16 (оба с RuBERT)", "Выполнено"),
+         "Ручные прогоны T09, T16 — с RuBERT", "Выполнено"),
         ("Проверка на человеческих голосовых киноотзывах с разбором влияния Whisper и ошибок",
-         "36 записей T11, оценка T14, анализ T15", "Выполнено"),
+         "36 записей T11; T14, T15", "Выполнено"),
         ("Другой участник повторил запуск; готовы отчёт, презентация и демонстрация",
-         "Запуск T16, отчёт T17; презентация и показ — T18", "Показ на защите"),
+         "Запуск T16, отчёт T17; показ — на защите", "Ожидает показа"),
     ]
     y = 1.6
-    rh = 0.97
+    rh = 1.0
     for i, (crit, evidence, status) in enumerate(rows, start=1):
-        card(slide, MX, y, CW, rh - 0.12)
-        badge(slide, MX + 0.22, y + (rh - 0.12 - 0.46) / 2, str(i))
-        text(slide, MX + 0.9, y + 0.06, 6.55, rh - 0.24, [crit], size=15, bold=True, color=INK,
+        ch = rh - 0.12
+        card(slide, MX, y, CW, ch)
+        badge(slide, MX + 0.22, y + (ch - 0.46) / 2, str(i))
+        text(slide, MX + 0.9, y + 0.04, 6.3, ch - 0.08, [crit], size=15, bold=True, color=INK,
              anchor=MSO_ANCHOR.MIDDLE)
-        text(slide, MX + 7.6, y + 0.06, 2.6, rh - 0.24, [evidence], size=12, color=MUTED,
+        text(slide, MX + 7.4, y + 0.04, 2.9, ch - 0.08, [evidence], size=14, color=TEXT,
              anchor=MSO_ANCHOR.MIDDLE)
         done = status == "Выполнено"
-        chip(slide, MX + CW - 1.75, y + (rh - 0.12 - 0.4) / 2, 1.55, status, fill=INK if done else WHITE,
-             color=WHITE if done else INK, size=12, h=0.4, line=None if done else INK)
+        chip(slide, MX + CW - 1.75, y + (ch - 0.42) / 2, 1.55, status, fill=INK if done else WHITE,
+             color=WHITE if done else INK, size=13, h=0.42, line=None if done else INK)
         y += rh
     footer(slide, n, total, "Критерии: docs/team_plan.md, раздел 12. noise, TTS и обработка любых сообщений в них не входят")
-    return ("Пройти пять критериев плана. Пятый закрывается самой защитой: презентация и показ. "
-            "T16 проверял бота с RuBERT — сказать об этом прямо.")
+    return ("Пройти пять критериев плана. Пятый закрывается самой защитой: презентация и показ; до показа он не "
+            "выполнен. T09 и T16 проверяли бота с RuBERT — сказать об этом прямо.")
 
 
 def s_answers(slide, f, n, total):
@@ -1012,7 +1060,7 @@ def s_answers(slide, f, n, total):
 def s_limits(slide, f, n, total):
     white_background(slide)
     set_title(slide, "Ограничения и возможные улучшения")
-    cw = 6.9
+    cw = 6.75
     limits = [
         ("Домен", "только киноотзывы одного сайта; произвольные сообщения не проверялись"),
         ("Голосовой набор", "36 записей, 4 диктора, чтение подготовленных сценариев"),
@@ -1026,20 +1074,24 @@ def s_limits(slide, f, n, total):
          size=15, space_after=13)
     x = MX + cw + 0.45
     w = SLIDE_W - MX - x
-    card(slide, x, 1.55, w, 4.6)
-    text(slide, x + 0.3, 1.7, w - 0.6, 0.4, ["Возможные улучшения"], size=18, bold=True, color=INK)
-    chip(slide, x + 0.3, 2.18, 3.2, "не реализованы, не обязательны", fill=WHITE, color=INK, size=12, line=INK)
-    text(slide, x + 0.3, 2.75, w - 0.6, 3.9, [
-        "Другие длины контекста и режимы обучения трансформера",
-        "Больше дикторов и спонтанная речь в голосовом тесте",
+    card(slide, x, 1.55, w, 2.95)
+    text(slide, x + 0.3, 1.7, w - 0.6, 0.4, ["Направления исследования"], size=18, bold=True, color=INK)
+    text(slide, x + 0.3, 2.2, w - 0.6, 2.2, [
+        "Другие режимы обучения трансформера и длина контекста",
+        "Больше дикторов и спонтанная речь",
         "Доверительные интервалы и тесты значимости",
-        "Класс noise для нерелевантных сообщений (предложение преподавателя)",
-        "TTS-аугментация train (вариант из задания)",
-        "Проверка сарказма и чужой критики (задача #44)",
-    ], size=14, bullets=True, bullet_color=INK, space_after=7)
-    footer(slide, n, total, "Источник: итоговый отчёт T17, раздел 11; docs/team_plan.md, раздел 9")
-    return ("Честно назвать ограничения. noise и TTS — только перспективы, не реализованные функции и не "
-            "условие сдачи.")
+        "Сарказм, несогласие и пересказ чужой критики",
+    ], size=15, bullets=True, bullet_color=INK, space_after=7)
+    card(slide, x, 4.7, w, 2.0, fill=WHITE, line=INK)
+    chip(slide, x + 0.3, 4.92, 3.2, "не реализованы, не обязательны", fill=INK, color=WHITE, size=12)
+    text(slide, x + 0.3, 5.4, w - 0.6, 1.2, [
+        [("Класс noise", {"bold": True}), (" (предложение преподавателя) и ", {}),
+         ("TTS-аугментация", {"bold": True}),
+         (" (вариант из задания) — в основную версию не входят.", {})]],
+        size=15)
+    footer(slide, n, total, "Источник: итоговый отчёт T17, раздел 11; docs/team_plan.md, разделы 9 и 12")
+    return ("Честно назвать ограничения. Направления справа — возможные исследования, а не обещания. noise и TTS "
+            "не реализованы и не являются условием сдачи.")
 
 
 def s_backup_matrices(slide, f, n, total):
