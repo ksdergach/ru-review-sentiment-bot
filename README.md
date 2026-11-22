@@ -4,14 +4,19 @@
 → `negative=0`, `neutral=1`, `positive=2`.
 [План](docs/team_plan.md) и [доска](https://github.com/users/ksdergach/projects/2).
 
-Текущий этап — подготовка финальной оценки по принятому протоколу T12.
-[Черновик итогового отчёта T17](reports/final/report.md) объединяет подтверждённые
-данные, validation-результаты и проверки бота. Финальные результаты T13/T14 и анализ
-ошибок T15 ещё ожидаются; задача №19 этим черновиком не закрывается.
-[Протокол T12](reports/freeze.md) принят: [PR №46](https://github.com/ksdergach/ru-review-sentiment-bot/pull/46)
-слит 20.11.2026, задача №15 закрыта. Выбраны baseline и Mac для финальных измерений.
-Правки проверки сумм и атомарной записи test приняты повторным ревью;
-финальные запуски №16/№17 выполняются отдельными согласованными шагами.
+**[Итоговый исследовательский отчёт T17](reports/final/report.md)** объединяет данные,
+модели, финальные результаты T13–T15 и проверку бота T16. Командная вычитка
+отчёта ещё не проведена, поэтому задача №19 пока открыта.
+
+| Результат | Значение | Подробности |
+|---|---|---|
+| Текстовый test, 9 324 записи (T13) | Baseline: accuracy 0,8907, macro-F1 **0,7264**; RuBERT: 0,8230 и 0,6803. Преимущества RuBERT нет | [README_T13](README_T13.md), [reports/evaluation/](reports/evaluation/final_report.md) |
+| 36 голосовых записей (T14) | Baseline на эталоне — macro-F1 0,8299, после Whisper — 0,7019 (ΔF1 −0,1280); WER 0,1569; сбоев и пустых ответов 0 | [README_T14](README_T14.md), [reports/voice_eval/](reports/voice_eval/report.md) |
+| Анализ ошибок (T15) | 40 ошибок baseline на test проверены участником; все 5 смен ответа после Whisper — у истинного neutral | [reports/error_analysis/](reports/error_analysis/report.md) |
+
+Все финальные оценки выполнены по [протоколу T12](reports/freeze.md), принятому в
+[PR №46](https://github.com/ksdergach/ru-review-sentiment-bot/pull/46). Для бота и T14 выбран baseline
+по validation; результат test этот выбор не менял. Задачи №14–№18 закрыты.
 
 [Промежуточная сдача NLP без трансформеров](docs/nlp_submission.md) и её
 [отчёт](reports/nlp/report.md) сохранены отдельно как материалы предыдущего этапа.
@@ -53,24 +58,27 @@ validation macro-F1 0,667824 против 0,718015 у baseline; преимуще
 позднее проверен локально в T12; новый ручной Telegram-прогон именно с этим
 комплектом не заявляется. Функциональные проверки не измеряют общую точность модели.
 
-## Маршрут воспроизведения и статус финальной оценки
+## Маршрут воспроизведения и итоговые результаты
 
 Команды ниже приведены для подготовленного окружения из раздела «Установка».
-Получение данных/моделей, обучение, запуск бота и финальные измерения — отдельные
+Получение данных и моделей, обучение, запуск бота и финальные измерения — отдельные
 действия. Они не выполняются автоматически при чтении отчёта или запуске тестов.
+Финальные запуски T13 и T14 уже выполнены по одному разу, их повтор не нужен
+для проверки результатов: опубликованные файлы проверяются командами из последнего столбца.
 
 | Шаг | Что использовать | Условие и результат |
 |---|---|---|
 | Исходный корпус | [Происхождение и суммы](NLP_dataset/README.md), `configs/dataset_source.json` | Получить файлы конфигурации `pc` закреплённой ревизии по правилам доступа источника; исходные Parquet сохранить |
 | Принятые train/validation | `python tools/restore_nlp_splits.py` | Восстанавливает принятые строки по T03; другой результат не перезаписывает |
-| Принятый baseline | Файл команды → `models/nlp_baseline/tfidf_logreg_baseline.joblib` | SHA-256 `389a768bcd108721c79ebf3a7b9dc5212ec100f5c2e1b06cf519ed076cd9bee3`; не заменять локальным переобучением |
+| Принятый baseline | Принятый файл от участника команды → `models/nlp_baseline/tfidf_logreg_baseline.joblib` | SHA-256 `389a768bcd108721c79ebf3a7b9dc5212ec100f5c2e1b06cf519ed076cd9bee3`; не заменять локальным переобучением |
 | Принятый RuBERT | `python tools/fetch_transformer.py`, затем `python tools/verify_transformer.py` | Требует сети при первом получении; проверяет комплект по принятому отчёту |
 | Whisper | `python -m src.speech artifacts/audio/debug.ogg --allow-download` | Подготовить отдельное отладочное аудио; фиксированная revision из `configs/speech.json`, T11 не использовать |
 | Тесты и запуск | Разделы «Быстрая проверка окружения» и «Голосовой Telegram-бот T09» | Модели и токен не устанавливаются тестами автоматически |
 | Фиксация и текстовый test | [T12](reports/freeze.md), `python tools/restore_frozen_test.py` | Принятая `reports/freeze.json` обязательна; инструмент восстанавливает test с проверкой сумм, без оценки моделей |
-| Финальный текстовый прогон | [№16 / PR №43](https://github.com/ksdergach/ru-review-sentiment-bot/pull/43) | Оценщик готовится отдельно; команда финального воспроизведения и результаты ожидаются |
-| Финальные 36 голосовых | [№17 / PR №45](https://github.com/ksdergach/ru-review-sentiment-bot/pull/45), [состав T11](README_T11.md) | Эталон и Whisper сравниваются одним baseline; команда и результаты ожидаются |
-| Итоговый анализ ошибок | [№18](https://github.com/ksdergach/ru-review-sentiment-bot/issues/18) | Выполняется после финальных предсказаний; предыдущий validation-анализ его не заменяет |
+| Финальный текстовый test (T13) | [README_T13](README_T13.md#команды), `python -m src.evaluate --run-final --freeze reports/freeze.json --out-dir reports/evaluation` | Выполнен 21.11.2026 ([№16](https://github.com/ksdergach/ru-review-sentiment-bot/issues/16), PR №43). Результаты в `reports/evaluation/`; повтор только на машине измерений по отдельному решению. Тесты оценщика: `python -m pytest -q tests/test_evaluate.py` |
+| 36 голосовых записей (T14) | [README_T14](README_T14.md#подготовка-и-запуск), `python tools/evaluate_voice.py --warmup-audio <запись T16>` | Выполнен один раз ([№17](https://github.com/ksdergach/ru-review-sentiment-bot/issues/17), PR №45). Нужны приватные файлы T11 вне Git. Сверка опубликованных файлов: `python -m pytest -q tests/test_evaluate_voice.py tests/test_voice_eval_public_results.py` |
+| Анализ ошибок (T15) | [отчёт T15](reports/error_analysis/report.md) | [№18](https://github.com/ksdergach/ru-review-sentiment-bot/issues/18), PR №48. Проверка без моделей: `python tools/analyze_errors_t15.py --check` и `python -m pytest -q tests/test_analyze_errors_t15.py` |
+| Итоговый отчёт (T17) | [reports/final/report.md](reports/final/report.md) | Сверка чисел и сумм — [preparation_checks.json](reports/final/preparation_checks.json) |
 
 Для отдельного воспроизведения обучения существуют
 `python src/train_baseline.py --config configs/nlp_baseline.json` и
@@ -84,6 +92,16 @@ Python 3.13.7, CPU. Это описание конкретной проверк�
 Профили T05 для Windows/CUDA и их память/скорость не переносятся на Mac.
 Полные версии и суммы среды записаны в фиксации T12; отдельный FFmpeg CLI
 для штатного пути через PyAV не обязателен (см. «Декодирование аудио»).
+
+Ресурсы по фактическим измерениям на этой машине (не гарантированный минимум):
+
+| Что | Значение | Источник |
+|---|---|---|
+| GPU | Не нужен для бота, T13 и T14: всё выполнялось на CPU. CUDA нужна только профилям обучения T05 | `reports/freeze.json`, `reports/evaluation/final_metrics.json` |
+| Память процесса baseline + Whisper | Пиковый RSS 898,3 MiB при загрузке, без распознавания аудио | [reports/freeze.md](reports/freeze.md), `reports/freeze_checks.json` |
+| Размер моделей вне Git | Baseline 3 598 091 байт; Whisper `model.bin` 483 546 902 байт; архив RuBERT 119 224 320 байт | `reports/freeze.md`, `reports/voice_eval/metrics.json`, `configs/transformer_bundle.json` |
+| Скорость | Whisper: медиана 4,0 с на запись длительностью 8–16 с. Классификация: 0,055 мс/текст у baseline, 1,382 мс/текст у RuBERT (партии по 64) | [T14](reports/voice_eval/report.md), [T13](reports/evaluation/final_report.md) |
+| Аудиодекодер | PyAV (`av==18.1.0` в `requirements.txt`, та же версия в запуске T14) | `requirements.txt`, `reports/voice_eval/metrics.json` |
 
 ## Установка
 
@@ -328,6 +346,10 @@ python -m src.speech artifacts/audio/debug.ogg --allow-download --show-text
 сериализованные модели, токенизаторы и checkpoints исключены через `.gitignore`.
 JSON с текстами вне этих локальных каталогов автоматически не исключается:
 не сохраняйте расшифровки в `reports/`.
+Приватные материалы финальной оценки тоже лежат только в игнорируемом `artifacts/`:
+аудио, таблица и manifest T11 (`artifacts/t11/`), построчные результаты T14
+(`artifacts/t14/`) и закрытые агрегаты T15 (`artifacts/t15/`). В `reports/` публикуются
+только агрегаты и ID без текстов.
 
 Проверка правил без создания файлов:
 
