@@ -233,6 +233,9 @@ def validate_annotations(data: dict, selected: list[dict], evidence: dict | None
             or any(v.get("verdict") not in VERDICTS for v in reviews)
             or any(e["review_status"] != "reviewed" for e in entries)):
         raise ValueError("Human review evidence does not cover every selected case")
+    counts = Counter(v["verdict"] for v in reviews)
+    if "verdict_counts" in evidence and evidence["verdict_counts"] != {k: counts[k] for k in VERDICTS}:
+        raise ValueError("Human review verdict counts do not match the reviews")
     return data
 
 

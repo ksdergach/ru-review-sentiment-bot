@@ -12,7 +12,7 @@
       "predicted_label_id": 1,
       "question": "Считаете ли вы претензию к показу основным носителем негатива, а не оценкой фильма?",
       "record_id": "test-00000-of-00001.parquet#row=00006341",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "3654413b52555a13675ad070cfc242af7e46dde34a01cf0d6fe5f0832c7fbae6",
       "true_label_id": 0
     },
@@ -25,7 +25,7 @@
       "predicted_label_id": 1,
       "question": "Согласны ли вы, что оценка фильма здесь косвенная, а основной объект текста — другие комментаторы?",
       "record_id": "test-00000-of-00001.parquet#row=00008868",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "be67482700ad670bc9ef7e05c24feeaff02975b79d0e417ca691df4d8b82ef1c",
       "true_label_id": 2
     },
@@ -38,7 +38,7 @@
       "predicted_label_id": 0,
       "question": "Подтверждаете ли вы, что текст не содержит оценки фильма?",
       "record_id": "test-00000-of-00001.parquet#row=00007783",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "da1674c75dc25bb2ab85eb08224aeb9bc4119c4392a7b7ca2ecd8d7526fad701",
       "true_label_id": 1
     },
@@ -53,7 +53,7 @@
       "predicted_label_id": 2,
       "question": "Согласны ли вы, что итог смешанный без явного преобладания?",
       "record_id": "test-00000-of-00001.parquet#row=00007103",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "66fd142be13c32ff33ec3774473b544f0b06ed3d3a4c51a7a11030b597cf2a1a",
       "true_label_id": 1
     },
@@ -67,7 +67,7 @@
       "predicted_label_id": 2,
       "question": "Согласны ли вы, что итог отзыва отрицательный, несмотря на похвалу визуальной части?",
       "record_id": "test-00000-of-00001.parquet#row=00000581",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "7274912aa4b049b5c4f8f24125fabd2e4294d916f0ae9b6da495b7705318de55",
       "true_label_id": 0
     },
@@ -81,7 +81,7 @@
       "predicted_label_id": 0,
       "question": "Считаете ли вы метку positive однозначной для этого текста?",
       "record_id": "test-00000-of-00001.parquet#row=00008369",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "f984bb4c7d7ba65ae946b54619721489a59d1e663bdbb0f85291339680b66421",
       "true_label_id": 2
     },
@@ -95,7 +95,7 @@
       "predicted_label_id": 1,
       "question": "Где для вас проходит граница negative/neutral в этом случае?",
       "record_id": "test-00000-of-00001.parquet#row=00007082",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "73442f254ecb05db43388e0d982adf5bf6bade7a388566289c6b5665f90962af",
       "true_label_id": 0
     },
@@ -109,7 +109,7 @@
       "predicted_label_id": 1,
       "question": "Видите ли вы в тексте явную положительную оценку?",
       "record_id": "test-00000-of-00001.parquet#row=00007751",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "7fb3fca6bd0d6e18a4f5439fe71ad39d6ef0dcc49701dce662cb98b41a1159ab",
       "true_label_id": 2
     },
@@ -123,7 +123,7 @@
       "predicted_label_id": 0,
       "question": "Что для вас важнее при выборе класса: итоговая фраза или преобладающая критика?",
       "record_id": "test-00000-of-00001.parquet#row=00001023",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "9a70eb769b84832b0eb5aa92d09c34430b6cf0ca210ed8727490934bff61fbe1",
       "true_label_id": 1
     },
@@ -136,7 +136,7 @@
       "predicted_label_id": 2,
       "question": "Подтверждаете ли вы, что текст не является оценкой фильма?",
       "record_id": "test-00000-of-00001.parquet#row=00009141",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "e685f507cdf18dbd4c5b545297b8cad1ab6f635d1a739e0e2622e2c9426604f9",
       "true_label_id": 1
     },
@@ -150,7 +150,7 @@
       "predicted_label_id": 2,
       "question": "Согласны ли вы, что рекомендация здесь иронична?",
       "record_id": "test-00000-of-00001.parquet#row=00009138",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "522b28d7757b3dc94baa13dbc5bfe35bca6347a3682cd156ebcac630ac06147c",
       "true_label_id": 0
     },
@@ -165,7 +165,7 @@
       "predicted_label_id": 0,
       "question": "Достаточно ли последней фразы для метки positive?",
       "record_id": "test-00000-of-00001.parquet#row=00003205",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "a7dcadf53280a5b04f9568c54c13dd55a49dacb48d14e7680f0c755ffee643c3",
       "true_label_id": 2
     },
@@ -179,7 +179,7 @@
       "predicted_label_id": 1,
       "question": "Можно ли по этому тексту уверенно определить отношение к фильму?",
       "record_id": "test-00000-of-00001.parquet#row=00009450",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "3eeda919822ce1b4042ff5253be108fbf4090bf6eeb14d301f3972241e71af0b",
       "true_label_id": 0
     },
@@ -193,7 +193,7 @@
       "predicted_label_id": 1,
       "question": "Согласны ли вы, что метка positive для этого текста спорна?",
       "record_id": "test-00000-of-00001.parquet#row=00003143",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "2d1b995939a050fde0edbe120d57290d1d3530287a854dea7407d1a08913b70b",
       "true_label_id": 2
     },
@@ -207,7 +207,7 @@
       "predicted_label_id": 0,
       "question": "Согласны ли вы, что итоговая оценка 3 делает neutral обоснованным?",
       "record_id": "test-00000-of-00001.parquet#row=00004160",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "ca32ed8e5cada3f0f82f1f9ab5f98f932b873a4e4f6b2aeaef7fd00d8f230185",
       "true_label_id": 1
     },
@@ -221,7 +221,7 @@
       "predicted_label_id": 2,
       "question": "Видите ли вы здесь преобладающую положительную оценку?",
       "record_id": "test-00000-of-00001.parquet#row=00002705",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "ba0fe5a2db839c2825f7c5826493a6eff645ddab757ea722efae653401b8f98c",
       "true_label_id": 1
     },
@@ -235,7 +235,7 @@
       "predicted_label_id": 2,
       "question": "Согласны ли вы, что положительные слова здесь не относятся к оценке фильма?",
       "record_id": "test-00000-of-00001.parquet#row=00005423",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "c0849b1126c3219c4d58ffa7745a12b9d602d0150ab3c864b63a644615e7da6e",
       "true_label_id": 0
     },
@@ -249,7 +249,7 @@
       "predicted_label_id": 0,
       "question": "Согласны ли вы, что общий тон положительный?",
       "record_id": "test-00000-of-00001.parquet#row=00006544",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "2ea90d6d8da623a977e36a3a950ee13abac51ee0aefd343eebe681fc6e458822",
       "true_label_id": 2
     },
@@ -262,7 +262,7 @@
       "predicted_label_id": 1,
       "question": "Согласны ли вы, что итог отзыва отрицательный?",
       "record_id": "test-00000-of-00001.parquet#row=00005094",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "084b77c2a6ac49e3bafe279f50a8250061ed9577354feb27df63ad20d9b83f0e",
       "true_label_id": 0
     },
@@ -275,7 +275,7 @@
       "predicted_label_id": 1,
       "question": "Согласны ли вы, что оговорка относится к прокату, а не к фильму?",
       "record_id": "test-00000-of-00001.parquet#row=00000297",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "bf7d1e51dc74f915a74142c7493dee23831c259c8a3afa3654a35048b396a759",
       "true_label_id": 2
     },
@@ -290,7 +290,7 @@
       "predicted_label_id": 0,
       "question": "Согласны ли вы, что итог смешанный и neutral обоснован?",
       "record_id": "test-00000-of-00001.parquet#row=00000942",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "9fcdec51bee98ce13165c1679c3e4684e6611543b9fbc708eb9884f5b4da0278",
       "true_label_id": 1
     },
@@ -305,7 +305,7 @@
       "predicted_label_id": 2,
       "question": "Согласны ли вы, что положительная часть частично относится к другому фильму?",
       "record_id": "test-00000-of-00001.parquet#row=00004994",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "6fee50a71914add3bbbf057eb42fbe8377910da6fbccf4a74b7018b7c9e174ab",
       "true_label_id": 1
     },
@@ -318,7 +318,7 @@
       "predicted_label_id": 2,
       "question": "Согласны ли вы, что отрицательный смысл передан иронией?",
       "record_id": "test-00000-of-00001.parquet#row=00008350",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "f8e3168b099621b5f800fbf662ccd1d68d3dc761fa276ce239aba23269372ef2",
       "true_label_id": 0
     },
@@ -332,7 +332,7 @@
       "predicted_label_id": 0,
       "question": "Считаете ли вы метку positive однозначной?",
       "record_id": "test-00000-of-00001.parquet#row=00006843",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "1f574cca49b15ea958db650f83ee6750e035a87887825d871e5c9427499618b6",
       "true_label_id": 2
     },
@@ -346,7 +346,7 @@
       "predicted_label_id": 1,
       "question": "Как вы соотносите словесную оценку и оценку 6 из 10?",
       "record_id": "test-00000-of-00001.parquet#row=00005760",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "2640ddee28dccec0ac84f58e8242a8e35fc8ff3cb891266bb3db531d8d441276",
       "true_label_id": 0
     },
@@ -360,7 +360,7 @@
       "predicted_label_id": 1,
       "question": "Видите ли вы в тексте преобладающую положительную оценку?",
       "record_id": "test-00000-of-00001.parquet#row=00005265",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "5bc21bc48985ee682970157601b6cf04e486b2296af51fd015f69542ec5845f2",
       "true_label_id": 2
     },
@@ -374,7 +374,7 @@
       "predicted_label_id": 0,
       "question": "Согласны ли вы, что итог отзыва смешанный?",
       "record_id": "test-00000-of-00001.parquet#row=00002957",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "a3c36ff0b558f2b7ddf062171daa13a237b32820d4e920c1dddbc1d4d84dd775",
       "true_label_id": 1
     },
@@ -389,7 +389,7 @@
       "predicted_label_id": 2,
       "question": "Согласны ли вы, что итог смешанный?",
       "record_id": "test-00000-of-00001.parquet#row=00006679",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "205dd59b7d766b44ad1a35c703e6a5585d07f5212311d0760452351aa3c11338",
       "true_label_id": 1
     },
@@ -403,7 +403,7 @@
       "predicted_label_id": 2,
       "question": "Как вы прочитали этот отзыв: как положительный для семейной аудитории или как отрицательный?",
       "record_id": "test-00000-of-00001.parquet#row=00005367",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "3774824af5f1434d3493f461e9c90007eea45f1e28a8dc509462605bda2a3489",
       "true_label_id": 0
     },
@@ -416,7 +416,7 @@
       "predicted_label_id": 0,
       "question": "Видите ли вы в тексте что-либо, что могло бы указывать на отрицательную оценку?",
       "record_id": "test-00000-of-00001.parquet#row=00007181",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "4a4c832d57d9d65d3caa26c80b1683f753b60e0bbf474d259a9fe090a550a039",
       "true_label_id": 2
     },
@@ -429,7 +429,7 @@
       "predicted_label_id": 1,
       "question": "Согласны ли вы, что итог отрицательный?",
       "record_id": "test-00000-of-00001.parquet#row=00001690",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "f708c1689119b74f379171629a8466e7728cb8d03d647f5a18d04807c0af7732",
       "true_label_id": 0
     },
@@ -442,7 +442,7 @@
       "predicted_label_id": 1,
       "question": "Согласны ли вы, что основная часть текста не оценивает фильм?",
       "record_id": "test-00000-of-00001.parquet#row=00009268",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "6d7e0b9a9a77c57023b589c480b790555abadb2c199f284f6313799c2c77d6e4",
       "true_label_id": 2
     },
@@ -455,7 +455,7 @@
       "predicted_label_id": 0,
       "question": "Подтверждаете ли вы, что оценки фильма в тексте нет?",
       "record_id": "test-00000-of-00001.parquet#row=00000686",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "0fa9e9a9685ea53741bdc7533b66df1b0e93a0524971164f077aee239a06d6a4",
       "true_label_id": 1
     },
@@ -469,7 +469,7 @@
       "predicted_label_id": 2,
       "question": "Какую оценку ремейка вы видите в этом тексте?",
       "record_id": "test-00000-of-00001.parquet#row=00006698",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "f6930d67ab1a6b1c01dd6219c9fe97ae835cc97484c53194591f8c371d18ee7c",
       "true_label_id": 1
     },
@@ -483,7 +483,7 @@
       "predicted_label_id": 2,
       "question": "Считаете ли вы итог отрицательным?",
       "record_id": "test-00000-of-00001.parquet#row=00003030",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "0c74b5eacc831d73b3560b5606a4cf4b56c9b81c605689369dbc91e49d1a9970",
       "true_label_id": 0
     },
@@ -497,7 +497,7 @@
       "predicted_label_id": 0,
       "question": "Согласны ли вы, что оценка 8 из 10 определяет класс positive?",
       "record_id": "test-00000-of-00001.parquet#row=00003152",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "e55175a7ab4af85eec2a3e346b0e4ebed136a7dc679724d8d2daba7d7c7a3d64",
       "true_label_id": 2
     },
@@ -510,7 +510,7 @@
       "predicted_label_id": 1,
       "question": "Согласны ли вы с отрицательной меткой и тем, что похвала относится к книге?",
       "record_id": "test-00000-of-00001.parquet#row=00008822",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "1c32b367f394ed4abc133717db69d5a27389323e69388fa04ab7fe02a0902f46",
       "true_label_id": 0
     },
@@ -524,7 +524,7 @@
       "predicted_label_id": 1,
       "question": "Какую тональность вы видите в этом тексте?",
       "record_id": "test-00000-of-00001.parquet#row=00009485",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "ea5b9e85ed0fa47cd91faf8421144ecef2494b5a14674eba83908e4e5900447d",
       "true_label_id": 2
     },
@@ -538,7 +538,7 @@
       "predicted_label_id": 0,
       "question": "Согласны ли вы, что итог сдержанный и neutral обоснован?",
       "record_id": "test-00000-of-00001.parquet#row=00004654",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "a240e8e88ec12cbae36d96f458671ba3e9f5e9af52e9cdced79456530bc8146f",
       "true_label_id": 1
     },
@@ -551,12 +551,12 @@
       "predicted_label_id": 2,
       "question": "Подтверждаете ли вы, что это анонс без оценки фильма?",
       "record_id": "test-00000-of-00001.parquet#row=00001577",
-      "review_status": "pending",
+      "review_status": "reviewed",
       "text_sha256": "4e5d3f62144b37caed1736642c3742c337581f607f6a61b99b38cf0d6c97f020",
       "true_label_id": 1
     }
   ],
-  "human_review_status": "pending",
+  "human_review_status": "confirmed",
   "model": "baseline",
   "model_changed": false,
   "original_labels_changed": false,

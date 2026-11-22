@@ -174,6 +174,11 @@ def test_confirmed_requires_evidence_for_every_case(small_selection):
     edited["errors"][0]["explanation"] = "Изменено после проверки."
     with pytest.raises(ValueError, match="every"):
         t.validate_annotations(edited, small_selection, evidence)
+    counted = {**evidence, "verdict_counts": {"agree": len(small_selection), "partial": 0, "disagree": 0}}
+    t.validate_annotations(data, small_selection, counted)
+    counted["verdict_counts"] = {"agree": len(small_selection) - 1, "partial": 1, "disagree": 0}
+    with pytest.raises(ValueError, match="counts"):
+        t.validate_annotations(data, small_selection, counted)
 
 
 def test_pending_review_cannot_mark_single_cases_reviewed(small_selection):
@@ -258,6 +263,7 @@ def test_public_t15_files_contain_no_source_texts_or_voice_records(real):
 def test_local_review_packet_is_git_ignored():
     assert b.git_ignore_status(ROOT / t.LOCAL_PACKET, ROOT) in (True, None)
     assert b.git_ignore_status(ROOT / v.PRIVATE_JOURNAL, ROOT) in (True, None)
+    assert b.git_ignore_status(ROOT / v.PRIVATE_FULL_AGGREGATES, ROOT) in (True, None)
 
 
 # --------------------------------------------------------------------------- #
@@ -375,9 +381,17 @@ def test_public_guard_blocks_ids_and_transcripts():
         v.assert_public_safe(json.dumps({"x": records[1]["asr_text"]}, ensure_ascii=False), records)
 
 
+def thirty_records():
+    """Шесть видов исхода по пять раз: группы WER не меньше порога публикации."""
+    base = six_records()
+    return [{**r, "record_id": f"voice_{i * 6 + j + 1:03d}",
+             "asr_text": r["asr_text"] and f"распознанный текст номер {i * 6 + j + 1}"}
+            for i in range(5) for j, r in enumerate(base)]
+
+
 @pytest.fixture
 def voice_project(tmp_path, monkeypatch):
-    records = six_records()
+    records = thirty_records()
     ids = [r["record_id"] for r in records]
     results = json.loads(json.dumps(ev.summarize(records, expected_ids=ids)))
     metrics = json.dumps({"results": results}).encode()
@@ -400,7 +414,9 @@ def test_run_writes_private_journal_and_public_aggregates_only(voice_project):
     root, kwargs, records = voice_project
     summary = v.run(root, write=True, **kwargs)
     public = (root / v.PUBLIC_AGGREGATES).read_text(encoding="utf-8")
-    assert json.loads(public) == summary and summary["source"]["inference_run"] is False
+    assert json.loads(public) == v.public_view(summary) and summary["source"]["inference_run"] is False
+    assert "wer_by_transition" not in json.loads(public) and "wer_by_transition" in summary
+    assert json.loads((root / v.PRIVATE_FULL_AGGREGATES).read_text(encoding="utf-8")) == summary
     assert not any(r["record_id"] in public for r in records)
     assert not any(r["asr_text"] and r["asr_text"] in public for r in records)
     journal = json.loads((root / v.PRIVATE_JOURNAL).read_text(encoding="utf-8"))
@@ -421,7 +437,7 @@ def test_run_refuses_mismatching_or_missing_private_records(voice_project):
     private.unlink()
     with pytest.raises(ev.PreconditionError, match="not found"):
         v.run(root, **kwargs)
-    assert not (root / v.PUBLIC_AGGREGATES).exists() and not (root / v.PRIVATE_JOURNAL).exists()
+    assert not any((root / p).exists() for p in (v.PUBLIC_AGGREGATES, v.PRIVATE_JOURNAL, v.PRIVATE_FULL_AGGREGATES))
 
 
 def test_run_refuses_wrong_control_values(voice_project):
@@ -435,3 +451,87 @@ def test_run_without_private_results_in_this_repository():
     if (ROOT / v.PRIVATE_RECORDS).exists():
         pytest.skip("private T14 results present: run the tool itself on this machine")
     assert v.main(["--check"]) == 2
+
+
+def test_validate_aggregates_rejects_inconsistent_values(voice_project):
+    root, kwargs, _ = voice_project
+    summary = v.run(root, **kwargs)
+    public = json.loads((root / v.PUBLIC_METRICS).read_text())
+    args = {"metrics_sha256": kwargs["metrics_sha256"], "control": kwargs["control"]}
+    v.validate_aggregates(summary, public, **args)
+    v.validate_aggregates(v.public_view(summary), public, **args)
+    for path, delta in ((("prediction_change_directions", "negative->neutral"), 1),
+                        (("wer_by_prediction_change", "changed", "deletions"), -1),
+                        (("wer_by_transition", "improved", "substitutions"), 1),
+                        (("failures", "asr_empty"), 1), (("net_correct_change",), 1)):
+        broken = copy.deepcopy(summary)
+        node = broken
+        for key in path[:-1]:
+            node = node[key]
+        node[path[-1]] += delta
+        with pytest.raises(ev.DataMismatchError):
+            v.validate_aggregates(broken, public, **args)
+    renamed = {**v.public_view(summary), "withheld": {"wer_by_transition": "x"}}
+    with pytest.raises(ev.DataMismatchError, match="withheld"):
+        v.validate_aggregates(renamed, public, **args)
+
+
+def test_by_true_class_must_add_up_to_published_matrices():
+    records = six_records()[:5]
+    ids = [r["record_id"] for r in records]
+    results = json.loads(json.dumps(ev.summarize(records, expected_ids=ids)))
+    control = {"reference_macro_f1": results["reference"]["macro_f1"], "asr_macro_f1": results["asr"]["macro_f1"],
+               "delta_macro_f1": results["delta_macro_f1"], "wer": results["wer"]["wer"]}
+    summary = {"task": "T15", "source": {"t14_metrics": v.PUBLIC_METRICS, "t14_metrics_sha256": "0" * 64,
+                                         "private_records": v.PRIVATE_RECORDS, "inference_run": False},
+               "t14_control": control, "public_bounds": v.public_transition_bounds(results), **v.aggregate(records)}
+    args = {"metrics_sha256": "0" * 64, "control": control}
+    v.validate_aggregates(summary, {"results": results}, **args)
+    swapped = copy.deepcopy(summary)
+    swapped["by_true_class"]["neutral"]["improved"] -= 1
+    swapped["by_true_class"]["negative"]["improved"] += 1
+    with pytest.raises(ev.DataMismatchError, match="by_true_class"):
+        v.validate_aggregates(swapped, {"results": results}, **args)
+
+
+def test_public_view_blocks_small_wer_groups():
+    agg = v.aggregate(six_records())  # 4 изменившихся ответа, 2 неизменных
+    with pytest.raises(ev.PublicationBlockedError, match="smaller than"):
+        v.public_view(agg)
+
+
+def test_publish_from_full_writes_only_the_public_view(voice_project):
+    root, kwargs, _ = voice_project
+    args = {"metrics_sha256": kwargs["metrics_sha256"], "control": kwargs["control"]}
+    with pytest.raises(ev.PreconditionError, match="not found"):
+        v.publish_from_full(root, **args)
+    summary = v.run(root, **kwargs)
+    full = root / v.PRIVATE_FULL_AGGREGATES
+    full.parent.mkdir(parents=True, exist_ok=True)
+    full.write_text(json.dumps(v.public_view(summary)), encoding="utf-8")
+    with pytest.raises(ev.DataMismatchError, match="not a full"):
+        v.publish_from_full(root, **args)
+    tampered = copy.deepcopy(summary)
+    tampered["transitions"]["worsened"] += 1
+    tampered["transitions"]["stayed_correct"] -= 1
+    full.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ev.DataMismatchError):
+        v.publish_from_full(root, **args)
+    assert not (root / v.PUBLIC_AGGREGATES).exists()
+    full.write_text(json.dumps(summary), encoding="utf-8")
+    view = v.publish_from_full(root, **args)
+    assert json.loads((root / v.PUBLIC_AGGREGATES).read_text(encoding="utf-8")) == view == v.public_view(summary)
+    with pytest.raises(ev.PreconditionError, match="already exist"):
+        v.publish_from_full(root, **args)
+
+
+def test_published_voice_aggregates_agree_with_t14():
+    path = ROOT / v.PUBLIC_AGGREGATES
+    if not path.exists():
+        pytest.skip("voice aggregates not published yet")
+    agg = json.loads(path.read_text(encoding="utf-8"))
+    v.validate_aggregates(agg, v.load_public_metrics(ROOT))
+    assert agg["withheld"] == v.PUBLIC_WITHHELD and "wer_by_transition" not in agg
+    assert agg["transitions"] == {"stayed_correct": 26, "worsened": 4, "improved": 0,
+                                  "stayed_wrong_same": 5, "stayed_wrong_changed": 1}
+    assert path.read_text(encoding="utf-8") == json.dumps(agg, ensure_ascii=False, indent=2, sort_keys=True) + "\n"

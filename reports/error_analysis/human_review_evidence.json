@@ -1,0 +1,311 @@
+{
+  "analysis_snapshot": {
+    "hashed_fields": [
+      "record_id",
+      "categories",
+      "explanation",
+      "confidence"
+    ],
+    "path": "reports/error_analysis/text_error_annotations.json",
+    "serialization": "src.train_baseline.sha256_json over the list of hashed fields per case"
+  },
+  "annotations_changed_after_review": false,
+  "annotations_sha256": "5bbcfe05e750daa6a45b88220cf4ba5188bd2309b2d36b14af07d04395bce7e2",
+  "blind_review": false,
+  "comment_policy": "Замечания к частичным согласиям перенесены из сводки передачи без изменений. Их формулировки подготовлены ИИ и приняты участником; самостоятельное авторство участнику не приписывается. Исходные тексты не включены.",
+  "confirmation_basis": "Оксаной подтверждено личное прочтение всех 40 отзывов и принятие решений: 31 «согласна», 9 «частично согласна», 0 «не согласна». Решения переданы координатором 22.11.2026 вместе со сводкой передачи; содержимое и контрольные суммы сверены.",
+  "contains_full_review_texts": false,
+  "coordinator_decisions": [
+    {
+      "date": "2026-11-22",
+      "decision": "Разметка сохранена без изменений; замечание оставлено в доказательстве и отчёте; категория negation оспорена проверкой и не считается установленной причиной ошибки; девять partial сохранены; повторная проверка на этом этапе не проводится.",
+      "subject": "№36"
+    }
+  ],
+  "final_test_used_for_tuning": false,
+  "human_review_status": "confirmed",
+  "independent_annotation": false,
+  "model_changed": false,
+  "original_labels_changed": false,
+  "partial_positions": [
+    6,
+    9,
+    11,
+    15,
+    26,
+    32,
+    35,
+    36,
+    39
+  ],
+  "predictions_sha256": "5454d40cc0e5869ca44bb3edd2efde7c95bd09fc40784b34b6bb03429d900568",
+  "recorded_by": "AI agent: оформление по переданным решениям, в проверке не участвовал",
+  "recorder_flags": [
+    {
+      "kind": "disputed_category",
+      "note": "Принятое замечание противоречит категории negation по её определению (report.md, А.3): решающий итог отзыва — оценка «8 из 10», и она не подтверждает первоначальную трактовку через отрицание. По решению координатора от 22.11.2026 исходная разметка сохранена без изменения annotations_sha256, повторная проверка не проводилась. negation для этого случая не считается установленной причиной ошибки.",
+      "position": 36,
+      "record_id": "test-00000-of-00001.parquet#row=00003152"
+    },
+    {
+      "kind": "factual_detail",
+      "note": "В объяснении похвала отнесена ко второй половине фильма, по тексту положительно оценена последняя треть. Категории и исходная метка от этого не зависят.",
+      "position": 6,
+      "record_id": "test-00000-of-00001.parquet#row=00008369"
+    },
+    {
+      "kind": "confidence_caveat",
+      "note": "Уверенность high относится к ироническому прочтению и действует только с оговоркой из замечания: буквальное понимание рекомендации не исключено.",
+      "position": 11,
+      "record_id": "test-00000-of-00001.parquet#row=00009138"
+    },
+    {
+      "kind": "interpretation_caveat",
+      "note": "Вывод объяснения «метка positive обоснована» опирается на силу впечатления; по принятому замечанию это не то же, что положительный знак оценки. Категория context замечанием не затронута.",
+      "position": 32,
+      "record_id": "test-00000-of-00001.parquet#row=00009268"
+    }
+  ],
+  "review_date": "2026-11-22",
+  "review_method": "Проверка черновика ИИ-ассистента по полным текстам с видимыми исходными метками, ответами модели, категориями и объяснениями. Предложения и формулировки замечаний первоначально подготовлены ИИ и перепроверены тем же ИИ; решения приняты участником после личного прочтения. Это не независимая проверка второго эксперта.",
+  "reviewed_count": 40,
+  "reviewer": "Оксана, участник команды проекта",
+  "reviews": [
+    {
+      "position": 1,
+      "record_id": "test-00000-of-00001.parquet#row=00006341",
+      "verdict": "agree"
+    },
+    {
+      "position": 2,
+      "record_id": "test-00000-of-00001.parquet#row=00008868",
+      "verdict": "agree"
+    },
+    {
+      "position": 3,
+      "record_id": "test-00000-of-00001.parquet#row=00007783",
+      "verdict": "agree"
+    },
+    {
+      "position": 4,
+      "record_id": "test-00000-of-00001.parquet#row=00007103",
+      "verdict": "agree"
+    },
+    {
+      "position": 5,
+      "record_id": "test-00000-of-00001.parquet#row=00000581",
+      "verdict": "agree"
+    },
+    {
+      "note": "В объяснении неточно указана часть фильма, которую автор хвалит; это не меняет исходную метку.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 6,
+      "record_id": "test-00000-of-00001.parquet#row=00008369",
+      "verdict": "partial"
+    },
+    {
+      "position": 7,
+      "record_id": "test-00000-of-00001.parquet#row=00007082",
+      "verdict": "agree"
+    },
+    {
+      "position": 8,
+      "record_id": "test-00000-of-00001.parquet#row=00007751",
+      "verdict": "agree"
+    },
+    {
+      "note": "Наблюдаемый объём критики нельзя выдавать за установленную причину ответа модели.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 9,
+      "record_id": "test-00000-of-00001.parquet#row=00001023",
+      "verdict": "partial"
+    },
+    {
+      "position": 10,
+      "record_id": "test-00000-of-00001.parquet#row=00009141",
+      "verdict": "agree"
+    },
+    {
+      "note": "Ироническое прочтение возможно, но высокая уверенность в нём требует оговорки: рекомендация допускает буквальное понимание.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 11,
+      "record_id": "test-00000-of-00001.parquet#row=00009138",
+      "verdict": "partial"
+    },
+    {
+      "position": 12,
+      "record_id": "test-00000-of-00001.parquet#row=00003205",
+      "verdict": "agree"
+    },
+    {
+      "position": 13,
+      "record_id": "test-00000-of-00001.parquet#row=00009450",
+      "verdict": "agree"
+    },
+    {
+      "position": 14,
+      "record_id": "test-00000-of-00001.parquet#row=00003143",
+      "verdict": "agree"
+    },
+    {
+      "note": "Шкала числовой оценки не названа; автоматическое соответствие балла нейтральному классу не задано.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 15,
+      "record_id": "test-00000-of-00001.parquet#row=00004160",
+      "verdict": "partial"
+    },
+    {
+      "position": 16,
+      "record_id": "test-00000-of-00001.parquet#row=00002705",
+      "verdict": "agree"
+    },
+    {
+      "position": 17,
+      "record_id": "test-00000-of-00001.parquet#row=00005423",
+      "verdict": "agree"
+    },
+    {
+      "position": 18,
+      "record_id": "test-00000-of-00001.parquet#row=00006544",
+      "verdict": "agree"
+    },
+    {
+      "position": 19,
+      "record_id": "test-00000-of-00001.parquet#row=00005094",
+      "verdict": "agree"
+    },
+    {
+      "position": 20,
+      "record_id": "test-00000-of-00001.parquet#row=00000297",
+      "verdict": "agree"
+    },
+    {
+      "position": 21,
+      "record_id": "test-00000-of-00001.parquet#row=00000942",
+      "verdict": "agree"
+    },
+    {
+      "position": 22,
+      "record_id": "test-00000-of-00001.parquet#row=00004994",
+      "verdict": "agree"
+    },
+    {
+      "position": 23,
+      "record_id": "test-00000-of-00001.parquet#row=00008350",
+      "verdict": "agree"
+    },
+    {
+      "position": 24,
+      "record_id": "test-00000-of-00001.parquet#row=00006843",
+      "verdict": "agree"
+    },
+    {
+      "position": 25,
+      "record_id": "test-00000-of-00001.parquet#row=00005760",
+      "verdict": "agree"
+    },
+    {
+      "note": "Нужно разделить личное отношение автора, качество перевода и предположение о реакции других зрителей.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 26,
+      "record_id": "test-00000-of-00001.parquet#row=00005265",
+      "verdict": "partial"
+    },
+    {
+      "position": 27,
+      "record_id": "test-00000-of-00001.parquet#row=00002957",
+      "verdict": "agree"
+    },
+    {
+      "position": 28,
+      "record_id": "test-00000-of-00001.parquet#row=00006679",
+      "verdict": "agree"
+    },
+    {
+      "position": 29,
+      "record_id": "test-00000-of-00001.parquet#row=00005367",
+      "verdict": "agree"
+    },
+    {
+      "position": 30,
+      "record_id": "test-00000-of-00001.parquet#row=00007181",
+      "verdict": "agree"
+    },
+    {
+      "position": 31,
+      "record_id": "test-00000-of-00001.parquet#row=00001690",
+      "verdict": "agree"
+    },
+    {
+      "note": "Сила эмоционального впечатления не тождественна положительному знаку оценки.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 32,
+      "record_id": "test-00000-of-00001.parquet#row=00009268",
+      "verdict": "partial"
+    },
+    {
+      "position": 33,
+      "record_id": "test-00000-of-00001.parquet#row=00000686",
+      "verdict": "agree"
+    },
+    {
+      "position": 34,
+      "record_id": "test-00000-of-00001.parquet#row=00006698",
+      "verdict": "agree"
+    },
+    {
+      "note": "Следует различать начальную отрицательную установку, последующую оценку и мораль сюжета; объём похвалы не доказывает причину ответа модели.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 35,
+      "record_id": "test-00000-of-00001.parquet#row=00003030",
+      "verdict": "partial"
+    },
+    {
+      "note": "Отрицание в заголовке списка недостатков ещё не означает, что решающая общая оценка выражена отрицанием.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 36,
+      "record_id": "test-00000-of-00001.parquet#row=00003152",
+      "verdict": "partial"
+    },
+    {
+      "position": 37,
+      "record_id": "test-00000-of-00001.parquet#row=00008822",
+      "verdict": "agree"
+    },
+    {
+      "position": 38,
+      "record_id": "test-00000-of-00001.parquet#row=00009485",
+      "verdict": "agree"
+    },
+    {
+      "note": "Итоговая рекомендация в тексте есть; её нужно отличать от однозначного полярного вердикта. Основание для mixed требует осторожной формулировки.",
+      "note_origin": "сформулировано ИИ, принято участником",
+      "position": 39,
+      "record_id": "test-00000-of-00001.parquet#row=00004654",
+      "verdict": "partial"
+    },
+    {
+      "position": 40,
+      "record_id": "test-00000-of-00001.parquet#row=00001577",
+      "verdict": "agree"
+    }
+  ],
+  "schema_version": 1,
+  "selected_ids_sha256": "4b20f4619c878faaed1721c863ae043ae6da431739092cf8b7d166bbbcad0ca8",
+  "source": {
+    "archive_sha256": "d18396a35f5a5726c6ab86665ae52584472f6831af2530c5b98c9ed145664064",
+    "contains_full_texts": false,
+    "decisions_content": "только 40 ID и решения, в порядке выборки",
+    "decisions_file": "text_review_decisions.json",
+    "decisions_sha256": "59c2baab0e0a931588a6e715724ed0779b24ece3b25dc291e6125820f706ba48",
+    "location": "закрытые материалы artifacts/t15/, вне Git"
+  },
+  "status_meaning": "confirmed подтверждает, что человеческая проверка всех 40 случаев проведена, включая 9 частичных согласий. Безоговорочного принятия всех объяснений статус не означает: замечания и пометки ниже ограничивают интерпретацию соответствующих случаев.",
+  "task": "T15",
+  "timezone": "Europe/Moscow",
+  "verdict_counts": {
+    "agree": 31,
+    "disagree": 0,
+    "partial": 9
+  }
+}

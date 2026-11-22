@@ -69,7 +69,7 @@
       "low": 3,
       "medium": 32
     },
-    "human_review_status": "pending"
+    "human_review_status": "confirmed"
   },
   "errors": {
     "by_direction": {
