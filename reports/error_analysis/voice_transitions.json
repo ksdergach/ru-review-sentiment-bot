@@ -99,27 +99,8 @@
     "stayed_wrong_same": 5,
     "worsened": 4
   },
-  "wer_by_prediction_change": {
-    "changed": {
-      "deletions": 4,
-      "insertions": 1,
-      "records": 5,
-      "records_without_word_errors": 0,
-      "reference_words": 116,
-      "substitutions": 12,
-      "wer": 0.14655172413793102
-    },
-    "unchanged": {
-      "deletions": 9,
-      "insertions": 6,
-      "records": 31,
-      "records_without_word_errors": 1,
-      "reference_words": 687,
-      "substitutions": 94,
-      "wer": 0.1586608442503639
-    }
-  },
   "withheld": {
-    "wer_by_transition": "withheld: small transition groups; together with wer_by_prediction_change and the original T14 CSV of PR #45 they reveal per-record WER. Full aggregates stay private in artifacts/t15/voice_transitions_full.json"
+    "wer_by_prediction_change": "withheld: with the original T14 CSV of PR #45 group membership is known, so group WER would describe individual records. Full aggregates stay private in artifacts/t15/voice_transitions_full.json",
+    "wer_by_transition": "withheld: with the original T14 CSV of PR #45 group membership is known, so group WER would describe individual records. Full aggregates stay private in artifacts/t15/voice_transitions_full.json"
   }
 }

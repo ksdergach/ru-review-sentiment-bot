@@ -37,6 +37,8 @@ CATEGORIES = ("mixed", "unclear_label", "sarcasm", "short", "neutral_confusion",
 CONFIDENCE = ("high", "medium", "low")
 VERDICTS = ("agree", "partial", "disagree")
 AUTHOR = "AI agent (draft for participant review)"
+# SHA-256 исходного файла решений участника (text_review_decisions.json, 22.11.2026).
+ACCEPTED_DECISIONS_SHA256 = "59c2baab0e0a931588a6e715724ed0779b24ece3b25dc291e6125820f706ba48"
 
 PREDICTIONS = "reports/evaluation/predictions.csv"
 FINAL_METRICS = "reports/evaluation/final_metrics.json"
@@ -199,7 +201,14 @@ def entries_sha256(entries: list[dict]) -> str:
                                  for e in entries])
 
 
-def validate_annotations(data: dict, selected: list[dict], evidence: dict | None = None) -> dict:
+def decisions_sha256(reviews: list[dict]) -> str:
+    """SHA-256 решений в форме исходного файла участника: пары ID/решение в порядке выборки."""
+    payload = {"reviews": [{"record_id": v.get("record_id"), "verdict": v.get("verdict")} for v in reviews]}
+    return hashlib.sha256((json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")).hexdigest()
+
+
+def validate_annotations(data: dict, selected: list[dict], evidence: dict | None = None,
+                         expected_decisions_sha256: str | None = None) -> dict:
     """Разметка относится к этой выборке; ``confirmed`` — только с записанной проверкой участника."""
     entries = data.get("errors", [])
     if [e.get("record_id") for e in entries] != [r["record_id"] for r in selected]:
@@ -234,8 +243,23 @@ def validate_annotations(data: dict, selected: list[dict], evidence: dict | None
             or any(e["review_status"] != "reviewed" for e in entries)):
         raise ValueError("Human review evidence does not cover every selected case")
     counts = Counter(v["verdict"] for v in reviews)
-    if "verdict_counts" in evidence and evidence["verdict_counts"] != {k: counts[k] for k in VERDICTS}:
+    if evidence.get("verdict_counts") != {k: counts[k] for k in VERDICTS} or evidence.get("reviewed_count") != len(reviews):
         raise ValueError("Human review verdict counts do not match the reviews")
+    actual = decisions_sha256(reviews)
+    if (evidence.get("source", {}).get("decisions_sha256") != actual
+            or (expected_decisions_sha256 is not None and actual != expected_decisions_sha256)):
+        raise ValueError("Human review decisions differ from the participant's decisions file")
+    partial = [i for i, v in enumerate(reviews, 1) if v["verdict"] == "partial"]
+    if evidence.get("partial_positions") != partial:
+        raise ValueError("Partial positions do not match the reviews")
+    for i, v in enumerate(reviews, 1):  # замечание — ровно у частичного согласия своей позиции
+        if v.get("position") != i or bool(str(v.get("note", "")).strip()) != (v["verdict"] == "partial"):
+            raise ValueError(f"Review note/position mismatch at position {i}")
+    for flag in evidence.get("recorder_flags", []):
+        pos = flag.get("position")
+        if (not isinstance(pos, int) or isinstance(pos, bool) or not 1 <= pos <= len(entries)
+                or flag.get("record_id") != entries[pos - 1]["record_id"]):
+            raise ValueError("Recorder flag does not match its position")
     return data
 
 
@@ -346,7 +370,8 @@ def analyze(root: Path = ROOT, *, need_annotations: bool = True) -> dict:
     if (root / ANNOTATIONS).exists():
         evidence_path = root / REVIEW_EVIDENCE
         evidence = baseline.read_json(evidence_path) if evidence_path.exists() else None
-        annotations = validate_annotations(baseline.read_json(root / ANNOTATIONS), selected, evidence)
+        annotations = validate_annotations(baseline.read_json(root / ANNOTATIONS), selected, evidence,
+                                           ACCEPTED_DECISIONS_SHA256)
     elif need_annotations:
         raise FileNotFoundError(f"Missing {ANNOTATIONS}; run --review-packet to prepare the draft")
     summary = build_summary(records, errors, selected, metrics, annotations)

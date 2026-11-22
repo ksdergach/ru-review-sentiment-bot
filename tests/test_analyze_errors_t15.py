@@ -153,10 +153,18 @@ def test_annotations_must_follow_selection_order(small_selection):
         t.validate_annotations(data, small_selection)
 
 
-def evidence_for(selected, data):
+def evidence_for(selected, data, verdicts=None):
+    verdicts = verdicts or ["agree"] * len(data["errors"])
+    reviews = [{"position": i, "record_id": e["record_id"], "verdict": v,
+                **({"note": "Замечание."} if v == "partial" else {})}
+               for i, (e, v) in enumerate(zip(data["errors"], verdicts), 1)]
     return {"selected_ids_sha256": b.sha256_json([r["record_id"] for r in selected]),
             "annotations_sha256": t.entries_sha256(data["errors"]),
-            "reviews": [{"record_id": e["record_id"], "verdict": "agree"} for e in data["errors"]]}
+            "source": {"decisions_sha256": t.decisions_sha256(reviews)},
+            "reviewed_count": len(reviews),
+            "verdict_counts": {k: verdicts.count(k) for k in t.VERDICTS},
+            "partial_positions": [i for i, v in enumerate(verdicts, 1) if v == "partial"],
+            "reviews": reviews}
 
 
 def test_confirmed_requires_evidence_for_every_case(small_selection):
@@ -174,11 +182,56 @@ def test_confirmed_requires_evidence_for_every_case(small_selection):
     edited["errors"][0]["explanation"] = "Изменено после проверки."
     with pytest.raises(ValueError, match="every"):
         t.validate_annotations(edited, small_selection, evidence)
-    counted = {**evidence, "verdict_counts": {"agree": len(small_selection), "partial": 0, "disagree": 0}}
-    t.validate_annotations(data, small_selection, counted)
-    counted["verdict_counts"] = {"agree": len(small_selection) - 1, "partial": 1, "disagree": 0}
+    counted = {**evidence, "verdict_counts": {"agree": len(small_selection) - 1, "partial": 1, "disagree": 0}}
     with pytest.raises(ValueError, match="counts"):
         t.validate_annotations(data, small_selection, counted)
+
+
+@pytest.fixture
+def confirmed(small_selection):
+    data = annotated(small_selection, review_status="reviewed")
+    data["human_review_status"] = "confirmed"
+    verdicts = ["partial" if i == 1 else "agree" for i in range(len(small_selection))]
+    evidence = evidence_for(small_selection, data, verdicts)
+    t.validate_annotations(data, small_selection, evidence, evidence["source"]["decisions_sha256"])
+    return data, evidence
+
+
+def _swap_verdicts(ev_):
+    r = ev_["reviews"]
+    r[0]["verdict"], r[1]["verdict"] = r[1]["verdict"], r[0]["verdict"]
+    r[0]["note"] = r[1].pop("note")
+
+
+@pytest.mark.parametrize("tamper, message", [
+    (_swap_verdicts, "decisions"),  # счётчики, позиции и замечания согласованы, сумма — нет
+    (lambda e: e["source"].update(decisions_sha256="0" * 64), "decisions"),
+    (lambda e: e.pop("verdict_counts"), "counts"),
+    (lambda e: e.update(partial_positions=[1]), "Partial positions"),
+    (lambda e: e["reviews"][0].update(note="Чужое замечание."), "note"),
+    (lambda e: e["reviews"][1].pop("note"), "note"),
+    (lambda e: e["reviews"][1].update(position=5), "position"),
+    (lambda e: e["reviews"].pop(), "every"),
+    (lambda e: e["reviews"].__setitem__(1, dict(e["reviews"][0])), "every"),
+    (lambda e: e.update(recorder_flags=[{"position": 1, "record_id": e["reviews"][1]["record_id"]}]), "flag"),
+])
+def test_tampered_review_evidence_is_rejected(small_selection, confirmed, tamper, message):
+    data, evidence = confirmed
+    accepted = evidence["source"]["decisions_sha256"]
+    broken = copy.deepcopy(evidence)
+    tamper(broken)
+    if tamper is _swap_verdicts:  # подделка согласована во всём, кроме исходной суммы решений
+        broken["partial_positions"] = [1]
+        broken["source"]["decisions_sha256"] = t.decisions_sha256(broken["reviews"])
+    with pytest.raises(ValueError, match=message):
+        t.validate_annotations(data, small_selection, broken, accepted)
+
+
+def test_published_evidence_matches_original_decisions_file():
+    evidence = json.loads((ROOT / t.REVIEW_EVIDENCE).read_text(encoding="utf-8"))
+    assert t.decisions_sha256(evidence["reviews"]) == t.ACCEPTED_DECISIONS_SHA256
+    assert evidence["source"]["decisions_sha256"] == t.ACCEPTED_DECISIONS_SHA256
+    assert evidence["verdict_counts"] == {"agree": 31, "partial": 9, "disagree": 0}
 
 
 def test_pending_review_cannot_mark_single_cases_reviewed(small_selection):
@@ -415,7 +468,9 @@ def test_run_writes_private_journal_and_public_aggregates_only(voice_project):
     summary = v.run(root, write=True, **kwargs)
     public = (root / v.PUBLIC_AGGREGATES).read_text(encoding="utf-8")
     assert json.loads(public) == v.public_view(summary) and summary["source"]["inference_run"] is False
-    assert "wer_by_transition" not in json.loads(public) and "wer_by_transition" in summary
+    assert "wer_by_transition" in summary and "wer_by_prediction_change" in summary
+    assert not {"wer_by_transition", "wer_by_prediction_change"} & set(json.loads(public))
+    assert "records_without_word_errors" not in public
     assert json.loads((root / v.PRIVATE_FULL_AGGREGATES).read_text(encoding="utf-8")) == summary
     assert not any(r["record_id"] in public for r in records)
     assert not any(r["asr_text"] and r["asr_text"] in public for r in records)
@@ -494,10 +549,61 @@ def test_by_true_class_must_add_up_to_published_matrices():
         v.validate_aggregates(swapped, {"results": results}, **args)
 
 
-def test_public_view_blocks_small_wer_groups():
-    agg = v.aggregate(six_records())  # 4 изменившихся ответа, 2 неизменных
-    with pytest.raises(ev.PublicationBlockedError, match="smaller than"):
-        v.public_view(agg)
+def _five_record_summary():
+    records = six_records()[:5]  # без сбоев
+    ids = [r["record_id"] for r in records]
+    results = json.loads(json.dumps(ev.summarize(records, expected_ids=ids)))
+    control = {"reference_macro_f1": results["reference"]["macro_f1"], "asr_macro_f1": results["asr"]["macro_f1"],
+               "delta_macro_f1": results["delta_macro_f1"], "wer": results["wer"]["wer"]}
+    summary = {"task": "T15", "source": {"t14_metrics": v.PUBLIC_METRICS, "t14_metrics_sha256": "0" * 64,
+                                         "private_records": v.PRIVATE_RECORDS, "inference_run": False},
+               "t14_control": control, "public_bounds": v.public_transition_bounds(results), **v.aggregate(records)}
+    return summary, {"results": results}, {"metrics_sha256": "0" * 64, "control": control}
+
+
+def test_public_view_has_no_group_wer_and_no_unknown_nested_fields():
+    summary, public, args = _five_record_summary()
+    noisy = copy.deepcopy(summary)
+    noisy["transitions"]["note"] = "приватное"
+    noisy["source"]["note"] = "приватное"
+    noisy["wer_by_prediction_change"]["changed"]["note"] = "приватное"
+    view = v.public_view(noisy)
+    assert view == v.public_view(summary)
+    assert "приватное" not in json.dumps(view, ensure_ascii=False)
+    assert "wer_by_transition" not in view and "wer_by_prediction_change" not in view
+    assert "records_without_word_errors" not in json.dumps(view)
+    assert set(view["withheld"]) == {"wer_by_transition", "wer_by_prediction_change"}
+    v.validate_aggregates(view, public, **args)
+    assert view["transitions"] == summary["transitions"] and view["t14_control"] == summary["t14_control"]
+
+
+@pytest.mark.parametrize("tamper", [
+    lambda s: s["failures"].update(worsened_with_asr_failure=1),  # ухудшение «со сбоем» при нуле сбоев
+    lambda s: s["transitions"].update(improved=True),  # bool вместо счётчика
+    lambda s: s["by_true_class"]["neutral"].update(improved=True),
+    lambda s: s["failures"].update(note=0),
+    lambda s: s["wer_by_prediction_change"]["changed"].update(note=0),
+])
+def test_validate_aggregates_rejects_impossible_counts(tamper):
+    summary, public, args = _five_record_summary()
+    v.validate_aggregates(summary, public, **args)
+    broken = copy.deepcopy(summary)
+    tamper(broken)
+    with pytest.raises(ev.DataMismatchError):
+        v.validate_aggregates(broken, public, **args)
+
+
+def test_validate_aggregates_rejects_negative_wer_compensated_by_another_group():
+    summary, public, args = _five_record_summary()
+    broken = copy.deepcopy(summary)
+    groups = broken["wer_by_transition"]
+    for key, delta in (("improved", -1), ("stayed_wrong_same", 1)):  # сумма удалений прежняя
+        g = groups[key]
+        g["deletions"] += delta
+        g["wer"] = (g["substitutions"] + g["deletions"] + g["insertions"]) / g["reference_words"]
+    assert groups["improved"]["deletions"] < 0
+    with pytest.raises(ev.DataMismatchError, match="wer_by_transition"):
+        v.validate_aggregates(broken, public, **args)
 
 
 def test_publish_from_full_writes_only_the_public_view(voice_project):
@@ -518,6 +624,12 @@ def test_publish_from_full_writes_only_the_public_view(voice_project):
     with pytest.raises(ev.DataMismatchError):
         v.publish_from_full(root, **args)
     assert not (root / v.PUBLIC_AGGREGATES).exists()
+    extra = copy.deepcopy(summary)
+    extra["wer_by_prediction_change"]["changed"]["note"] = "приватное"
+    full.write_text(json.dumps(extra), encoding="utf-8")
+    with pytest.raises(ev.DataMismatchError, match="wer_by_prediction_change"):
+        v.publish_from_full(root, **args)
+    assert not (root / v.PUBLIC_AGGREGATES).exists()
     full.write_text(json.dumps(summary), encoding="utf-8")
     view = v.publish_from_full(root, **args)
     assert json.loads((root / v.PUBLIC_AGGREGATES).read_text(encoding="utf-8")) == view == v.public_view(summary)
@@ -531,7 +643,24 @@ def test_published_voice_aggregates_agree_with_t14():
         pytest.skip("voice aggregates not published yet")
     agg = json.loads(path.read_text(encoding="utf-8"))
     v.validate_aggregates(agg, v.load_public_metrics(ROOT))
-    assert agg["withheld"] == v.PUBLIC_WITHHELD and "wer_by_transition" not in agg
+    assert agg["withheld"] == v.PUBLIC_WITHHELD
+    assert not {"wer_by_transition", "wer_by_prediction_change"} & set(agg)
+    assert agg["records"] == 36 and agg["prediction_changed"] == 5 and agg["net_correct_change"] == -4
+    assert all(n == 0 for n in agg["failures"].values())
+    assert agg["t14_control"]["wer"] == 126 / 803
     assert agg["transitions"] == {"stayed_correct": 26, "worsened": 4, "improved": 0,
                                   "stayed_wrong_same": 5, "stayed_wrong_changed": 1}
     assert path.read_text(encoding="utf-8") == json.dumps(agg, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+
+
+def test_public_t15_files_contain_no_group_wer_or_unsupported_causal_claims():
+    public_dir = ROOT / t.PUBLIC_DIR
+    texts = {p.name: p.read_text(encoding="utf-8") for p in sorted(public_dir.iterdir()) if p.is_file()}
+    for name, payload in texts.items():
+        assert "records_without_word_errors" not in payload, name
+        assert not re.search(r'"wer_by_(?:transition|prediction_change)"\s*:\s*\{', payload), name
+    report = texts["report.md"]
+    for phrase in ("35 из 36", "без единой ошибки", "0,1466", "0,1587", "0,147 против", "17 / 116",
+                   "ничего не раскрывают", "потеря слабого нейтрального сигнала", "не отличаются"):
+        assert phrase.lower() not in report.lower(), phrase
+    assert "гипотеза, не проверенная причинным экспериментом" in report.lower()

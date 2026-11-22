@@ -10,7 +10,7 @@
 
 Перед расчётом приватные записи сверяются с опубликованным ``reports/voice_eval/metrics.json``:
 пересчитанная сводка T14 должна совпасть полностью. Публично пишутся только агрегаты
-без ID и меток отдельных записей и без WER по группам переходов; построчные переходы и
+без ID и меток отдельных записей и без группового WER; построчные переходы и
 полные агрегаты — только в ``artifacts/t15/``.
 """
 from __future__ import annotations
@@ -45,15 +45,18 @@ CONTROL_TOLERANCE = 5e-11
 TRANSITIONS = ("stayed_correct", "worsened", "improved", "stayed_wrong_same", "stayed_wrong_changed")
 LABELS = ev.LABELS
 # Первоначальный публичный CSV T14 (история PR #45) содержит предсказания по каждому ID, поэтому
-# состав группы «ответ изменился» известен. Группы переходов малы (в T14 одна — из одной записи), и
-# их разность с wer_by_prediction_change дала бы WER и длину эталона отдельной записи с известным ID.
-PUBLIC_WITHHELD = {"wer_by_transition": "withheld: small transition groups; together with wer_by_prediction_change "
-                                        "and the original T14 CSV of PR #45 they reveal per-record WER. "
-                                        f"Full aggregates stay private in {PRIVATE_FULL_AGGREGATES}"}
-MIN_PUBLIC_WER_GROUP = 5  # обычный минимальный размер публикуемой группы; пустая группа допустима
+# состав групп по смене ответа и по переходам частично известен. Любой групповой WER тогда говорит
+# что-то о конкретных записях (например, «у каждой есть ошибки слов»), поэтому публично его нет.
+_WER_WITHHELD = ("withheld: with the original T14 CSV of PR #45 group membership is known, so group WER "
+                 f"would describe individual records. Full aggregates stay private in {PRIVATE_FULL_AGGREGATES}")
+PUBLIC_WITHHELD = {"wer_by_transition": _WER_WITHHELD, "wer_by_prediction_change": _WER_WITHHELD}
 AGGREGATE_KEYS = frozenset({"task", "source", "t14_control", "public_bounds", "records", "transitions",
                             "net_correct_change", "prediction_changed", "prediction_change_directions",
                             "failures", "wer_by_transition", "wer_by_prediction_change", "by_true_class"})
+FAILURE_KEYS = ("asr_empty", "asr_error", "reference_classifier_errors", "asr_classifier_errors",
+                "worsened_with_asr_failure")
+WER_GROUP_KEYS = frozenset({"records", "substitutions", "deletions", "insertions", "reference_words", "wer",
+                            "records_without_word_errors"})
 
 
 # --------------------------------------------------------------------------- #
@@ -182,12 +185,19 @@ def check_consistency(agg: Mapping[str, Any], results: Mapping[str, Any]) -> Non
             raise ev.DataMismatchError(f"Transitions outside bounds implied by T14 matrices: {key}")
 
 
+def _is_count(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
 def _check_wer_groups(groups: Mapping[str, Any], sizes: Mapping[str, int], totals: Mapping[str, Any]) -> bool:
-    if set(groups) != set(sizes):
+    if set(groups) != set(sizes) or any(set(g) != WER_GROUP_KEYS for g in groups.values()):
         return False
     for key, g in groups.items():
+        if not all(_is_count(g[k]) for k in WER_GROUP_KEYS - {"wer"}):
+            return False
         errors = g["substitutions"] + g["deletions"] + g["insertions"]
-        if (g["records"] != sizes[key] or not 0 <= g["records_without_word_errors"] <= g["records"]
+        if (g["records"] != sizes[key] or g["records_without_word_errors"] > g["records"]
+                or (g["records"] == 0 and (errors or g["reference_words"]))
                 or g["wer"] != (errors / g["reference_words"] if g["reference_words"] else None)):
             return False
     fields = ("substitutions", "deletions", "insertions", "reference_words")
@@ -216,14 +226,16 @@ def validate_aggregates(agg: Mapping[str, Any], public: Mapping[str, Any], *,
     if agg["public_bounds"] != public_transition_bounds(results) or agg["records"] != results["records"]:
         fail("public_bounds/records")
     t = agg["transitions"]
-    if set(t) != set(TRANSITIONS):
+    if set(t) != set(TRANSITIONS) or not all(_is_count(n) for n in t.values()):
         fail("transitions")
     check_consistency(agg, results)
-    if agg["net_correct_change"] != t["improved"] - t["worsened"]:
+    if (not isinstance(agg["net_correct_change"], int) or isinstance(agg["net_correct_change"], bool)
+            or agg["net_correct_change"] != t["improved"] - t["worsened"]):
         fail("net_correct_change")
     directions = agg["prediction_change_directions"]
     changed = t["worsened"] + t["improved"] + t["stayed_wrong_changed"]
-    if agg["prediction_changed"] != changed or sum(directions.values()) != changed:
+    if (not _is_count(agg["prediction_changed"]) or agg["prediction_changed"] != changed
+            or not all(_is_count(n) for n in directions.values()) or sum(directions.values()) != changed):
         fail("prediction_changed")
     columns = results["reference"]["confusion_matrix"]["columns"]
     ref_cols, asr_cols = ([sum(col) for col in zip(*results[m]["confusion_matrix"]["values"])] for m in ("reference", "asr"))
@@ -237,16 +249,20 @@ def validate_aggregates(agg: Mapping[str, Any], public: Mapping[str, Any], *,
     if any(r + flow[c] != a for c, r, a in zip(columns, ref_cols, asr_cols)):
         fail("prediction_change_directions")
     f, pf = agg["failures"], results["failures"]
+    if set(f) != set(FAILURE_KEYS) or not all(_is_count(n) for n in f.values()):
+        fail("failures")
     if (f["asr_empty"], f["asr_error"], f["reference_classifier_errors"], f["asr_classifier_errors"]) != (
             pf["asr_status"]["empty"], pf["asr_status"]["error"], pf["reference_classifier_errors"],
-            pf["asr_classifier_errors"]) or not 0 <= f["worsened_with_asr_failure"] <= t["worsened"]:
+            pf["asr_classifier_errors"]) or f["worsened_with_asr_failure"] > min(
+            t["worsened"], f["asr_empty"] + f["asr_error"]):
         fail("failures")
     by_class, failures_present = agg["by_true_class"], any(f[k] for k in f if k != "worsened_with_asr_failure")
     if failures_present or isinstance(by_class, str):
         if not (failures_present and isinstance(by_class, str) and by_class.startswith("withheld")):
             fail("by_true_class")
     else:
-        if set(by_class) != set(LABELS) or any(set(row) != set(TRANSITIONS) for row in by_class.values()):
+        if set(by_class) != set(LABELS) or any(set(row) != set(TRANSITIONS) or not all(map(_is_count, row.values()))
+                                               for row in by_class.values()):
             fail("by_true_class")
         for i, label in enumerate(LABELS):
             row, ref, asr = (by_class[label], results["reference"]["confusion_matrix"]["values"][i],
@@ -256,21 +272,35 @@ def validate_aggregates(agg: Mapping[str, Any], public: Mapping[str, Any], *,
                 fail(f"by_true_class: {label}")
         if any(sum(by_class[label][k] for label in LABELS) != t[k] for k in TRANSITIONS):
             fail("by_true_class totals")
-    if not _check_wer_groups(agg["wer_by_prediction_change"],
-                             {"changed": changed, "unchanged": agg["records"] - changed}, results["wer"]):
+    if full and not _check_wer_groups(agg["wer_by_prediction_change"],
+                                      {"changed": changed, "unchanged": agg["records"] - changed}, results["wer"]):
         fail("wer_by_prediction_change")
     if full and not _check_wer_groups(agg["wer_by_transition"], t, results["wer"]):
         fail("wer_by_transition")
 
 
 def public_view(summary: Mapping[str, Any]) -> dict[str, Any]:
-    """Публичное представление полных агрегатов: без групп WER, разность которых выделяет запись."""
-    small = [k for k, g in summary["wer_by_prediction_change"].items() if 0 < g["records"] < MIN_PUBLIC_WER_GROUP]
-    if small:
-        raise ev.PublicationBlockedError(f"WER group smaller than {MIN_PUBLIC_WER_GROUP} records: "
-                                         f"{', '.join(small)}; nothing written")
-    view = {k: v for k, v in summary.items() if k not in PUBLIC_WITHHELD}
-    return {**view, "withheld": dict(PUBLIC_WITHHELD)}
+    """Публичное представление, собранное явно по разрешённым полям; групповой WER не переносится."""
+    by_class = summary["by_true_class"]
+    bounds = summary["public_bounds"]
+    return {
+        "task": summary["task"],
+        "source": {k: summary["source"][k] for k in ("t14_metrics", "t14_metrics_sha256", "private_records",
+                                                     "inference_run")},
+        "t14_control": {k: summary["t14_control"][k] for k in CONTROL},
+        "public_bounds": {"by_true_class": {label: {k: list(bounds["by_true_class"][label][k])
+                                                    for k in ("worsened", "improved")} for label in LABELS},
+                          "worsened": list(bounds["worsened"]), "improved": list(bounds["improved"])},
+        "records": summary["records"],
+        "transitions": {k: summary["transitions"][k] for k in TRANSITIONS},
+        "net_correct_change": summary["net_correct_change"],
+        "prediction_changed": summary["prediction_changed"],
+        "prediction_change_directions": {str(k): n for k, n in summary["prediction_change_directions"].items()},
+        "failures": {k: summary["failures"][k] for k in FAILURE_KEYS},
+        "by_true_class": by_class if isinstance(by_class, str) else
+        {label: {k: by_class[label][k] for k in TRANSITIONS} for label in LABELS},
+        "withheld": dict(PUBLIC_WITHHELD),
+    }
 
 
 def _dump(data: Mapping[str, Any]) -> str:
