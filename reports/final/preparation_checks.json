@@ -112,7 +112,7 @@
     }
   },
   "issue_acceptance": {
-    "C1": "verified_static: commands match argparse/modules/configs; T13/T14 runs and T16 independent check are cited, not repeated. Manual Telegram run with the selected baseline was not performed",
+    "C1": "verified: commands match existing modules, argparse and configs (static check, 34 commands); accepted T13/T14 runs and T16 results apply to the current code (src/bot.py, src/classifier.py, src/speech.py, configs and requirements.txt unchanged since T16 commit 1c74861 and T13 run commit 2b6f7d2; tools/evaluate_voice.py changed after T14 run commit a0e7a10 only within accepted PR #45: public-output label-disclosure guard and timing summary; record evaluation, classification and ASR calls unchanged); model bundles identified by sha256/revision in reports/voice_eval/metrics.json and report sha256 in reports/evaluation/final_metrics.json; T16 independent check (RuBERT, 825 passed / 1 skipped) accounted for; independent technical review of HEAD b4be925: APPROVED, PASS for C1-C4. Limitations: commands were not re-executed in T17; T16 checked RuBERT; no manual end-to-end Telegram run with the selected baseline",
     "C2": "verified: real T13 tables for both models, T14 reference/ASR tables, WER, failures, timings and limitations from accepted JSON",
     "C3": "verified: source, revision, license, configs, freeze and result checksums and artifact paths listed",
     "C4": "verified_for_diff: documentation-only changes; no secrets, audio, models or text exports; no pending fields presented as done",
