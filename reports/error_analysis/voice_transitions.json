@@ -1,0 +1,106 @@
+{
+  "by_true_class": {
+    "negative": {
+      "improved": 0,
+      "stayed_correct": 9,
+      "stayed_wrong_changed": 0,
+      "stayed_wrong_same": 3,
+      "worsened": 0
+    },
+    "neutral": {
+      "improved": 0,
+      "stayed_correct": 5,
+      "stayed_wrong_changed": 1,
+      "stayed_wrong_same": 2,
+      "worsened": 4
+    },
+    "positive": {
+      "improved": 0,
+      "stayed_correct": 12,
+      "stayed_wrong_changed": 0,
+      "stayed_wrong_same": 0,
+      "worsened": 0
+    }
+  },
+  "failures": {
+    "asr_classifier_errors": 0,
+    "asr_empty": 0,
+    "asr_error": 0,
+    "reference_classifier_errors": 0,
+    "worsened_with_asr_failure": 0
+  },
+  "net_correct_change": -4,
+  "prediction_change_directions": {
+    "negative->positive": 1,
+    "neutral->negative": 2,
+    "neutral->positive": 2
+  },
+  "prediction_changed": 5,
+  "public_bounds": {
+    "by_true_class": {
+      "negative": {
+        "improved": [
+          0,
+          3
+        ],
+        "worsened": [
+          0,
+          3
+        ]
+      },
+      "neutral": {
+        "improved": [
+          0,
+          3
+        ],
+        "worsened": [
+          4,
+          7
+        ]
+      },
+      "positive": {
+        "improved": [
+          0,
+          0
+        ],
+        "worsened": [
+          0,
+          0
+        ]
+      }
+    },
+    "improved": [
+      0,
+      6
+    ],
+    "worsened": [
+      4,
+      10
+    ]
+  },
+  "records": 36,
+  "source": {
+    "inference_run": false,
+    "private_records": "artifacts/t14/records.json",
+    "t14_metrics": "reports/voice_eval/metrics.json",
+    "t14_metrics_sha256": "cac6208afbdf38cdf9af3fecfdba68220c29c960a8cde7e1009b576add852a7a"
+  },
+  "t14_control": {
+    "asr_macro_f1": 0.7018518518518518,
+    "delta_macro_f1": -0.1280412823891085,
+    "reference_macro_f1": 0.8298931342409603,
+    "wer": 0.1569115815691158
+  },
+  "task": "T15",
+  "transitions": {
+    "improved": 0,
+    "stayed_correct": 26,
+    "stayed_wrong_changed": 1,
+    "stayed_wrong_same": 5,
+    "worsened": 4
+  },
+  "withheld": {
+    "wer_by_prediction_change": "withheld: with the original T14 CSV of PR #45 group membership is known, so group WER would describe individual records. Full aggregates stay private in artifacts/t15/voice_transitions_full.json",
+    "wer_by_transition": "withheld: with the original T14 CSV of PR #45 group membership is known, so group WER would describe individual records. Full aggregates stay private in artifacts/t15/voice_transitions_full.json"
+  }
+}

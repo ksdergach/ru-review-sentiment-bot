@@ -1,0 +1,565 @@
+{
+  "analysis_date": "2026-11-21",
+  "author": "AI agent (draft for participant review)",
+  "confidence_meaning": "Уверенность в том, что категории описывают текст; причинная связь с ответом модели ни в одном случае не проверена.",
+  "errors": [
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Отрицательное отношение выражено главным образом как претензия к формату показа и цене билета (заявленное 3D фактически отсутствовало); сам фильм оценён сдержанно. Метка negative по тексту обоснована. Вероятно, в тексте мало привычной для негативных отзывов оценочной лексики о фильме; вклад отдельных слов не проверялся.",
+      "predicted_label_id": 1,
+      "question": "Считаете ли вы претензию к показу основным носителем негатива, а не оценкой фильма?",
+      "record_id": "test-00000-of-00001.parquet#row=00006341",
+      "review_status": "reviewed",
+      "text_sha256": "3654413b52555a13675ad070cfc242af7e46dde34a01cf0d6fe5f0832c7fbae6",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Текст адресован критикам фильма: автор защищает труд режиссёра, а положительная оценка фильма выражена косвенно, через вывод в последней фразе. Явных оценочных слов о самом фильме мало. Метка positive допустима.",
+      "predicted_label_id": 1,
+      "question": "Согласны ли вы, что оценка фильма здесь косвенная, а основной объект текста — другие комментаторы?",
+      "record_id": "test-00000-of-00001.parquet#row=00008868",
+      "review_status": "reviewed",
+      "text_sha256": "be67482700ad670bc9ef7e05c24feeaff02975b79d0e417ca691df4d8b82ef1c",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Реплика обращена к другому пользователю и содержит рассуждение о вкусах и нравоучение; оценки самого фильма нет, поэтому метка neutral соответствует правилам проекта. В тексте есть отрицательно окрашенные слова, относящиеся не к фильму; предположение, что они повлияли на ответ negative, не проверялось.",
+      "predicted_label_id": 0,
+      "question": "Подтверждаете ли вы, что текст не содержит оценки фильма?",
+      "record_id": "test-00000-of-00001.parquet#row=00007783",
+      "review_status": "reviewed",
+      "text_sha256": "da1674c75dc25bb2ab85eb08224aeb9bc4119c4392a7b7ca2ecd8d7526fad701",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "mixed",
+        "negation",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Автору фильм понравился не очень, но режиссёру даётся положительная оценка и есть совет сходить один раз; явного преобладающего итога нет, что соответствует neutral. Отрицательная часть выражена отрицанием при положительном глаголе; гипотеза: модель учитывает положительное слово сильнее, чем отрицание. Не проверено на модели.",
+      "predicted_label_id": 2,
+      "question": "Согласны ли вы, что итог смешанный без явного преобладания?",
+      "record_id": "test-00000-of-00001.parquet#row=00007103",
+      "review_status": "reviewed",
+      "text_sha256": "66fd142be13c32ff33ec3774473b544f0b06ed3d3a4c51a7a11030b597cf2a1a",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "mixed",
+        "negation"
+      ],
+      "confidence": "medium",
+      "explanation": "Большая часть текста хвалит визуальную сторону (пейзажи, съёмки), а отрицательный итог выражен через непонятный сюжет и сонливость при просмотре, плюс отрицание при глаголе спасения. Метка negative согласуется с итогом. Положительной лексики больше по объёму; это правдоподобное, но не проверенное объяснение ответа positive.",
+      "predicted_label_id": 2,
+      "question": "Согласны ли вы, что итог отзыва отрицательный, несмотря на похвалу визуальной части?",
+      "record_id": "test-00000-of-00001.parquet#row=00000581",
+      "review_status": "reviewed",
+      "text_sha256": "7274912aa4b049b5c4f8f24125fabd2e4294d916f0ae9b6da495b7705318de55",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "mixed",
+        "unclear_label"
+      ],
+      "confidence": "medium",
+      "explanation": "Отзыв сочетает критику спецэффектов и затянутой большей части фильма с похвалой двум актёрам и второй половине. Метка positive возможна из-за рекомендации сходить ради актёров, но перевес не очевиден. Исходная метка не меняется.",
+      "predicted_label_id": 0,
+      "question": "Считаете ли вы метку positive однозначной для этого текста?",
+      "record_id": "test-00000-of-00001.parquet#row=00008369",
+      "review_status": "reviewed",
+      "text_sha256": "f984bb4c7d7ba65ae946b54619721489a59d1e663bdbb0f85291339680b66421",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "mixed",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Сдержанно-отрицательный отзыв: близость к книге хвалится, игра актёров и режиссура оцениваются слабо, фильм назван фильмом на один раз. Метка negative допустима, но по правилам проекта граница с neutral здесь размыта.",
+      "predicted_label_id": 1,
+      "question": "Где для вас проходит граница negative/neutral в этом случае?",
+      "record_id": "test-00000-of-00001.parquet#row=00007082",
+      "review_status": "reviewed",
+      "text_sha256": "73442f254ecb05db43388e0d982adf5bf6bade7a388566289c6b5665f90962af",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "short",
+        "unclear_label"
+      ],
+      "confidence": "medium",
+      "explanation": "Очень короткий текст (10 слов): фильм назван фильмом на любителя и жизненным, автор не считает его комедией. Явной положительной оценки нет, поэтому ответ neutral объясним по тексту, а метка positive неочевидна. Исходная метка не меняется.",
+      "predicted_label_id": 1,
+      "question": "Видите ли вы в тексте явную положительную оценку?",
+      "record_id": "test-00000-of-00001.parquet#row=00007751",
+      "review_status": "reviewed",
+      "text_sha256": "7fb3fca6bd0d6e18a4f5439fe71ad39d6ef0dcc49701dce662cb98b41a1159ab",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "mixed",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Большая часть текста — критика предсказуемого сюжета и монтажа; затем хвалится игра ведущего актёра, а итог сдержанно-одобрительный: фильм на один раз. Метка neutral отражает сдержанный итог, ответ negative — преобладающий объём критики. Обе трактовки возможны.",
+      "predicted_label_id": 0,
+      "question": "Что для вас важнее при выборе класса: итоговая фраза или преобладающая критика?",
+      "record_id": "test-00000-of-00001.parquet#row=00001023",
+      "review_status": "reviewed",
+      "text_sha256": "9a70eb769b84832b0eb5aa92d09c34430b6cf0ca210ed8727490934bff61fbe1",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "high",
+      "explanation": "Это обращение к пользователям сайта с просьбой не публиковать спойлеры; оценки фильма нет, метка neutral соответствует правилам проекта. Текст вежливый и содержит одобрительные слова о рецензиях; предположение, что они дали ответ positive, не проверялось.",
+      "predicted_label_id": 2,
+      "question": "Подтверждаете ли вы, что текст не является оценкой фильма?",
+      "record_id": "test-00000-of-00001.parquet#row=00009141",
+      "review_status": "reviewed",
+      "text_sha256": "e685f507cdf18dbd4c5b545297b8cad1ab6f635d1a739e0e2622e2c9426604f9",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "sarcasm",
+        "short"
+      ],
+      "confidence": "high",
+      "explanation": "Короткая ироничная рекомендация: посмотреть стоит лишь для сравнения книги с неудачной экранизацией. Формула рекомендации обычно встречается в положительных отзывах, а отрицательный смысл несёт одно оценочное слово. Метка negative соответствует смыслу.",
+      "predicted_label_id": 2,
+      "question": "Согласны ли вы, что рекомендация здесь иронична?",
+      "record_id": "test-00000-of-00001.parquet#row=00009138",
+      "review_status": "reviewed",
+      "text_sha256": "522b28d7757b3dc94baa13dbc5bfe35bca6347a3682cd156ebcac630ac06147c",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "mixed",
+        "negation",
+        "unclear_label"
+      ],
+      "confidence": "medium",
+      "explanation": "Много критики неправдоподобия военных сцен, затем положительный итог выражен идиомой с отрицанием (потраченных денег не жалко). Метка positive держится на последней фразе; без неё текст скорее критический. Ответ negative объясним объёмом критики.",
+      "predicted_label_id": 0,
+      "question": "Достаточно ли последней фразы для метки positive?",
+      "record_id": "test-00000-of-00001.parquet#row=00003205",
+      "review_status": "reviewed",
+      "text_sha256": "a7dcadf53280a5b04f9568c54c13dd55a49dacb48d14e7680f0c755ffee643c3",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "short",
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Короткая жалоба (11 слов) на постоянный дождь в изображении будущего; неясно, относится ли она к фильму в целом. Негативная эмоция есть, но объект оценки узкий, и контекста мало для уверенного класса.",
+      "predicted_label_id": 1,
+      "question": "Можно ли по этому тексту уверенно определить отношение к фильму?",
+      "record_id": "test-00000-of-00001.parquet#row=00009450",
+      "review_status": "reviewed",
+      "text_sha256": "3eeda919822ce1b4042ff5253be108fbf4090bf6eeb14d301f3972241e71af0b",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "mixed",
+        "unclear_label"
+      ],
+      "confidence": "medium",
+      "explanation": "Начинается с умеренного одобрения, далее подробная критика сценария и связности, в конце похвала одной сцене. Метка positive спорна: по тексту преобладает критика, ответ neutral выглядит обоснованным. Исходная метка не меняется.",
+      "predicted_label_id": 1,
+      "question": "Согласны ли вы, что метка positive для этого текста спорна?",
+      "record_id": "test-00000-of-00001.parquet#row=00003143",
+      "review_status": "reviewed",
+      "text_sha256": "2d1b995939a050fde0edbe120d57290d1d3530287a854dea7407d1a08913b70b",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "mixed",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Большая часть текста — критика пустого сюжета, затем похвала актрисе и итоговая средняя оценка 3. Метка neutral согласуется со средней оценкой и смешанностью; ответ negative — с объёмом критики. Числовая оценка в итоге — сигнал, который модель мешка слов может не учитывать; не проверено.",
+      "predicted_label_id": 0,
+      "question": "Согласны ли вы, что итоговая оценка 3 делает neutral обоснованным?",
+      "record_id": "test-00000-of-00001.parquet#row=00004160",
+      "review_status": "reviewed",
+      "text_sha256": "ca32ed8e5cada3f0f82f1f9ab5f98f932b873a4e4f6b2aeaef7fd00d8f230185",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "mixed",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Фильм назван интересным, но тяжёлым для понимания из-за финансовых терминов; ироничное сравнение с деловым телеканалом. Явного итога нет, метка neutral допустима. Ответ positive может быть связан с эмоциональными словами в начале; не проверено.",
+      "predicted_label_id": 2,
+      "question": "Видите ли вы здесь преобладающую положительную оценку?",
+      "record_id": "test-00000-of-00001.parquet#row=00002705",
+      "review_status": "reviewed",
+      "text_sha256": "ba0fe5a2db839c2825f7c5826493a6eff645ddab757ea722efae653401b8f98c",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "negation",
+        "context"
+      ],
+      "confidence": "high",
+      "explanation": "Короткий текст (17 слов): автор любит фильмы со смыслом, но в этом его нет, и смотреть неинтересно, несмотря на звёздный состав. Положительные слова относятся к общим предпочтениям и составу, а отрицательный смысл выражен через отрицания. Метка negative соответствует смыслу.",
+      "predicted_label_id": 2,
+      "question": "Согласны ли вы, что положительные слова здесь не относятся к оценке фильма?",
+      "record_id": "test-00000-of-00001.parquet#row=00005423",
+      "review_status": "reviewed",
+      "text_sha256": "c0849b1126c3219c4d58ffa7745a12b9d602d0150ab3c864b63a644615e7da6e",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "mixed",
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Идея фильма и тема сильных людей нравятся автору, концовка разочаровала. Слова о жестокости описывают содержание фильма, а не отношение автора. Метка positive согласуется с преобладающим тоном; ответ negative мог быть вызван лексикой темы и словом о разочаровании; не проверено.",
+      "predicted_label_id": 0,
+      "question": "Согласны ли вы, что общий тон положительный?",
+      "record_id": "test-00000-of-00001.parquet#row=00006544",
+      "review_status": "reviewed",
+      "text_sha256": "2ea90d6d8da623a977e36a3a950ee13abac51ee0aefd343eebe681fc6e458822",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "mixed"
+      ],
+      "confidence": "medium",
+      "explanation": "Отрицательный отзыв об исполнительнице главной роли с явной резко негативной оценкой, но с развёрнутой похвалой другой актрисе; итоговая оценка фильма отрицательная. Метка negative обоснована. Похвала второй актрисе — правдоподобная причина ответа neutral; не проверено.",
+      "predicted_label_id": 1,
+      "question": "Согласны ли вы, что итог отзыва отрицательный?",
+      "record_id": "test-00000-of-00001.parquet#row=00005094",
+      "review_status": "reviewed",
+      "text_sha256": "084b77c2a6ac49e3bafe279f50a8250061ed9577354feb27df63ad20d9b83f0e",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Однозначно положительная оценка франшизы с ожиданием следующей части; оговорка после союза но касается даты выхода в прокат, а не фильма. В тексте есть сленговое заимствование. Метка positive обоснована; почему модель выбрала neutral, по тексту не установлено точно.",
+      "predicted_label_id": 1,
+      "question": "Согласны ли вы, что оговорка относится к прокату, а не к фильму?",
+      "record_id": "test-00000-of-00001.parquet#row=00000297",
+      "review_status": "reviewed",
+      "text_sha256": "bf7d1e51dc74f915a74142c7493dee23831c259c8a3afa3654a35048b396a759",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "mixed",
+        "negation",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Критика неестественной игры актёров и сдержанно-одобрительный итог, выраженный отрицанием при отрицательном слове, с пожеланием улучшения. Метка neutral отражает смешанный итог. Гипотеза: модель недооценивает отрицание при отрицательном слове; не проверено.",
+      "predicted_label_id": 0,
+      "question": "Согласны ли вы, что итог смешанный и neutral обоснован?",
+      "record_id": "test-00000-of-00001.parquet#row=00000942",
+      "review_status": "reviewed",
+      "text_sha256": "9fcdec51bee98ce13165c1679c3e4684e6611543b9fbc708eb9884f5b4da0278",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "mixed",
+        "context",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Фильм уступает первой экранизации и восторга не вызвал, но спецэффекты лучше и смотреть стоит; самая сильная положительная оценка относится к прежнему исполнителю роли, а не к этому фильму. Метка neutral допустима.",
+      "predicted_label_id": 2,
+      "question": "Согласны ли вы, что положительная часть частично относится к другому фильму?",
+      "record_id": "test-00000-of-00001.parquet#row=00004994",
+      "review_status": "reviewed",
+      "text_sha256": "6fee50a71914add3bbbf057eb42fbe8377910da6fbccf4a74b7018b7c9e174ab",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "sarcasm"
+      ],
+      "confidence": "medium",
+      "explanation": "Ироничное перечисление штампов фильма ужасов и разочарование авторами; явных оценочных слов почти нет, отрицательный смысл передан через перечисление. Метка negative соответствует смыслу. Ирония выражена неявно, поэтому уверенность средняя.",
+      "predicted_label_id": 2,
+      "question": "Согласны ли вы, что отрицательный смысл передан иронией?",
+      "record_id": "test-00000-of-00001.parquet#row=00008350",
+      "review_status": "reviewed",
+      "text_sha256": "f8e3168b099621b5f800fbf662ccd1d68d3dc761fa276ce239aba23269372ef2",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "mixed",
+        "unclear_label"
+      ],
+      "confidence": "medium",
+      "explanation": "Похвала стремлению местных кинематографистов и съёмкам природы сочетается с критикой игры актёров и спецэффектов. Метка positive возможна, но критика занимает заметную часть текста. Исходная метка не меняется.",
+      "predicted_label_id": 0,
+      "question": "Считаете ли вы метку positive однозначной?",
+      "record_id": "test-00000-of-00001.parquet#row=00006843",
+      "review_status": "reviewed",
+      "text_sha256": "1f574cca49b15ea958db650f83ee6750e035a87887825d871e5c9427499618b6",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "unclear_label",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Автор жалеет о просмотре и называет сюжет незатейливым, но в конце ставит оценку 6 из 10. Словесная часть отрицательная, числовая — скорее средняя. Метка negative допустима, ответ neutral не противоречит тексту.",
+      "predicted_label_id": 1,
+      "question": "Как вы соотносите словесную оценку и оценку 6 из 10?",
+      "record_id": "test-00000-of-00001.parquet#row=00005760",
+      "review_status": "reviewed",
+      "text_sha256": "2640ddee28dccec0ac84f58e8242a8e35fc8ff3cb891266bb3db531d8d441276",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "mixed",
+        "unclear_label"
+      ],
+      "confidence": "medium",
+      "explanation": "Фильм на любителя, советы по переводу, похвала камео и вывод, что большинству он не понравится. Явного положительного итога нет; метка positive спорна, ответ neutral объясним. Исходная метка не меняется.",
+      "predicted_label_id": 1,
+      "question": "Видите ли вы в тексте преобладающую положительную оценку?",
+      "record_id": "test-00000-of-00001.parquet#row=00005265",
+      "review_status": "reviewed",
+      "text_sha256": "5bc21bc48985ee682970157601b6cf04e486b2296af51fd015f69542ec5845f2",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "mixed",
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Длинный текст (190 слов): автор спорит с резко отрицательными отзывами других зрителей и защищает местное кино, но подробно критикует игру актёров. Наиболее резкие отрицательные слова пересказывают чужие мнения. Метка neutral отражает смешанность; ответ negative мог быть вызван этой лексикой; не проверено.",
+      "predicted_label_id": 0,
+      "question": "Согласны ли вы, что итог отзыва смешанный?",
+      "record_id": "test-00000-of-00001.parquet#row=00002957",
+      "review_status": "reviewed",
+      "text_sha256": "a3c36ff0b558f2b7ddf062171daa13a237b32820d4e920c1dddbc1d4d84dd775",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "mixed",
+        "negation",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Сначала похвала съёмкам и актёрам, затем критика сюжета и итог через отрицание: впечатления фильм не произвёл. Метка neutral отражает смешанный итог. Положительная лексика в начале — правдоподобная, но не проверенная причина ответа positive.",
+      "predicted_label_id": 2,
+      "question": "Согласны ли вы, что итог смешанный?",
+      "record_id": "test-00000-of-00001.parquet#row=00006679",
+      "review_status": "reviewed",
+      "text_sha256": "205dd59b7d766b44ad1a35c703e6a5585d07f5212311d0760452351aa3c11338",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "unclear_label",
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Отрицательная фраза в начале адресована определённой аудитории (поклонникам грубого юмора), а остальная, большая часть текста подробно хвалит фильм для семейного просмотра. По содержанию ответ positive выглядит обоснованным; метка negative вызывает сомнение. Дефект разметки без правил аннотирования не установлен, метка не меняется.",
+      "predicted_label_id": 2,
+      "question": "Как вы прочитали этот отзыв: как положительный для семейной аудитории или как отрицательный?",
+      "record_id": "test-00000-of-00001.parquet#row=00005367",
+      "review_status": "reviewed",
+      "text_sha256": "3774824af5f1434d3493f461e9c90007eea45f1e28a8dc509462605bda2a3489",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "unknown"
+      ],
+      "confidence": "low",
+      "explanation": "Короткий (12 слов) и для человека однозначно положительный текст: можно и посмеяться, и испытать волнение. Причина ответа negative по тексту не установлена; влияние отдельных слов на модели не проверялось.",
+      "predicted_label_id": 0,
+      "question": "Видите ли вы в тексте что-либо, что могло бы указывать на отрицательную оценку?",
+      "record_id": "test-00000-of-00001.parquet#row=00007181",
+      "review_status": "reviewed",
+      "text_sha256": "4a4c832d57d9d65d3caa26c80b1683f753b60e0bbf474d259a9fe090a550a039",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "mixed"
+      ],
+      "confidence": "medium",
+      "explanation": "Идея и панорамы природы хвалятся, но игра актёров, уровень юмора и впечатление в целом оцениваются отрицательно; автор досидел сеанс ради семьи. Итог отрицательный, метка negative обоснована. Наличие похвалы — правдоподобная причина ответа neutral; не проверено.",
+      "predicted_label_id": 1,
+      "question": "Согласны ли вы, что итог отрицательный?",
+      "record_id": "test-00000-of-00001.parquet#row=00001690",
+      "review_status": "reviewed",
+      "text_sha256": "f708c1689119b74f379171629a8466e7728cb8d03d647f5a18d04807c0af7732",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Положительная оценка выражена двумя короткими фразами (фильм потряс и удивил), а основная часть — рассуждение о религии, а не о фильме. Метка positive обоснована. Гипотеза: оценочный сигнал теряется среди длинного рассуждения на другую тему; не проверено.",
+      "predicted_label_id": 1,
+      "question": "Согласны ли вы, что основная часть текста не оценивает фильм?",
+      "record_id": "test-00000-of-00001.parquet#row=00009268",
+      "review_status": "reviewed",
+      "text_sha256": "6d7e0b9a9a77c57023b589c480b790555abadb2c199f284f6313799c2c77d6e4",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "high",
+      "explanation": "Реплика в споре комментаторов: призыв не ссориться и уточнение студии-производителя. Оценки фильма нет, метка neutral соответствует правилам проекта. Слова о ссоре относятся к обсуждению, а не к фильму; их влияние на ответ negative не проверялось.",
+      "predicted_label_id": 0,
+      "question": "Подтверждаете ли вы, что оценки фильма в тексте нет?",
+      "record_id": "test-00000-of-00001.parquet#row=00000686",
+      "review_status": "reviewed",
+      "text_sha256": "0fa9e9a9685ea53741bdc7533b66df1b0e93a0524971164f077aee239a06d6a4",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "context",
+        "unclear_label"
+      ],
+      "confidence": "low",
+      "explanation": "Намерение посмотреть оригинал и предположение, что он лучше ремейка. Оценка этого фильма лишь подразумевается сравнением, поэтому и neutral, и positive можно обосновать. Уверенность низкая.",
+      "predicted_label_id": 2,
+      "question": "Какую оценку ремейка вы видите в этом тексте?",
+      "record_id": "test-00000-of-00001.parquet#row=00006698",
+      "review_status": "reviewed",
+      "text_sha256": "f6930d67ab1a6b1c01dd6219c9fe97ae835cc97484c53194591f8c371d18ee7c",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "mixed",
+        "unclear_label"
+      ],
+      "confidence": "medium",
+      "explanation": "Длинный текст (318 слов): автор сразу говорит, что фильм ему не понравился, но затем подробно выделяет сильные драматические моменты, игру актёра и смысл финала. Явного преобладающего отрицательного итога нет; метка negative спорна, ответ positive объясним объёмом похвалы. Исходная метка не меняется.",
+      "predicted_label_id": 2,
+      "question": "Считаете ли вы итог отрицательным?",
+      "record_id": "test-00000-of-00001.parquet#row=00003030",
+      "review_status": "reviewed",
+      "text_sha256": "0c74b5eacc831d73b3560b5606a4cf4b56c9b81c605689369dbc91e49d1a9970",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "mixed",
+        "negation"
+      ],
+      "confidence": "medium",
+      "explanation": "Структурированный отзыв: короткий список понравившегося, длинный список непонравившегося (заголовок с отрицанием) и итоговая оценка 8 из 10. Метка positive согласуется с числовой оценкой; объём перечисленных недостатков и отрицание — правдоподобные причины ответа negative; не проверено.",
+      "predicted_label_id": 0,
+      "question": "Согласны ли вы, что оценка 8 из 10 определяет класс positive?",
+      "record_id": "test-00000-of-00001.parquet#row=00003152",
+      "review_status": "reviewed",
+      "text_sha256": "e55175a7ab4af85eec2a3e346b0e4ebed136a7dc679724d8d2daba7d7c7a3d64",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "medium",
+      "explanation": "Однозначно отрицательный отзыв: хорошая книга, неудачная экранизация, автор не пойдёт на продолжение. Положительное слово относится к книге, а не к фильму. Метка negative обоснована; почему модель выбрала neutral, по тексту точно не установлено.",
+      "predicted_label_id": 1,
+      "question": "Согласны ли вы с отрицательной меткой и тем, что похвала относится к книге?",
+      "record_id": "test-00000-of-00001.parquet#row=00008822",
+      "review_status": "reviewed",
+      "text_sha256": "1c32b367f394ed4abc133717db69d5a27389323e69388fa04ab7fe02a0902f46",
+      "true_label_id": 0
+    },
+    {
+      "categories": [
+        "unclear_label",
+        "sarcasm"
+      ],
+      "confidence": "low",
+      "explanation": "Тон текста ироничный и грустный: перечисляются тяжёлые бытовые темы фильма и совет не показывать детям. Однозначной оценки фильма нет; метка positive неочевидна, ирония предполагается. Уверенность низкая.",
+      "predicted_label_id": 1,
+      "question": "Какую тональность вы видите в этом тексте?",
+      "record_id": "test-00000-of-00001.parquet#row=00009485",
+      "review_status": "reviewed",
+      "text_sha256": "ea5b9e85ed0fa47cd91faf8421144ecef2494b5a14674eba83908e4e5900447d",
+      "true_label_id": 2
+    },
+    {
+      "categories": [
+        "mixed",
+        "neutral_confusion"
+      ],
+      "confidence": "medium",
+      "explanation": "Фильм назван скучным, но это объясняется замыслом; обычный сюжет, сравнение не в пользу фильма и рекомендация только взрослой аудитории. Явного итога нет; метка neutral допустима, ответ negative объясним словами о скуке; не проверено.",
+      "predicted_label_id": 0,
+      "question": "Согласны ли вы, что итог сдержанный и neutral обоснован?",
+      "record_id": "test-00000-of-00001.parquet#row=00004654",
+      "review_status": "reviewed",
+      "text_sha256": "a240e8e88ec12cbae36d96f458671ba3e9f5e9af52e9cdced79456530bc8146f",
+      "true_label_id": 1
+    },
+    {
+      "categories": [
+        "context"
+      ],
+      "confidence": "high",
+      "explanation": "Это анонс документального фильма о концерте, а не отзыв: оценки нет, метка neutral соответствует правилам проекта. Текст содержит восторженную лексику о рекордах группы; её влияние на ответ positive не проверялось.",
+      "predicted_label_id": 2,
+      "question": "Подтверждаете ли вы, что это анонс без оценки фильма?",
+      "record_id": "test-00000-of-00001.parquet#row=00001577",
+      "review_status": "reviewed",
+      "text_sha256": "4e5d3f62144b37caed1736642c3742c337581f607f6a61b99b38cf0d6c97f020",
+      "true_label_id": 1
+    }
+  ],
+  "human_review_status": "confirmed",
+  "model": "baseline",
+  "model_changed": false,
+  "original_labels_changed": false,
+  "predictions_sha256": "5454d40cc0e5869ca44bb3edd2efde7c95bd09fc40784b34b6bb03429d900568",
+  "selected_ids_sha256": "4b20f4619c878faaed1721c863ae043ae6da431739092cf8b7d166bbbcad0ca8"
+}
