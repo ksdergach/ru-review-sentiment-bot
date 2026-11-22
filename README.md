@@ -4,11 +4,23 @@
 → `negative=0`, `neutral=1`, `positive=2`.
 [План](docs/team_plan.md) и [доска](https://github.com/users/ksdergach/projects/2).
 
-Текущий приоритет — [сдача NLP без трансформеров](docs/nlp_submission.md):
-TF-IDF + Logistic Regression, качество данных, анализ ошибок и короткий отчёт.
-[Milestone](https://github.com/ksdergach/ru-review-sentiment-bot/milestone/1)
-собирает задачи этой сдачи; RuBERT не входит в её обязательный объём.
-Отдельный эксперимент [T06](README_T06.md) дообучает RuBERT на том же train.
+**[Итоговый исследовательский отчёт T17](reports/final/report.md)** объединяет данные,
+модели, финальные результаты T13–T15 и проверку бота T16. Командная вычитка
+проведена 22.11.2026: участник команды принял отчёт в редакции `bccff19`.
+
+| Результат | Значение | Подробности |
+|---|---|---|
+| Текстовый test, 9 324 записи (T13) | Baseline: accuracy 0,8907, macro-F1 **0,7264**; RuBERT: 0,8230 и 0,6803. Преимущества RuBERT нет | [README_T13](README_T13.md), [reports/evaluation/](reports/evaluation/final_report.md) |
+| 36 голосовых записей (T14) | Baseline на эталоне — macro-F1 0,8299, после Whisper — 0,7019 (ΔF1 −0,1280); WER 0,1569; сбоев и пустых ответов 0 | [README_T14](README_T14.md), [reports/voice_eval/](reports/voice_eval/report.md) |
+| Анализ ошибок (T15) | 40 ошибок baseline на test проверены участником; все 5 смен ответа после Whisper — у истинного neutral | [reports/error_analysis/](reports/error_analysis/report.md) |
+
+Все финальные оценки выполнены по [протоколу T12](reports/freeze.md), принятому в
+[PR №46](https://github.com/ksdergach/ru-review-sentiment-bot/pull/46). Для бота и T14 выбран baseline
+по validation; результат test этот выбор не менял. Задачи №14–№18 закрыты.
+
+[Промежуточная сдача NLP без трансформеров](docs/nlp_submission.md) и её
+[отчёт](reports/nlp/report.md) сохранены отдельно как материалы предыдущего этапа.
+Отдельный эксперимент [T06](README_T06.md) дообучил RuBERT на том же train.
 [Качество данных и транскрипций](reports/nlp/data_quality.md): показатели
 корпуса проверены; пользователь подтвердил эталон 12-секундного фрагмента,
 WER = 0% (0 ошибок / 24 слова). N01 завершена; результат ASR относится только к этому фрагменту.
@@ -23,7 +35,9 @@ T03/T05 приняты по [проверке 03.10.2026](reports/acceptance/202
 на принятом 07.10.2026 детерминированном Mac-комплекте (после T04). Полная validation:
 accuracy 88,9381%, macro-F1 0,718015; финальный test не использован.
 [Протокол](reports/nlp/baseline_reproducibility.md) фиксирует решение по отбору признаков;
-человеческая проверка 40 ошибок ожидается.
+пользователь проверил все 40 случаев: 30 согласий и 10 частичных согласий
+([подтверждение](reports/nlp/human_review_evidence.json)). Это проверка объяснений
+с видимыми ответами модели, не независимая слепая разметка и не анализ финального test.
 
 T02 завершена: [аудит 100 отзывов агентом](reports/dataset/agent_review.md)
 и [подтверждение пользователем 15 случаев](reports/dataset/manual_review.md).
@@ -32,11 +46,62 @@ T02 завершена: [аудит 100 отзывов агентом](reports/d
 В репозитории уже есть подготовка данных (T03), обучение baseline (T04),
 проверка ресурсов (T05) и модуль распознавания голоса (T08).
 Baseline-часть общего интерфейса классификатора и текстовый Telegram-бот
-реализуются в N03 (#26). Для RuBERT выполнена полная эпоха [T06](README_T06.md):
+реализованы в N03 (#26). Для RuBERT выполнена полная эпоха [T06](README_T06.md):
 validation macro-F1 0,667824 против 0,718015 у baseline; преимущества нет.
 Голосовой режим Telegram-бота добавлен в T09 (#11): [запуск и проверка](#голосовой-telegram-бот-t09);
 ручная проверка с реальными моделями через Telegram выполнена 16.11.2026 —
 [протокол](reports/bot/t09_smoke.md).
+
+Независимая проверка на Mac 19.11.2026 выполнена с RuBERT:
+голос/текст, ограничения длины и занятость подтверждены
+([T16](reports/bot/t16_independent_check_macos_2026-11-19.md)). Принятый baseline
+позднее проверен локально в T12; новый ручной Telegram-прогон именно с этим
+комплектом не заявляется. Функциональные проверки не измеряют общую точность модели.
+
+## Маршрут воспроизведения и итоговые результаты
+
+Команды ниже приведены для подготовленного окружения из раздела «Установка».
+Получение данных и моделей, обучение, запуск бота и финальные измерения — отдельные
+действия. Они не выполняются автоматически при чтении отчёта или запуске тестов.
+Финальные запуски T13 и T14 уже выполнены по одному разу, их повтор не нужен
+для проверки результатов: опубликованные файлы проверяются командами из последнего столбца.
+
+| Шаг | Что использовать | Условие и результат |
+|---|---|---|
+| Исходный корпус | [Происхождение и суммы](NLP_dataset/README.md), `configs/dataset_source.json` | Получить файлы конфигурации `pc` закреплённой ревизии по правилам доступа источника; исходные Parquet сохранить |
+| Принятые train/validation | `python tools/restore_nlp_splits.py` | Восстанавливает принятые строки по T03; другой результат не перезаписывает |
+| Принятый baseline | Принятый файл от участника команды → `models/nlp_baseline/tfidf_logreg_baseline.joblib` | SHA-256 `389a768bcd108721c79ebf3a7b9dc5212ec100f5c2e1b06cf519ed076cd9bee3`; не заменять локальным переобучением |
+| Принятый RuBERT | `python tools/fetch_transformer.py`, затем `python tools/verify_transformer.py` | Требует сети при первом получении; проверяет комплект по принятому отчёту |
+| Whisper | `python -m src.speech artifacts/audio/debug.ogg --allow-download` | Подготовить отдельное отладочное аудио; фиксированная revision из `configs/speech.json`, T11 не использовать |
+| Тесты и запуск | Разделы «Быстрая проверка окружения» и «Голосовой Telegram-бот T09» | Модели и токен не устанавливаются тестами автоматически |
+| Фиксация и текстовый test | [T12](reports/freeze.md), `python tools/restore_frozen_test.py` | Принятая `reports/freeze.json` обязательна; инструмент восстанавливает test с проверкой сумм, без оценки моделей |
+| Финальный текстовый test (T13) | [README_T13](README_T13.md#команды), `python -m src.evaluate --run-final --freeze reports/freeze.json --out-dir reports/evaluation` | Выполнен 21.11.2026 ([№16](https://github.com/ksdergach/ru-review-sentiment-bot/issues/16), PR №43). Результаты в `reports/evaluation/`; повтор только на машине измерений по отдельному решению. Тесты оценщика: `python -m pytest -q tests/test_evaluate.py` |
+| 36 голосовых записей (T14) | [README_T14](README_T14.md#подготовка-и-запуск), `python tools/evaluate_voice.py --warmup-audio <запись T16>` | Выполнен один раз ([№17](https://github.com/ksdergach/ru-review-sentiment-bot/issues/17), PR №45). Нужны приватные файлы T11 вне Git. Сверка опубликованных файлов: `python -m pytest -q tests/test_evaluate_voice.py tests/test_voice_eval_public_results.py` |
+| Анализ ошибок (T15) | [отчёт T15](reports/error_analysis/report.md) | [№18](https://github.com/ksdergach/ru-review-sentiment-bot/issues/18), PR №48. Проверка без моделей: `python tools/analyze_errors_t15.py --check` и `python -m pytest -q tests/test_analyze_errors_t15.py` |
+| Итоговый отчёт (T17) | [reports/final/report.md](reports/final/report.md) | Сверка чисел и сумм — [preparation_checks.json](reports/final/preparation_checks.json) |
+
+Для отдельного воспроизведения обучения существуют
+`python src/train_baseline.py --config configs/nlp_baseline.json` и
+`python -m src.train_transformer --config configs/transformer.json`.
+Они могут обновлять модели и отчёты: запускать только в отдельной рабочей копии
+с сохранёнными исходными результатами. После фиксации T12 обучение не является
+шагом запуска бота или финальной оценки. Параметры и условия описаны в разделах ниже.
+
+Проверенная машина выбранного запуска: Apple M1, 16 GiB RAM, macOS 26.5.2 arm64,
+Python 3.13.7, CPU. Это описание конкретной проверки, не минимальные требования.
+Профили T05 для Windows/CUDA и их память/скорость не переносятся на Mac.
+Полные версии и суммы среды записаны в фиксации T12; отдельный FFmpeg CLI
+для штатного пути через PyAV не обязателен (см. «Декодирование аудио»).
+
+Ресурсы по фактическим измерениям на этой машине (не гарантированный минимум):
+
+| Что | Значение | Источник |
+|---|---|---|
+| GPU | Не нужен для бота, T13 и T14: всё выполнялось на CPU. CUDA нужна только профилям обучения T05 | `reports/freeze.json`, `reports/evaluation/final_metrics.json` |
+| Память процесса baseline + Whisper | Пиковый RSS 898,3 MiB при загрузке, без распознавания аудио | [reports/freeze.md](reports/freeze.md), `reports/freeze_checks.json` |
+| Размер моделей вне Git | Baseline 3 598 091 байт; Whisper `model.bin` 483 546 902 байт; архив RuBERT 119 224 320 байт | `reports/freeze.md`, `reports/voice_eval/metrics.json`, `configs/transformer_bundle.json` |
+| Скорость | Whisper: медиана 4,0 с на запись длительностью 8–16 с. Классификация: 0,055 мс/текст у baseline, 1,382 мс/текст у RuBERT (партии по 64) | [T14](reports/voice_eval/report.md), [T13](reports/evaluation/final_report.md) |
+| Аудиодекодер | PyAV (`av==18.1.0` в `requirements.txt`, та же версия в запуске T14) | `requirements.txt`, `reports/voice_eval/metrics.json` |
 
 ## Установка
 
@@ -281,6 +346,10 @@ python -m src.speech artifacts/audio/debug.ogg --allow-download --show-text
 сериализованные модели, токенизаторы и checkpoints исключены через `.gitignore`.
 JSON с текстами вне этих локальных каталогов автоматически не исключается:
 не сохраняйте расшифровки в `reports/`.
+Приватные материалы финальной оценки тоже лежат только в игнорируемом `artifacts/`:
+аудио, таблица и manifest T11 (`artifacts/t11/`), построчные результаты T14
+(`artifacts/t14/`) и закрытые агрегаты T15 (`artifacts/t15/`). В `reports/` публикуются
+только агрегаты и ID без текстов.
 
 Проверка правил без создания файлов:
 
@@ -576,12 +645,12 @@ Whisper используйте отдельную отладочную запи�
 
 ```bash
 export TELEGRAM_BOT_TOKEN="<реальный токен от BotFather>"
-export CLASSIFIER_BACKEND=rubert   # или baseline при наличии принятого комплекта
+export CLASSIFIER_BACKEND=baseline   # выбран в T12; нужен принятый комплект
 python -m src.bot
 ```
 
 PowerShell: `$env:TELEGRAM_BOT_TOKEN="<реальный токен от BotFather>"`,
-`$env:CLASSIFIER_BACKEND="rubert"`, затем `python -m src.bot`.
+`$env:CLASSIFIER_BACKEND="baseline"`, затем `python -m src.bot`.
 Токен — только в переменной окружения текущей сессии; не сохраняйте его в Git,
 отчётах, снимках экрана и истории команд. `.env` автоматически не читается.
 Одновременно для одного токена должен работать только один процесс polling.
