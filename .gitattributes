@@ -25,6 +25,7 @@
 # Binary: datasets, reports, model bundles and audio are never converted or diffed as text.
 *.parquet binary
 *.pdf binary
+*.pptx binary
 *.safetensors binary
 *.tar binary
 *.ogg binary
